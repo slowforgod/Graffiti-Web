@@ -99,18 +99,18 @@ backend, frontend 코드가 아직 하나도 없어서 01-auth, 02-page-core, 12
 critical gap: 0
 
 ## 7. 수용 기준 (테스트 가능하게)
-- [ ] AC-1: Given 기본 `application.yml`, When 앱 컨텍스트가 뜨면, Then `GraffitiProperties`의 값이 `ARCHITECTURE.md` §6 기본값과 같다(대표 키: canvas 7680×4320, cell 48, chunk 480, threshold 0.70, countdown 6h, max-lifetime 7d, cooldown 30m, ml.mode SHADOW)
-- [ ] AC-2: Given 범위 밖 설정값, When 바인딩하면, Then 검증 실패로 기동이 중단된다
-- [ ] AC-3: Given MySQL(Testcontainers), When 앱이 뜨면, Then Flyway가 적용되고 `GET /actuator/health`가 200 `{"status":"UP"}`이며 `components` 등 상세가 없다
-- [ ] AC-4: When `GET /actuator/env`, Then 404 (SEC-10)
-- [ ] AC-5: Given 컨트롤러가 `ApiException(COOLDOWN, {retryAfterSec:720})`을 던지면, Then 429와 `{"error":{"code":"COOLDOWN","message":…,"details":{"retryAfterSec":720}}}`
-- [ ] AC-6: Given 처리 안 된 `RuntimeException("secret detail")`, Then 500 `INTERNAL`이고 본문에 "secret detail"이 없다 (SEC-13)
-- [ ] AC-7: `ErrorCode`의 코드와 HTTP 상태가 `API.md` §0 표 14개와 일치한다
-- [ ] AC-8: `npm run lint`가 `dangerouslySetInnerHTML` 사용 코드에서 실패한다 (SEC-12, 임시 파일로 확인 후 삭제)
-- [ ] AC-9: `npm test`, `npm run build`가 통과하고, `App`이 한국어 제목을 렌더링한다
-- [ ] AC-10: CI 워크플로가 backend test, frontend lint/test/build, gitleaks를 모두 실행한다
-- [ ] AC-11: 저장소에 `.env`가 없고 `.env.example`에는 값 없이 키만 있다 (SEC-06)
-- [ ] AC-12: `LocalDateTime.now()` 등 시스템 시계 직접 호출이 없다 (`Clock` 빈만 존재)
+- [x] AC-1: Given 기본 `application.yml`, When 앱 컨텍스트가 뜨면, Then `GraffitiProperties`의 값이 `ARCHITECTURE.md` §6 기본값과 같다(대표 키: canvas 7680×4320, cell 48, chunk 480, threshold 0.70, countdown 6h, max-lifetime 7d, cooldown 30m, ml.mode SHADOW)
+- [x] AC-2: Given 범위 밖 설정값, When 바인딩하면, Then 검증 실패로 기동이 중단된다
+- [x] AC-3: Given MySQL(Testcontainers), When 앱이 뜨면, Then Flyway가 적용되고 `GET /actuator/health`가 200 `{"status":"UP"}`이며 `components` 등 상세가 없다
+- [x] AC-4: When `GET /actuator/env`, Then 404 (SEC-10)
+- [x] AC-5: Given 컨트롤러가 `ApiException(COOLDOWN, {retryAfterSec:720})`을 던지면, Then 429와 `{"error":{"code":"COOLDOWN","message":…,"details":{"retryAfterSec":720}}}`
+- [x] AC-6: Given 처리 안 된 `RuntimeException("secret detail")`, Then 500 `INTERNAL`이고 본문에 "secret detail"이 없다 (SEC-13)
+- [x] AC-7: `ErrorCode`의 코드와 HTTP 상태가 `API.md` §0 표 14개와 일치한다
+- [x] AC-8: `npm run lint`가 `dangerouslySetInnerHTML` 사용 코드에서 실패한다 (SEC-12, 임시 파일로 확인 후 삭제)
+- [x] AC-9: `npm test`, `npm run build`가 통과하고, `App`이 한국어 제목을 렌더링한다
+- [x] AC-10: CI 워크플로가 backend test, frontend lint/test/build, gitleaks를 모두 실행한다
+- [x] AC-11: 저장소에 `.env`가 없고 `.env.example`에는 값 없이 키만 있다 (SEC-06)
+- [x] AC-12: `LocalDateTime.now()` 등 시스템 시계 직접 호출이 없다 (`Clock` 빈만 존재)
 
 ## 8. 테스트 계획
 | 층 | 대상 | 파일 (예정) |
@@ -133,9 +133,19 @@ critical gap: 0
 
 ## 리뷰 기록 (/gf-review가 추가)
 <!-- 날짜 · 커밋 SHA · CRITICAL n / INFO n · AUTO-FIX n · ASK 결과 · 상태 -->
+- 2026-10-21 · `8eef82c` · CRITICAL 0 / INFO 4 · AUTO-FIX 1 · ASK 없음 · PASS
+  - AUTO-FIX: `/actuator` 링크 목록이 200으로 열려 있어 `management.endpoints.web.discovery.enabled=false` (SEC-10, `ApplicationIT`가 잡음)
+  - INFO-1: `graffiti.doodle.palette` 12색의 hex 값은 D-07에 색 이름만 있어 구현에서 정함. 디자인 확정 시 `application.yml`만 바꾸면 됨
+  - INFO-2: Spring MVC의 405/415 등 API.md 표에 없는 4xx는 원래 HTTP 상태를 유지하고 코드는 `VALIDATION_FAILED`로 보냄
+  - INFO-3: Flyway(Boot 3.5 관리 버전)가 MySQL 8.4를 "테스트되지 않음"으로 경고함. 마이그레이션과 기동은 정상. 8.0은 2026-04 EOL이라 8.4 LTS 유지
+  - INFO-4: eslint-plugin-react가 ESLint 10을 지원하지 않아, `dangerouslySetInnerHTML` 금지는 코어 규칙 `no-restricted-syntax`로 구현하고 `src/eslintConfig.test.ts`로 고정
 
 ## QA 기록 (/gf-qa가 추가)
 <!-- 날짜 · 커밋 SHA · 시나리오 통과/실패 · 발견 버그(ISSUE-NNN) · 상태 -->
+- 2026-10-21 · `8eef82c` · 통과 · 버그 0 · PASS
+  - 자동: backend `./gradlew test` 22개 통과(실패 0, 스킵 0, MySQL 8.4 Testcontainers 포함), frontend lint 통과, `npm test` 4개 통과, `npm run build` 통과
+  - 수동: `docker compose up -d mysql` → healthy, 포트는 `127.0.0.1:3306`만 / `./gradlew bootRun` → `GET /actuator/health` = `{"status":"UP"}`, `/actuator/env` 404, `/api/nope` → `{"error":{"code":"NOT_FOUND",...}}` / `npm run dev` → `/`에 제목 "경희 낙서장", `/actuator/health`, `/api/*`가 8080으로 프록시됨
+  - 미실행: gitleaks는 로컬에서 이미지를 받지 못해 CI 첫 실행에서 확인
 
 ## 보안 감사 기록 (/gf-security가 추가, 해당 시)
 
