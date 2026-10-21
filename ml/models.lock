@@ -1,0 +1,20 @@
+# Model versions the ML server may load (D-40, SEC-17). Weights live in S3, never in git.
+# The server loads MODEL_DIR/<file> only when its sha256 matches. Change this file in the same PR
+# as the evaluation report for the new version (D-39).
+
+[image]
+# "none" until the first zero-shot model is chosen (D-37). The server then answers 503.
+version = "none"
+# uri = "s3://<bucket>/models/<version>/<file>"
+# file = "<file>"
+# sha256 = "<64 hex characters>"
+
+# Score at or above which a category flags the doodle. "safe" is never a flagging category.
+# [image.thresholds]
+# sexual = 0.5
+# violence = 0.5
+# hate_symbol = 0.5
+
+[ocr]
+# OCR engine is chosen in 07b (D-35).
+version = "none"

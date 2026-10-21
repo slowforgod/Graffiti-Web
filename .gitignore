@@ -13,12 +13,14 @@ frontend/dist/
 ml/**/models/
 ml/**/data/
 ml/**/exports/
+ml/eval/sets/
 *.pt
 *.pth
 *.onnx
 *.safetensors
 *.ckpt
 __pycache__/
+.pytest_cache/
 .venv/
 *.pyc
 
