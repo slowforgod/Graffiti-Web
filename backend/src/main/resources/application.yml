@@ -25,6 +25,8 @@ management:
     web:
       exposure:
         include: health
+      discovery:
+        enabled: false     # no /actuator link index
   endpoint:
     health:
       access: read-only
