@@ -1,6 +1,6 @@
 # 00-bootstrap: 저장소 골격, 로컬 실행 환경, CI
 
-- **상태**: IN_PROGRESS
+- **상태**: MERGED
 - **승인자**: 현 (slowforgod) / 승인일: 2026-10-21
 - **브랜치**: `feat/00-bootstrap` / PR: https://github.com/slowforgod/Graffiti-Web/pull/3
 - **선행 명세**: 없음
