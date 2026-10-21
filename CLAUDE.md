@@ -21,7 +21,7 @@
 
 ## 2. 명령어와 설정
 
-> backend, frontend 명령은 `00-bootstrap`에서 확정했다. `ml/` 명령은 ML 트랙에서 만들 예정 값이다.
+> backend, frontend 명령은 `00-bootstrap`, `ml/` 명령은 `ml-prep`에서 확정했다. ML 서버는 Python 3.12.
 > 요구사항: Java 21, Node 22, Docker(로컬 MySQL과 Testcontainers). 비밀값은 `.env.example`을 복사한 `.env`에 사람이 채운다(SEC-06).
 
 ```bash
@@ -33,14 +33,14 @@ cd frontend && npm ci && npm run dev       # 프론트 (localhost:5173, /api와 
 cd frontend && npm test                    # 프론트 테스트 (Vitest)
 cd frontend && npm run lint                # ESLint (dangerouslySetInnerHTML 금지 규칙 포함)
 cd frontend && npm run build               # 프로덕션 빌드
-cd ml/serving && pip install -r requirements.txt && uvicorn app.main:app --port 8000   # ML 서버 (모델은 models.lock 기준으로 S3에서 받음)
+cd ml/serving && pip install -r requirements-dev.txt && uvicorn app.main:build --factory --port 8000   # ML 서버 (MODEL_DIR의 가중치를 models.lock 체크섬으로 검증, 모델이 없으면 503)
 cd ml/serving && pytest                     # ML 서버 테스트
-cd ml/eval && python evaluate.py            # 평가 세트로 지표 계산 (D-39)
+cd ml/eval && pytest && python evaluate.py --manifest <세트>/manifest.csv   # 평가 세트로 D-39 지표 계산 (ml/README.md)
 ```
 
-**전체 검사** (PR 전, `/gf-ship`이 실행): `./gradlew test` + `npm test` + `npm run lint` + `npm run build` + `pytest`(ml/serving)
+**전체 검사** (PR 전, `/gf-ship`이 실행): `./gradlew test` + `npm test` + `npm run lint` + `npm run build` + `pytest`(ml/serving, ml/eval)
 
-CI(`.github/workflows/ci.yml`)는 PR과 main push마다 backend `./gradlew test`, frontend `npm ci` → lint → test → build, gitleaks 시크릿 스캔을 실행한다. `ml/serving`이 생기면 pytest 단계를 추가한다. main에서 CI가 통과하면 `deploy.yml`이 이어서 돈다.
+CI(`.github/workflows/ci.yml`)는 PR과 main push마다 backend `./gradlew test`, frontend `npm ci` → lint → test → build, ml `pytest`(serving, eval), gitleaks 시크릿 스캔을 실행한다. main에서 CI가 통과하면 `deploy.yml`이 이어서 돈다.
 
 ### Test Coverage
 - Minimum: 도메인 패키지(`page`, `doodle`, `moderation`의 순수 로직) 라인 80% (D-32, PROPOSED)

@@ -9,6 +9,10 @@ updates:
     directory: /frontend
     schedule:
       interval: weekly
+  - package-ecosystem: pip
+    directory: /ml/serving
+    schedule:
+      interval: weekly
   - package-ecosystem: github-actions
     directory: /
     schedule:
