@@ -1,6 +1,6 @@
 # ML moderation server (D-36). Internal network only: compose must not publish its port (SEC-17).
 # Build context: ml/  (docker build -f serving/Dockerfile ml)
-FROM python:3.12.12-slim-bookworm
+FROM python:3.14.7-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
     MODELS_LOCK=/app/models.lock MODEL_DIR=/models
