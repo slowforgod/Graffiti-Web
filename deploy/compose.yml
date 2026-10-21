@@ -1,0 +1,76 @@
+# Staging (and later production) stack on one EC2 host (D-01, D-04).
+# Run from /opt/graffiti with: docker compose --env-file .env --env-file image.env up -d
+# .env holds secrets and is written on the server by a person (SEC-06); image.env is written by
+# .github/workflows/deploy.yml with the image tag to run.
+name: graffiti
+
+services:
+  web:
+    image: ${IMAGE_PREFIX:?set IMAGE_PREFIX in .env}-web:${IMAGE_TAG:?set IMAGE_TAG}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+      NGINX_ENVSUBST_FILTER: "^DOMAIN$$"
+    volumes:
+      - certbot-conf:/etc/letsencrypt:ro
+      - certbot-www:/var/www/certbot:ro
+    # Reload every 6 hours so renewed certificates are picked up. The image's entrypoint still runs
+    # first so the TLS selection and template steps happen.
+    entrypoint: ["/bin/sh", "-c", "while :; do sleep 6h; nginx -s reload; done & exec /docker-entrypoint.sh nginx -g 'daemon off;'"]
+    depends_on:
+      - app
+
+  app:
+    image: ${IMAGE_PREFIX}-app:${IMAGE_TAG}
+    restart: unless-stopped
+    # No ports: only nginx reaches the app (SEC-10).
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/graffiti
+      DB_USERNAME: ${DB_USERNAME:?set DB_USERNAME in .env}
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      APP_ORIGIN: https://${DOMAIN}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?set GOOGLE_CLIENT_ID in .env}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?set GOOGLE_CLIENT_SECRET in .env}
+    mem_limit: 1g
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.4.9
+    restart: unless-stopped
+    # No ports: Docker network only (SEC-10).
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+00:00
+    environment:
+      MYSQL_DATABASE: graffiti
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?set DB_ROOT_PASSWORD in .env}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    mem_limit: 768m
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  certbot:
+    image: certbot/certbot:v5.1.0
+    restart: unless-stopped
+    volumes:
+      - certbot-conf:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
+    entrypoint: ["/bin/sh", "-c", "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"]
+
+volumes:
+  mysql-data:
+  certbot-conf:
+  certbot-www:
