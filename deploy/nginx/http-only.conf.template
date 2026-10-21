@@ -1,0 +1,11 @@
+# Used until a certificate exists: answers the Let's Encrypt challenge and serves the app over HTTP.
+server {
+    listen 80;
+    server_name ${DOMAIN};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    include /etc/nginx/snippets/locations.conf;
+}

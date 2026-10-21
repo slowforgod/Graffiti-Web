@@ -1,0 +1,5 @@
+# Allow-list: images get build outputs only, never sources, node_modules or .env (SEC-06).
+*
+!backend/build/libs/graffiti.jar
+!frontend/dist/
+!deploy/nginx/
