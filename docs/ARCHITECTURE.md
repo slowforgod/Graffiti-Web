@@ -49,10 +49,14 @@ backend/src/main/java/kr/ac/khu/graffiti/
 ├── user/          User 엔티티, 쿨다운 값(last_posted_at), 차단 상태
 ├── page/          ★ 핵심 도메인
 │   ├── PageCommandProcessor (인터페이스) + SingleThreadPageCommandProcessor
+│   │                        커맨드: ApplyFootprint, EndPage, GetPageSnapshot, EnsureLivePage, InstallPage
 │   ├── PageState            메모리 상태 (cellCount, status, scheduledEndAt)
-│   ├── OccupancyGrid        선분 bbox → 칸 계산, 참조 카운트, 비트맵 (순수 로직)
+│   ├── Footprint            선분 bbox(굵기 포함)/텍스트 박스 → 칸 집합 (순수 로직)
+│   ├── OccupancyGrid        참조 카운트, 점유율, 비트맵 (순수 로직)
 │   ├── PageLifecycle        상태 전이, 종료 시각 계산 (순수 로직)
-│   └── PageTimer            종료 예약, 재시작 복구
+│   ├── PageTimer            종료 예약 (PageStatusChanged마다 재예약)
+│   ├── PageBootstrap        재시작 복구 (웹 서버 시작 전)
+│   └── event/               PageStatusChanged, OccupancyChanged, PageTurned (커밋 후 발행 → 04가 STOMP로 중계)
 ├── doodle/        Doodle 엔티티, DoodleValidator(순수 로직), 게시/삭제 유스케이스, 청크 조회
 ├── moderation/    ModerationProvider 인터페이스, 구현체 4개(WordFilter, KhuChat, OpenAi, Ml), DoodleRenderer,
 │                  ModerationService(병렬 호출과 판정 합성), MlPredictionRecorder
@@ -149,12 +153,12 @@ Client                         REST(Controller)          PageCommandProcessor(�
 ### 4.4 페이지 넘김
 
 ```
-PageTimer (scheduled_end_at 도달) ──▶ 큐: EndPage
+PageTimer (scheduled_end_at 도달) ──▶ 큐: EndPage(pageId)   (현재 페이지가 아니면 무시, 아직 이르면 재예약)
   ① UPDATE page SET status=ENDED, ended_at, end_reason, final_occupancy_permille,
      final_occupancy_bitmap
   ② INSERT 새 page (ACTIVE, 현재 설정값 스냅샷)
   ③ PageState 교체 (cellCount 새 배열)
-  ④ broadcast /topic/page.{old}.meta  page:turned {newPageId}
+  ④ 커밋 후 이벤트 PageTurned(old, new), PageStatusChanged(new) → broadcast /topic/page.{old}.meta  page:turned {newPageId}
 클라이언트: 초안 폐기 → 옛 페이지 구독 해제 → /api/pages/current → 새 페이지 로딩(4.2)
 ```
 
@@ -164,10 +168,12 @@ PageTimer (scheduled_end_at 도달) ──▶ 큐: EndPage
 ### 4.5 서버 시작과 재시작 복구 (D-25)
 
 ```
-1. 비종료(ACTIVE/COUNTDOWN) 페이지 조회 → 없으면 새로 생성
-2. 그 페이지의 PUBLISHED doodle 전부 읽어서 OccupancyGrid 재계산
-3. scheduled_end_at이 지났으면 즉시 EndPage, 아니면 타이머 예약
-4. 그 다음에 HTTP와 STOMP 요청을 받기 시작
+PageBootstrap (SmartLifecycle, 웹 서버보다 앞 단계)
+1. 큐: EnsureLivePage — 비종료(ACTIVE/COUNTDOWN) 페이지 조회 → 없으면 새로 생성
+2. 큐 밖: PublishedFootprintSource로 그 페이지의 PUBLISHED doodle을 읽어 OccupancyGrid 재계산 (INV-02)
+3. 큐: InstallPage — 메모리 상태 설치, PageStatusChanged → PageTimer 예약
+4. scheduled_end_at이 지났으면 즉시 EndPage
+5. 그 다음에 웹 서버가 HTTP와 STOMP 요청을 받기 시작
 ```
 
 ### 4.6 삭제, 숨김, 복구

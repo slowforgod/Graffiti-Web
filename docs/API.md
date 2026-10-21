@@ -89,6 +89,7 @@
 ```json
 { "cols": 160, "rows": 90, "bitmap": "<base64, 1800바이트, 행 우선, 칸 하나당 1비트>", "occupancyPermille": 712 }
 ```
+- 비트 순서: 칸 인덱스 `row * 160 + col`의 비트는 바이트 `index / 8`의 최상위 비트부터(`0x80 >>> (index % 8)`). `page.final_occupancy_bitmap`도 같은 형식입니다.
 
 `GET /api/pages/{pageId}/doodles?chunks=...`
 ```json
