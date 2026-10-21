@@ -1,5 +1,5 @@
 # nginx with the built SPA. CI builds frontend/dist first (12a decision 1).
-FROM nginx:1.30.1-alpine
+FROM nginx:1.31.7-alpine
 
 RUN rm /etc/nginx/conf.d/default.conf
 COPY deploy/nginx/nginx.conf /etc/nginx/nginx.conf
