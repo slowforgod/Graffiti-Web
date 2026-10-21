@@ -13,9 +13,12 @@ import jakarta.validation.constraints.NotBlank;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import kr.ac.khu.graffiti.user.UserAccountService;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,12 +26,18 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
+// Security filters are covered by SecurityIT; this test is about the error body only.
 @WebMvcTest(controllers = GlobalExceptionHandlerTest.ThrowingController.class)
+@AutoConfigureMockMvc(addFilters = false)
 @Import({GlobalExceptionHandler.class, GlobalExceptionHandlerTest.ThrowingController.class})
 class GlobalExceptionHandlerTest {
 
     @Autowired
     private MockMvc mvc;
+
+    // Needed by the @CurrentUser argument resolver that @WebMvcTest picks up.
+    @MockitoBean
+    private UserAccountService accounts;
 
     @Test
     void apiExceptionKeepsCodeStatusAndDetails() throws Exception {

@@ -39,10 +39,13 @@
 | 메서드 | 경로 | 권한 | 설명 |
 |---|---|---|---|
 | GET | `/oauth2/authorization/google` | 공개 | Google 로그인 시작 (Spring Security 기본) |
-| GET | `/login/oauth2/code/google` | 공개 | OAuth 콜백. 도메인 검증(SEC-04) 후 `/`로 리다이렉트. 실패하면 `/?loginError=DOMAIN_NOT_ALLOWED` |
-| POST | `/api/auth/logout` | 로그인 | 세션 무효화 |
+| GET | `/login/oauth2/code/google` | 공개 | OAuth 콜백. 도메인 검증(SEC-04) 후 `/`로 리다이렉트. 학교 계정이 아니면 `/?loginError=DOMAIN_NOT_ALLOWED`, 그 밖의 실패(사용자 취소, Google 오류)는 `/?loginError=LOGIN_FAILED` |
+| POST | `/api/auth/logout` | 로그인(동의 전 허용) | 세션 무효화. 204 |
 | GET | `/api/me` | 공개 | 비로그인이면 `{ "authenticated": false }` |
-| POST | `/api/me/consent` | 로그인(동의 전 허용) | 개인정보 동의 기록 |
+| POST | `/api/me/consent` | 로그인(동의 전 허용) | 개인정보 동의 기록. 응답은 `GET /api/me`와 같은 형식. 다시 호출해도 최초 시각 유지 |
+
+- 모든 `/api/**`는 비로그인이면 리다이렉트가 아니라 401 `UNAUTHENTICATED`입니다(`GET /api/me` 제외).
+- `XSRF-TOKEN` 쿠키는 어떤 응답에서든 내려옵니다. 앱은 시작할 때 `GET /api/me`를 부르므로 첫 변경 요청 전에 쿠키가 있습니다.
 
 `GET /api/me` (로그인 상태)
 ```json
@@ -54,7 +57,7 @@
   "role": "USER",
   "consentRequired": false,
   "banned": false,
-  "cooldownEndsAt": "2026-10-21T05:30:00.000Z"   // 쿨다운 없으면 null
+  "cooldownEndsAt": "2026-10-21T05:30:00Z"   // 쿨다운 없으면 null (06 전에는 항상 null)
 }
 ```
 

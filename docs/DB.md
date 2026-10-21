@@ -154,7 +154,9 @@ CREATE TABLE ml_prediction (
   CONSTRAINT fk_mlp_doodle FOREIGN KEY (doodle_id) REFERENCES doodle(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Spring Session JDBC 테이블은 spring-session-jdbc가 제공하는 schema-mysql.sql을 마이그레이션에 포함
+-- Spring Session JDBC 테이블(SPRING_SESSION, SPRING_SESSION_ATTRIBUTES)은 spring-session-jdbc 3.5.x의
+-- schema-mysql.sql을 그대로 V2__spring_session.sql에 넣음. 자동 생성은 끔(spring.session.jdbc.initialize-schema=never).
+-- 로그인 후 세션 속성은 SecurityContext(SessionUser: userId만)이고 이메일, 토큰은 없음(SEC-13).
 ```
 
 - `doodle_chunk`는 **게시될 때** 넣습니다. REJECTED doodle은 넣지 않고, 복구할 때 넣습니다. HIDDEN이나 DELETED가 돼도 행은 남기며, 조회할 때 `doodle.status='PUBLISHED'`로 거릅니다.

@@ -44,9 +44,10 @@
 
 ```
 backend/src/main/java/kr/ac/khu/graffiti/
-├── config/        설정 바인딩(GraffitiProperties), Security, WebSocket, Session
-├── auth/          OAuth 성공 핸들러, 도메인 검증, 동의, 닉네임 생성, /api/me
-├── user/          User 엔티티, 쿨다운 값(last_posted_at), 차단 상태
+├── config/        설정 바인딩(GraffitiProperties), SecurityConfig(필터 체인, SPA CSRF, 401/403 JSON), WebSocket
+├── auth/          KhuDomainVerifier(SEC-04 순수 로직), KhuOidcUserService, 로그인 성공·실패 핸들러,
+│                  SessionUser(세션에는 userId만), @CurrentUser + Access(SIGNED_IN/LOGIN/AUTHOR/ADMIN), MeController
+├── user/          User 엔티티, UserAccountService(첫 로그인 가입, 역할 동기화, 동의), NicknameGenerator(순수 로직)
 ├── page/          ★ 핵심 도메인
 │   ├── PageCommandProcessor (인터페이스) + SingleThreadPageCommandProcessor
 │   │                        커맨드: ApplyFootprint, EndPage, GetPageSnapshot, EnsureLivePage, InstallPage
@@ -86,6 +87,7 @@ ml/
 ```
 frontend/src/
 ├── api/           REST 클라이언트(CSRF 헤더 자동 첨부), 에러 코드 타입
+├── auth/          /api/me 상태, 로그인·로그아웃 바, 동의 화면, 로그인 실패 안내
 ├── realtime/      STOMP 클라이언트, 청크 구독 관리자(구독 → 조회 → 병합, INV-09)
 ├── canvas/        Konva Stage, 뷰포트(팬/줌, 0.5~4배), 청크 계산, 청크별 레이어 캐시
 ├── tools/         펜, 텍스트, 지우개(초안 전용), 선택, 이동 + 초안 상태 머신
@@ -164,6 +166,28 @@ PageTimer (scheduled_end_at 도달) ──▶ 큐: EndPage(pageId)   (현재 페
 
 - 상태 전이는 `UPDATE ... WHERE id=? AND status=?`처럼 **이전 상태를 조건으로** 실행합니다. 영향받은 행이 0이면 예외를 던집니다.
 - T−5분 카운트다운은 클라이언트가 `scheduledEndAt`과 서버 시각 차이(`serverTime`)로 계산합니다. 서버 푸시는 필요 없습니다.
+
+### 4.4a 로그인 (D-21, SEC-04, SEC-13)
+
+```
+브라우저 ─▶ /oauth2/authorization/google  (hd=khu.ac.kr 힌트) ─▶ Google ─▶ /login/oauth2/code/google
+  Spring Security: ID 토큰 서명, iss, aud, exp, nonce 검증
+  KhuOidcUserService (userinfo 호출 없음, ID 토큰 클레임만 사용)
+    KhuDomainVerifier: hd == khu.ac.kr && email_verified == true && email이 "@khu.ac.kr"로 끝남
+      실패 ─▶ LoginFailureHandler: 세션 무효화, /?loginError=DOMAIN_NOT_ALLOWED (그 밖의 실패는 LOGIN_FAILED)
+    UserAccountService.loginOrRegister(sub, email): google_sub로 조회, 없으면 닉네임·커서 색과 함께 INSERT
+      유니크 충돌(동시 첫 로그인, 닉네임 중복)은 새 트랜잭션으로 재시도 (최대 nickname-max-attempts)
+      role = ADMIN_EMAILS 포함 여부로 매 로그인 동기화 (D-23)
+  LoginSuccessHandler: 인증 객체를 SessionUser(userId)만 담은 것으로 교체해 세션에 저장, / 로 리다이렉트
+     (ID 토큰, 이메일, Google 액세스 토큰은 세션에 남지 않음)
+
+요청: SecurityFilterChain ─ CSRF(변경 요청, XSRF-TOKEN 쿠키 → X-XSRF-TOKEN 헤더)
+      ─ /api/** 는 세션 필요(없으면 401 JSON, GET /api/me만 공개)
+      ─ 컨트롤러의 @CurrentUser(Access): 매 요청 DB에서 동의, 차단, 역할을 읽어 판정
+```
+
+- 세션은 Spring Session JDBC(`SPRING_SESSION`)에 저장하고 쿠키 `SESSION`은 `HttpOnly; Secure; SameSite=Lax`, 유지 기간은 `graffiti.auth.session-timeout`입니다.
+- 로컬 개발에서 Google OAuth 클라이언트의 승인된 리디렉션 URI는 `http://localhost:5173/login/oauth2/code/google`입니다(Vite 프록시가 Host를 유지).
 
 ### 4.5 서버 시작과 재시작 복구 (D-25)
 
@@ -261,6 +285,8 @@ PageBootstrap (SmartLifecycle, 웹 서버보다 앞 단계)
 | `graffiti.moderation.ml.flag-threshold` | 모델 버전별 값 (평가로 결정) | D-37, D-39 |
 | `graffiti.auth.allowed-domain` | khu.ac.kr | D-21 |
 | `graffiti.auth.admin-emails` | 환경변수 `ADMIN_EMAILS` | D-23 |
+| `graffiti.auth.session-timeout` | 30d (세션 쿠키 max-age와 Spring Session 만료에 같이 사용) | D-21 |
+| `graffiti.auth.nickname-max-attempts` | 10 | D-22 |
 | `graffiti.web.allowed-origins` | 환경변수 `APP_ORIGIN` | SEC-03 |
 
 비밀값(`GOOGLE_CLIENT_ID/SECRET`, `OPENAI_API_KEY`, `KHUCHAT_API_KEY`, `DB_PASSWORD`)은 환경변수로만 받습니다(SEC-06).
