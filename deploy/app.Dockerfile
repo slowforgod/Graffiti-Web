@@ -1,5 +1,5 @@
 # Runtime image for the Spring app. CI builds backend/build/libs/graffiti.jar first (12a decision 1).
-FROM eclipse-temurin:21.0.11_10-jre-noble
+FROM eclipse-temurin:24.0.2_12-jre-noble
 
 RUN groupadd --system app && useradd --system --gid app --no-create-home app
 WORKDIR /app
