@@ -44,7 +44,7 @@ cd ml/eval && python evaluate.py            # 평가 세트로 지표 계산 (D-
 - 그 외 패키지: 목표값 없음. 대신 명세의 수용 기준과 SEC 거부 테스트가 전부 있어야 함
 
 ### 배포 설정 (`/gf-deploy-check`가 읽음)
-- 운영 URL: (12-deploy에서 기입)
+- 운영 URL: (12b-deploy-prod에서 기입, 스테이징 URL은 12a)
 - 헬스체크: `/actuator/health`
 - 배포 방식: main 머지 → GitHub Actions → EC2 `docker compose pull && up -d`
 - 환경변수 목록: `.env.example` (값은 GitHub Secrets와 EC2에만)

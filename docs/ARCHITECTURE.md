@@ -265,7 +265,7 @@ PageTimer (scheduled_end_at 도달) ──▶ 큐: EndPage
 GitHub (main 머지) ─▶ GitHub Actions: test → build images → push (GHCR) → SSH로 EC2에서 docker compose pull && up -d
 EC2 (메모리 4GB급, D-36) 보안 그룹: 80/443만 개방, 22는 팀원 IP만 (SEC-10)
 docker-compose: nginx, app, ml(mem_limit, 외부 포트 없음), mysql(볼륨), certbot
-ml 이미지 빌드 시 models.lock의 버전을 S3에서 받아 포함하거나, 컨테이너 시작 시 내려받음 (12-deploy에서 확정)
+ml 이미지 빌드 시 models.lock의 버전을 S3에서 받아 포함하거나, 컨테이너 시작 시 내려받음 (12a-deploy-staging에서 확정)
 ```
 
-세부 절차는 `docs/specs/12-deploy.md`에서 확정합니다.
+세부 절차는 `docs/specs/12a-deploy-staging.md`, `12b-deploy-prod.md`에서 확정합니다.

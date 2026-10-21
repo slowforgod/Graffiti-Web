@@ -101,7 +101,7 @@ def main():
     run = entries[start:]
 
     spec_path = None
-    m = re.match(r"^(?:feat|fix)/(\d+[a-z]?)-", branch)
+    m = re.match(r"^(?:feat|fix)/(ml-\d+|\d+[a-z]?)-", branch)
     if m:
         found = sorted(glob.glob(os.path.join(root, "docs", "specs", m.group(1) + "-*.md")))
         spec_path = found[0] if found else None
