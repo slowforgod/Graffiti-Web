@@ -41,7 +41,7 @@ services:
         condition: service_healthy
 
   mysql:
-    image: mysql:8.4.9
+    image: mysql:9.7.1
     restart: unless-stopped
     # No ports: Docker network only (SEC-10).
     command:
