@@ -2,6 +2,7 @@ package kr.ac.khu.graffiti.page;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import kr.ac.khu.graffiti.common.error.ApiException;
 import kr.ac.khu.graffiti.common.error.ErrorCode;
 import kr.ac.khu.graffiti.config.GraffitiProperties;
@@ -52,7 +53,7 @@ class PageCommandHandler {
 
         PageState next;
         if (PageLifecycle.shouldStartCountdown(state.status(), grid.occupancyPermille(), state.rules())) {
-            Instant now = clock.instant();
+            Instant now = now();
             Instant endAt = PageLifecycle.scheduledEnd(state.createdAt(), now, state.rules());
             tx.executeWithoutResult(s -> requireOneRow(pages.startCountdown(state.id(), now, endAt), state));
             next = state.withCountdown(now, endAt, grid);
@@ -74,7 +75,7 @@ class PageCommandHandler {
 
     PageSnapshot endPage(PageCommand.EndPage c) {
         PageState state = requireCurrent(c.pageId());
-        Instant now = clock.instant();
+        Instant now = now();
         if (now.isBefore(state.scheduledEndAt())) {
             // A timer that fired early: keep the page and let the listener schedule it again.
             publishStatus(state);
@@ -98,7 +99,7 @@ class PageCommandHandler {
 
     long ensureLivePage() {
         return tx.execute(s -> pages.findLive()
-                .orElseGet(() -> pages.save(newPageFromConfig(pages.findMaxSeq() + 1, clock.instant())))
+                .orElseGet(() -> pages.save(newPageFromConfig(pages.findMaxSeq() + 1, now())))
                 .getId());
     }
 
@@ -118,6 +119,11 @@ class PageCommandHandler {
                 page.countdownDuration(), page.maxLifetime());
         return Page.newActive(seq, new CellGeometry(canvas.width(), canvas.height(), canvas.cellSize()),
                 canvas.chunkSize(), rules, now);
+    }
+
+    // The database keeps milliseconds (DATETIME(3)); match it so memory and rows agree after a restart.
+    private Instant now() {
+        return clock.instant().truncatedTo(ChronoUnit.MILLIS);
     }
 
     private void publishStatus(PageState state) {

@@ -1,6 +1,9 @@
 package kr.ac.khu.graffiti.page;
 
 import java.time.Clock;
+import java.util.concurrent.CompletionException;
+import kr.ac.khu.graffiti.common.error.ApiException;
+import kr.ac.khu.graffiti.common.error.ErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.SmartLifecycle;
@@ -51,7 +54,16 @@ class PageBootstrap implements SmartLifecycle {
         log.info("Page {} (seq {}) recovered: {}, {} permille", snapshot.id(), snapshot.seq(), snapshot.status(),
                 snapshot.occupancyPermille());
         if (!clock.instant().isBefore(snapshot.scheduledEndAt())) {
-            snapshot = processor.submit(new PageCommand.EndPage(pageId)).join();
+            // The timer scheduled by InstallPage may also fire right away; whichever EndPage runs
+            // second gets PAGE_ENDED. Both run on the queue, so the page turns exactly once.
+            try {
+                processor.submit(new PageCommand.EndPage(pageId)).join();
+            } catch (CompletionException e) {
+                if (!(e.getCause() instanceof ApiException api && api.code() == ErrorCode.PAGE_ENDED)) {
+                    throw e;
+                }
+            }
+            snapshot = processor.submit(new PageCommand.GetPageSnapshot()).join();
         }
         return snapshot;
     }
