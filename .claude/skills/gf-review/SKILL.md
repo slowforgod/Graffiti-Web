@@ -1,5 +1,7 @@
 ---
 name: gf-review
+model: claude-opus-5-5
+effort: medium
 description: graffiti 머지 전 diff 리뷰. base 브랜치 대비 변경을 전부 읽고 checklist.md의 CRITICAL(불변 조건, 보안, 경쟁 조건, LLM 출력, Gate Integrity)과 INFORMATIONAL 항목으로 검사한다. 기계적인 문제는 바로 고치고(AUTO-FIX), 판단이 필요한 것은 묻는다(ASK). 결과를 명세의 리뷰 기록에 남긴다. "리뷰해줘", "diff 확인", "머지 전 점검"에 사용.
 ---
 

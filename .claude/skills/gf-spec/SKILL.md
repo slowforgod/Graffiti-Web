@@ -1,5 +1,7 @@
 ---
 name: gf-spec
+model: claude-opus-5-5
+effort: medium
 description: graffiti 기능 명세 작성. 로드맵 번호(NN)나 기능 설명을 받아 docs/specs/NN-<이름>.md를 템플릿대로 작성하고 계획을 잠근다(관련 결정, 불변 조건, 보안 규칙, 실패 모드, 수용 기준, 테스트 계획). "명세 써줘", "spec", "다음 기능 준비", "NN번 시작하자"에 사용. 코드는 작성하지 않는다.
 ---
 

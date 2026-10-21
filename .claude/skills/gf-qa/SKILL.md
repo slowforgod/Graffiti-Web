@@ -1,5 +1,7 @@
 ---
 name: gf-qa
+model: claude-sonnet-5-5
+effort: medium
 description: graffiti QA. 명세의 수용 기준과 QA 시나리오를 실제로 실행해서 확인한다(REST, STOMP 다중 클라이언트, 브라우저 확인). 버그를 찾으면 회귀 테스트부터 작성해 실패를 확인한 뒤 최소 수정하고, 검증된 수정만 커밋한다. "QA", "테스트해봐", "동작 확인", "버그 찾아줘"에 사용. 보고만 원하면 "report-only" 인자를 준다.
 ---
 

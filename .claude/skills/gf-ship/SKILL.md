@@ -1,5 +1,7 @@
 ---
 name: gf-ship
+model: claude-sonnet-5-5
+effort: low
 description: graffiti PR 생성 파이프라인. base 브랜치 머지 → 전체 테스트 → 리뷰·QA 기록 확인(G3, G4) → 문서 동기화 확인 → bisect 커밋 정리 → push → PR 생성. 사용자가 명시적으로 /gf-ship을 호출할 때만 사용.
 disable-model-invocation: true
 ---
