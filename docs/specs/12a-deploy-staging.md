@@ -1,6 +1,6 @@
 # 12a-deploy-staging: 스테이징 배포 골격 (이미지, compose, nginx, TLS, Actions)
 
-- **상태**: IN_PROGRESS
+- **상태**: MERGED (PR #18, 2026-10-21)
 - **승인자**: 현 (slowforgod) / 승인일: 2026-10-21 (결정 필요 1~3은 추천안으로 확정)
 - **브랜치**: `feat/12a-deploy-staging`
 - **선행 명세**: 00
