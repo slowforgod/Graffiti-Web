@@ -67,6 +67,8 @@ class GraffitiPropertiesTest {
             assertThat(p.moderation().ml().flagThreshold()).isNull();
 
             assertThat(p.auth().allowedDomain()).isEqualTo("khu.ac.kr");
+            assertThat(p.auth().sessionTimeout()).isEqualTo(Duration.ofDays(30));
+            assertThat(p.auth().nicknameMaxAttempts()).isEqualTo(10);
         });
     }
 
@@ -115,6 +117,11 @@ class GraffitiPropertiesTest {
     @Test
     void rejectsNonPositiveCooldown() {
         assertStartupFails("graffiti.post-cooldown=0s");
+    }
+
+    @Test
+    void rejectsNonPositiveSessionTimeout() {
+        assertStartupFails("graffiti.auth.session-timeout=0s");
     }
 
     @Test

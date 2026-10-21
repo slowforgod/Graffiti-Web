@@ -124,7 +124,14 @@ public record GraffitiProperties(
 
     public record Auth(
             @NotBlank String allowedDomain,
-            @NotNull List<String> adminEmails) {
+            @NotNull List<String> adminEmails,
+            @NotNull Duration sessionTimeout,
+            @Positive int nicknameMaxAttempts) {
+
+        @AssertTrue(message = "session-timeout must be positive")
+        public boolean isSessionTimeoutPositive() {
+            return isPositive(sessionTimeout);
+        }
     }
 
     public record Web(

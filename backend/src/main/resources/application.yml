@@ -15,8 +15,31 @@ spring:
           time_zone: UTC
   flyway:
     enabled: true
+  session:
+    jdbc:
+      initialize-schema: never   # tables come from Flyway (V2__spring_session.sql)
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            # Placeholders keep the app bootable without credentials; real values come from the environment (SEC-06).
+            client-id: ${GOOGLE_CLIENT_ID:unset}
+            client-secret: ${GOOGLE_CLIENT_SECRET:unset}
+            scope: openid,email,profile
   jackson:
     time-zone: UTC
+
+server:
+  servlet:
+    session:
+      timeout: ${graffiti.auth.session-timeout}
+      cookie:
+        name: SESSION
+        http-only: true
+        secure: true
+        same-site: lax
+        max-age: ${graffiti.auth.session-timeout}
 
 management:
   endpoints:
@@ -85,5 +108,7 @@ graffiti:
   auth:
     allowed-domain: khu.ac.kr
     admin-emails: ${ADMIN_EMAILS:}
+    session-timeout: 30d
+    nickname-max-attempts: 10
   web:
     allowed-origins: ${APP_ORIGIN:http://localhost:5173}
