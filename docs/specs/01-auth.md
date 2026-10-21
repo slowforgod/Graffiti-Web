@@ -108,20 +108,20 @@
 critical gap: 0
 
 ## 7. 수용 기준 (테스트 가능하게)
-- [ ] AC-1: Given `hd=khu.ac.kr`, `email_verified=true`, `a@khu.ac.kr`, When 로그인, Then `users` 1행 생성, 닉네임이 "익명의 … #dddd" 형식, 커서 색이 `#RRGGBB`, `/`로 리다이렉트
-- [ ] AC-2: 같은 사용자의 두 번째 로그인은 행을 새로 만들지 않고 닉네임·색이 그대로다
-- [ ] AC-3 (SEC-04): `hd` 누락, `hd=gmail.com`, `email_verified=false`, `x@khu.ac.kr.evil.com` 각각 계정이 생기지 않고 `/?loginError=DOMAIN_NOT_ALLOWED`로 간다
-- [ ] AC-4: 비로그인 `GET /api/me` → 200 `{"authenticated":false}`
-- [ ] AC-5: 로그인 `GET /api/me` → API.md §1 형식, 이메일 필드 없음(SEC-13)
-- [ ] AC-6: `POST /api/me/consent` 후 `consentRequired=false`, 두 번 호출해도 최초 시각 유지
-- [ ] AC-7 (SEC-03): CSRF 헤더 없는 `POST /api/me/consent` → 403 `CSRF_INVALID` / 세션 쿠키가 `HttpOnly; Secure; SameSite=Lax`
-- [ ] AC-8: 비로그인 `POST /api/auth/logout`, `POST /api/me/consent` → 401 `UNAUTHENTICATED` (리다이렉트 아님)
-- [ ] AC-9: `ADMIN_EMAILS`에 있는 사용자는 `role=ADMIN`, 목록에서 빠지면 다음 로그인에 `USER`
-- [ ] AC-10: 동의 전 사용자가 `작성자` 권한 경로 호출 → 403 `CONSENT_REQUIRED`, 차단 사용자 → 403 `BANNED`
-- [ ] AC-11 (SEC-02): 요청 본문에 `userId`를 넣어도 세션 사용자로 처리된다(동의 엔드포인트로 검증)
-- [ ] AC-12 (SEC-13): 로그인 성공·실패 로그에 이메일, ID 토큰, 세션 ID가 없다
-- [ ] AC-13: 세션이 MySQL `SPRING_SESSION`에 저장되고 앱 재시작 후에도 유지된다
-- [ ] AC-14 (프론트): 동의 전이면 동의 화면이 보이고, 동의하면 사라진다 / `loginError=DOMAIN_NOT_ALLOWED`면 한국어 안내가 보인다 / 변경 요청에 `X-XSRF-TOKEN`이 붙는다
+- [x] AC-1: Given `hd=khu.ac.kr`, `email_verified=true`, `a@khu.ac.kr`, When 로그인, Then `users` 1행 생성, 닉네임이 "익명의 … #dddd" 형식, 커서 색이 `#RRGGBB`, `/`로 리다이렉트
+- [x] AC-2: 같은 사용자의 두 번째 로그인은 행을 새로 만들지 않고 닉네임·색이 그대로다
+- [x] AC-3 (SEC-04): `hd` 누락, `hd=gmail.com`, `email_verified=false`, `x@khu.ac.kr.evil.com` 각각 계정이 생기지 않고 `/?loginError=DOMAIN_NOT_ALLOWED`로 간다
+- [x] AC-4: 비로그인 `GET /api/me` → 200 `{"authenticated":false}`
+- [x] AC-5: 로그인 `GET /api/me` → API.md §1 형식, 이메일 필드 없음(SEC-13)
+- [x] AC-6: `POST /api/me/consent` 후 `consentRequired=false`, 두 번 호출해도 최초 시각 유지
+- [x] AC-7 (SEC-03): CSRF 헤더 없는 `POST /api/me/consent` → 403 `CSRF_INVALID` / 세션 쿠키가 `HttpOnly; Secure; SameSite=Lax`
+- [x] AC-8: 비로그인 `POST /api/auth/logout`, `POST /api/me/consent` → 401 `UNAUTHENTICATED` (리다이렉트 아님)
+- [x] AC-9: `ADMIN_EMAILS`에 있는 사용자는 `role=ADMIN`, 목록에서 빠지면 다음 로그인에 `USER`
+- [x] AC-10: 동의 전 사용자가 `작성자` 권한 경로 호출 → 403 `CONSENT_REQUIRED`, 차단 사용자 → 403 `BANNED`
+- [x] AC-11 (SEC-02): 요청 본문에 `userId`를 넣어도 세션 사용자로 처리된다(동의 엔드포인트로 검증)
+- [x] AC-12 (SEC-13): 로그인 성공·실패 로그에 이메일, ID 토큰, 세션 ID가 없다
+- [x] AC-13: 세션이 MySQL `SPRING_SESSION`에 저장되고 앱 재시작 후에도 유지된다
+- [x] AC-14 (프론트): 동의 전이면 동의 화면이 보이고, 동의하면 사라진다 / `loginError=DOMAIN_NOT_ALLOWED`면 한국어 안내가 보인다 / 변경 요청에 `X-XSRF-TOKEN`이 붙는다
 
 ## 8. 테스트 계획
 | 층 | 대상 | 파일 (예정) |
@@ -147,8 +147,24 @@ PR revert. `V1__users.sql`, `V2__spring_session.sql`은 새 테이블만 추가�
 ---
 
 ## 리뷰 기록 (/gf-review가 추가)
+- 2026-10-21 · `7647971` · CRITICAL 0 / INFO 5 · AUTO-FIX 3 · ASK 없음 · PASS
+  - AUTO-FIX 1: `application.yml`에 `server:` 블록을 넣으면서 `spring.jackson.time-zone`이 `server.jackson` 아래로 밀려 무시되던 것을 되돌림
+  - AUTO-FIX 2: Vite 프록시 문자열 축약형은 `changeOrigin: true`라서 OAuth `redirect_uri`가 `localhost:8080`으로 만들어졌음. `/api`, `/oauth2`, `/login`은 Host를 유지하도록 바꿈 (curl로 `redirect_uri=http://localhost:5173/login/oauth2/code/google` 확인)
+  - AUTO-FIX 3: `@WebMvcTest`가 새 `@CurrentUser` 해석기를 읽어 `GlobalExceptionHandlerTest` 컨텍스트가 깨짐 → 해당 테스트는 보안 필터를 끄고 `UserAccountService`를 mock (에러 본문만 검사하는 테스트이고 보안은 `SecurityIT`가 검사)
+  - INFO-1: Spring Security 6.5.11에는 `csrf().spa()`가 없어서 레퍼런스 문서의 SPA 방식(`SpaCsrfTokenRequestHandler`)을 그대로 옮김
+  - INFO-2: 세션에는 `SessionUser(userId)`만 저장하고 Google 액세스 토큰도 저장하지 않음(`OAuth2AuthorizedClientRepository` no-op). `SecurityIT`가 `SPRING_SESSION_ATTRIBUTES`에 이메일과 sub가 없음을 확인
+  - INFO-3: 권한은 `@CurrentUser(Access)`가 매 요청 DB에서 판정. URL 규칙은 "`/api/**`는 세션 필요, `GET /api/me`만 공개" 하나뿐이고, 나머지 경로(OAuth, health, error, 정적 파일)는 `permitAll`
+  - INFO-4: spring-security-test의 `csrf()`는 공유 컨텍스트의 CSRF 저장소를 바꿔서 다른 테스트를 깨뜨림 → `AuthorizationIT`는 실제 쿠키·헤더 이중 제출을 사용
+  - INFO-5: `npm audit`의 vitest 계열 critical 2건은 main에도 있던 개발 의존성 문제(이 PR과 무관). Dependabot 업데이트로 처리 예정
 
 ## QA 기록 (/gf-qa가 추가)
+- 2026-10-21 · `7647971` · 통과 · 버그 1(위 AUTO-FIX 2) · PASS (실제 Google 로그인은 미검증)
+  - 자동: backend `./gradlew test` 109개 통과(실패 0, 스킵 0), frontend `npm test` 14개 통과, `npm run lint`, `npm run build` 통과. 라인 커버리지: `KhuDomainVerifier`, `NicknameGenerator`, `UserAccountService`, 로그인 핸들러 100%, `CurrentUserArgumentResolver` 95%, `MeController` 89%(쿨다운 계산은 06에서 `last_posted_at`이 생긴 뒤)
+  - 수동(로컬 MySQL + `bootRun`, curl): `GET /api/me` → `{"authenticated":false}`와 `XSRF-TOKEN` 쿠키(`Secure; SameSite=Lax`, HttpOnly 아님) / `/oauth2/authorization/google` → Google로 302, `hd=khu.ac.kr`, `nonce` 포함 / CSRF 없는 `POST /api/me/consent` → 403 `CSRF_INVALID` / 비로그인 로그아웃 → 401 `UNAUTHENTICATED` / 잘못된 state로 콜백 → `/?loginError=LOGIN_FAILED` / `/login` 기본 로그인 페이지 없음(404)
+  - AC-3, AC-12의 로그인 경로는 `LoginFlowIT`가 실제 Google 등록 정보와 DB로 `KhuOidcUserService`와 핸들러를 실행해서 확인. ID 토큰 서명 검증 자체는 Spring Security 몫이라 테스트하지 않음
+  - AC-13: 세션이 `SPRING_SESSION`에 30일 만료로 저장되는 것은 `SecurityIT`로 확인. 앱 재시작 후 유지는 저장 위치로 판단했고 실제 재시작은 Google 로그인 QA 때 함께 확인
+  - 미검증: 실제 Google 로그인(학교 계정 성공, 개인 Gmail 거절, 로그아웃, 브라우저 재시작 후 유지). `GOOGLE_CLIENT_ID/SECRET`이 있어야 함. 승인된 리디렉션 URI: 로컬 `http://localhost:5173/login/oauth2/code/google`
+  - 동의 문구는 초안이다. 보관 기간을 "서비스 운영 기간 동안 보관 (학교 확인 후 확정)"으로 넣었고, 공개 전 학교 개인정보 담당 부서 확인이 필요(SEC-13, D-38)
 
 ## 보안 감사 기록 (/gf-security가 추가, 해당 시)
 
