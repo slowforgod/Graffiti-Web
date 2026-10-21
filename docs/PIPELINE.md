@@ -44,7 +44,7 @@
 | **G2 테스트 통과** | `./gradlew test`, `npm test`, `npm run lint`가 모두 통과. 실제 실행 출력 첨부 | Claude Code (자기 보고는 주장일 뿐이므로 G3에서 다시 실행) | 커밋, PR 본문 |
 | **G3 리뷰 통과** | 미해결 CRITICAL 0개. Gate Integrity 항목은 전부 사람이 판단 | `/gf-review` + 사람(ASK 항목) | 명세 `## 리뷰 기록` (커밋 SHA 포함) |
 | **G4 QA 통과** | 명세의 수용 기준과 QA 시나리오 전부 통과. 발견된 버그는 회귀 테스트와 함께 수정 또는 TODOS로 | `/gf-qa` | 명세 `## QA 기록` (커밋 SHA 포함) |
-| **G5 PR 승인** | 팀원 1명 이상 승인, CI 통과 | **팀원(사람)** | GitHub PR |
+| **G5 PR 승인** | 팀원 1명 이상 승인, CI 통과 → **승인받은 PR 작성자가 Rebase and merge** | **팀원(사람)** | GitHub PR |
 | **G6 배포 확인** | 헬스체크, WebSocket 연결, 스모크 시나리오 통과 | `/gf-deploy-check` | 명세 `## 배포 기록` |
 
 - **G3, G4 기록에는 커밋 SHA를 남깁니다.** `/gf-ship`은 기록된 SHA 이후에 코드가 바뀌었으면 해당 게이트를 다시 요구합니다.
@@ -96,7 +96,10 @@ DRAFT ──(G1 사람 승인)──▶ APPROVED ──(구현 시작)──▶ 
 
 ## 5. 팀 운영 규칙
 
-- **브랜치**: `feat/NN-<이름>`, `fix/<짧은-설명>`. main에 직접 push 금지
+- **브랜치**: `feat/NN-<이름>`, `fix/<짧은-설명>`, `docs/<짧은-설명>`. main에 직접 push 금지
+- **PR과 머지**: PR은 작업 브랜치에서 main으로 연다. G1~G4는 `/gf-ship`이 확인하고, **팀원 1명 이상 승인 + CI 통과(G5) 후 PR 작성자가 직접 머지**한다. Claude Code는 머지하지 않는다
+- **머지 방식은 "Rebase and merge"**: bisect 가능하게 나눈 커밋을 main에 그대로 남기기 위해서다. "Squash and merge"는 쓰지 않는다. 머지 후 작업 브랜치는 삭제한다
+- **브랜치 보호**: 비공개 저장소에서 main 보호 규칙(승인·CI 필수, 직접 push 금지)을 GitHub이 강제하려면 Pro 이상(학생은 Student Developer Pack)이 필요하다. 보호 규칙이 없는 동안에는 이 규칙과 훅(main push 확인)으로 지킨다
 - **작업 넘기기**: 하루 작업이 끝나거나 다른 팀원에게 넘길 때 `/gf-handoff save` → `.handoff/<브랜치>.md`를 커밋. 이어받는 사람은 `/gf-handoff load`
 - **결정 변경**: 구현 중 결정과 맞지 않는 상황을 만나면 Claude Code는 `NEEDS_CONTEXT`로 멈춥니다. 팀이 `docs/DECISIONS.md`를 고친 뒤(번복은 SUPERSEDED 표시) 명세를 수정하고 재개합니다
 - **범위 밖 아이디어**: 코드에 넣지 말고 `TODOS.md`에 추가
