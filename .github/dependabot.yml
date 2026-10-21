@@ -25,3 +25,7 @@ updates:
     directory: /deploy
     schedule:
       interval: weekly
+  - package-ecosystem: docker
+    directory: /ml/serving
+    schedule:
+      interval: weekly
