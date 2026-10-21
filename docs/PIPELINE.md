@@ -30,7 +30,7 @@
  │        ▼  [G6] 통과 → 명세 상태를 DONE으로                                               │
  └─────────────────────────────────────────────────────────────────────────────────────────┘
 
- 자동 실행: G1 승인 후 /gf-run NN 하나로 ②~⑤를 연달아 실행 (멈춤 조건은 §8)
+ 자동 실행: G1 승인 후 /gf-run NN 하나로 ②~④를 연달아 실행 → 요약 보고서 확인 → ⑤는 사람이 직접 (§8)
  언제든:  버그·이상 동작 → /gf-investigate (근본 원인 먼저, 3-strike)
           작업 넘기기/이어받기 → /gf-handoff save | load
           위험 명령(rm -rf, DROP, force-push…) → .claude/hooks/check-careful.sh가 자동으로 확인 요청
@@ -141,15 +141,26 @@ DRAFT ──(G1 사람 승인)──▶ APPROVED ──(구현 시작)──▶ 
 
 ```
 사람: /gf-spec NN → 팀원 검토 → APPROVED (G1)
-/gf-run NN ─▶ gf-run-implement ─▶ gf-run-review ─▶ gf-run-qa ─▶ gf-run-ship ─▶ PR 생성 후 정지
-              (Sonnet · high)     (Opus · medium)   (Sonnet · medium) (Sonnet · low)
-사람: 팀원 승인 → Rebase and merge (G5)
+/gf-run NN ─▶ gf-run-implement ─▶ gf-run-review ─▶ gf-run-qa ─▶ 정지
+              (Sonnet · high)     (Opus · medium)   (Sonnet · medium)
+                                                          │
+                              훅 gf-run-report.py ◀───────┘  .gf-run/reports/<브랜치>-<시각>.md
+사람: 보고서 확인 → /gf-ship (PR 생성) → 팀원 승인 → Rebase and merge (G5)
 ```
 
 - `gf-run-*`는 `/gf-run` 전용 래퍼 스킬입니다. `context: fork`로 **단계마다 별도 서브에이전트**를 띄우고, 원래 스킬(`gf-implement` 등)의 절차를 무인 실행 규칙과 함께 따릅니다. 슬래시 메뉴에는 보이지 않습니다(`user-invocable: false`).
 - **멈추는 조건**: 서브에이전트가 `NEEDS_DECISION`(리뷰의 ASK 항목, Gate Integrity 등) / `BLOCKED`(테스트 실패, 환경 문제) / `NEEDS_CONTEXT`(결정 변경 필요)를 반환하면 정지합니다. 사용자가 결정한 뒤 `/gf-run NN --from <단계>`로 재개합니다.
 - **검증**: 오케스트레이터는 서브에이전트 보고를 그대로 믿지 않고 git 상태와 명세의 리뷰·QA 기록을 직접 확인한 뒤 다음 단계로 넘어갑니다.
+- **PR은 자동으로 만들지 않습니다.** QA까지 끝나면 멈추고, 사용자가 보고서를 확인한 뒤 `/gf-ship`을 직접 실행합니다.
 - 단계별 모델을 바꿀 때는 원래 스킬과 `gf-run-*` 래퍼의 frontmatter를 **함께** 고칩니다(§7 표와 같은 커밋).
+
+### QA 완료 요약 보고서 (훅)
+- `.claude/settings.json`의 `PostToolUse`(matcher `Skill`) 훅이 `.claude/hooks/gf-run-report.py`를 실행합니다.
+- `gf-run-*` 단계가 끝날 때마다 반환 결과를 `.gf-run/<브랜치>.jsonl`에 쌓고, **`gf-run-qa`가 끝나면** 이번 실행(마지막 implement 이후)의 보고서를 `.gf-run/reports/<브랜치>-<시각>.md`로 만듭니다.
+- 보고서 내용: 단계별 상태·요약·테스트, **확인이 필요한 이슈**(DONE이 아닌 단계, 결정 필요 항목, 우려), QA에서 다룬 이슈 ID, 커밋 목록, 변경 파일, 커밋되지 않은 변경, 명세의 리뷰·QA 기록, 다음 할 일, 단계별 원본 결과
+- 만들어지면 채팅에 경로와 이슈 건수가 표시되고, macOS 알림도 뜹니다.
+- `.gf-run/`은 로컬 전용이라 커밋되지 않습니다(`.gitignore`). 중간에 멈춘 실행은 보고서를 만들지 않습니다.
+- 훅은 어떤 오류가 나도 파이프라인을 막지 않습니다. 오류는 `.gf-run/hook-error.log`에 남습니다.
 
 ### 모델 적용 실험 (2026-10-21, Claude Code 2.1.299)
 | 방식 | 결과 |
@@ -157,4 +168,5 @@ DRAFT ──(G1 사람 승인)──▶ APPROVED ──(구현 시작)──▶ 
 | 사용자가 `/probe-a`(model: haiku) 직접 호출 | Haiku로 실행됨 ✅ |
 | 오케스트레이터 스킬이 `probe-a`를 Skill 도구로 이어 호출 (inline) | 지정 모델 무시, 세션 모델(Opus)로 실행됨 ❌ |
 | 오케스트레이터가 `context: fork` + `background: false`인 `probe-a`, `probe-b`를 이어 호출 | Haiku, Sonnet이 각각 사용됨, 순서대로 끝까지 실행됨 ✅ |
+| `PostToolUse`(matcher `Skill`) 훅이 fork 스킬 종료 시 받는 입력 | `tool_input.skill`에 스킬 이름, `tool_response.result`에 서브에이전트 반환 텍스트 ✅, 훅의 `systemMessage`가 사용자에게 표시됨 ✅ |
 

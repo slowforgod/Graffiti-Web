@@ -30,3 +30,6 @@ __pycache__/
 .idea/
 .vscode/
 *.iml
+
+# /gf-run 단계 기록과 요약 보고서 (로컬 전용)
+.gf-run/

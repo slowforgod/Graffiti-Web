@@ -117,7 +117,7 @@ cd ml/eval && python evaluate.py            # 평가 세트로 지표 계산 (D-
 |---|---|
 | 다음 기능을 시작한다, 명세가 필요하다 | `/gf-spec NN` |
 | APPROVED 명세를 구현한다 | `/gf-implement NN` |
-| 구현부터 PR까지 자동으로 돌린다 | `/gf-run NN` (사용자가 직접 호출, 결정이 필요하면 멈춤) |
+| 구현부터 QA까지 자동으로 돌린다 | `/gf-run NN` (사용자가 직접 호출, 결정이 필요하면 멈춤, 끝나면 `.gf-run/reports/`에 요약 보고서) |
 | 구현을 마쳤고 머지 전 점검이 필요하다 | `/gf-review` |
 | 동작을 확인하고 버그를 찾는다 | `/gf-qa NN` (보고만: `report-only`) |
 | 에러, 테스트 실패, 이상 동작 | `/gf-investigate` (직접 고치지 말 것) |
