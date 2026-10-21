@@ -72,14 +72,18 @@ backend/src/main/java/kr/ac/khu/graffiti/
 
 ```
 ml/
-├── serving/       FastAPI 추론 서버 (POST /v1/moderate, GET /health)
-│   ├── app/       라우터, 이미지 분류기, OCR, 응답 스키마
-│   ├── tests/     pytest (스키마, 시간 제한, 잘못된 입력)
-│   └── Dockerfile
-├── training/      미세조정 스크립트 (운영 데이터 추출본 사용, 작성자 정보 없음)
-├── eval/          평가 세트 메타데이터, 지표 계산 스크립트 (D-39)
-└── models.lock    사용할 모델 버전 이름과 S3 경로, 체크섬 (가중치 파일은 git에 없음)
+├── serving/       FastAPI 추론 서버 (POST /v1/moderate, GET /health), Python 3.12
+│   ├── app/       main(엔드포인트), lock(models.lock 검증), decision(라벨, 순수), image_input(PNG 검증),
+│   │              models(ImageClassifier·OcrEngine 프로토콜, 레지스트리), schemas, settings
+│   ├── tests/     pytest (가짜 분류기로 API, 잘못된 입력, 체크섬, 로그에 OCR 글자 없음)
+│   └── Dockerfile 비 root, 빌드 컨텍스트는 ml/
+├── training/      미세조정 스크립트 (운영 데이터 추출본 사용, 작성자 정보 없음) — 07b 이후
+├── eval/          evaluate.py(서버 호출) + metrics.py(D-39 지표, 순수). 평가 이미지는 sets/(git 제외)와 S3
+└── models.lock    TOML. 모델 버전, S3 경로, 파일 이름, sha256, 카테고리별 임계값 (가중치 파일은 git에 없음)
 ```
+
+- 서버는 시작할 때 `models.lock`을 읽고 `MODEL_DIR/<file>`의 sha256이 맞을 때만 분류기를 만듭니다. 모델이 없거나 체크섬이 다르면 뜨기는 하지만 `/health`와 `/v1/moderate`가 503입니다(INV-13: Spring은 판정 없음으로 처리).
+- 라벨은 서버가 정합니다: `safe`가 아닌 카테고리 중 하나라도 `models.lock`의 임계값 이상이면 `FLAGGED`.
 - 현재 시각은 항상 주입받은 `java.time.Clock`으로 얻습니다. 타이머와 쿨다운 테스트에서 시간을 조작하기 위해서예요.
 
 ## 3. 프론트엔드 구조
