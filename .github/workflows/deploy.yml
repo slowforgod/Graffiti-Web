@@ -1,0 +1,116 @@
+name: Deploy
+
+# Runs after CI passes on main, so only tested commits become images (12a).
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+env:
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/graffiti
+
+# Actions are pinned to commit SHAs (SEC-16), the same ones ci.yml uses.
+jobs:
+  images:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - id: tag
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: echo "tag=${SHA}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
+      - run: ./gradlew bootJar
+        working-directory: backend
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci && npm run build
+        working-directory: frontend
+
+      - name: Build and push images
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+          prefix="$(echo "$IMAGE_PREFIX" | tr '[:upper:]' '[:lower:]')"
+          docker build -f deploy/app.Dockerfile -t "$prefix-app:$TAG" .
+          docker build -f deploy/web.Dockerfile -t "$prefix-web:$TAG" .
+          docker push "$prefix-app:$TAG"
+          docker push "$prefix-web:$TAG"
+
+  staging:
+    needs: images
+    # Skipped until a person sets up the server and the STAGING_HOST variable (deploy/README.md).
+    if: vars.STAGING_HOST != ''
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+      packages: read
+    env:
+      HOST: ${{ vars.STAGING_HOST }}
+      SSH_USER: ${{ vars.STAGING_SSH_USER }}
+      TAG: ${{ needs.images.outputs.tag }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Set up SSH
+        env:
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.STAGING_SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Deploy
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          ssh_opts="-i $HOME/.ssh/id_deploy -o StrictHostKeyChecking=yes"
+          scp $ssh_opts deploy/compose.yml "$SSH_USER@$HOST:/opt/graffiti/compose.yml"
+          echo "$GHCR_TOKEN" | ssh $ssh_opts "$SSH_USER@$HOST" "docker login ghcr.io -u '$ACTOR' --password-stdin"
+          ssh $ssh_opts "$SSH_USER@$HOST" "set -e; cd /opt/graffiti
+            printf 'IMAGE_TAG=%s\n' '$TAG' > image.env
+            docker compose --env-file .env --env-file image.env pull
+            docker compose --env-file .env --env-file image.env up -d --remove-orphans
+            docker image prune -f
+            docker logout ghcr.io"
+      - name: Check health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS "https://$HOST/actuator/health" | grep -q '"UP"'; then
+              echo "staging is up"; exit 0
+            fi
+            sleep 5
+          done
+          echo "staging did not become healthy" >&2
+          exit 1
