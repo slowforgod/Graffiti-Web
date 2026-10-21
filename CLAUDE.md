@@ -116,6 +116,8 @@ cd ml/eval && python evaluate.py            # 평가 세트로 지표 계산 (D-
 | 상황 | 사용 |
 |---|---|
 | 다음 기능을 시작한다, 명세가 필요하다 | `/gf-spec NN` |
+| APPROVED 명세를 구현한다 | `/gf-implement NN` |
+| 구현부터 PR까지 자동으로 돌린다 | `/gf-run NN` (사용자가 직접 호출, 결정이 필요하면 멈춤) |
 | 구현을 마쳤고 머지 전 점검이 필요하다 | `/gf-review` |
 | 동작을 확인하고 버그를 찾는다 | `/gf-qa NN` (보고만: `report-only`) |
 | 에러, 테스트 실패, 이상 동작 | `/gf-investigate` (직접 고치지 말 것) |
@@ -123,5 +125,7 @@ cd ml/eval && python evaluate.py            # 평가 세트로 지표 계산 (D-
 | PR을 만든다 | `/gf-ship` (사용자가 직접 호출) |
 | 배포 후 확인 | `/gf-deploy-check` (사용자가 직접 호출) |
 | 작업 저장, 이어받기 | `/gf-handoff save` / `load` |
+
+각 스킬의 모델과 effort는 `SKILL.md` frontmatter에 고정돼 있다(`docs/PIPELINE.md` §7). `gf-run-*`는 `/gf-run` 전용 내부 단계이므로 직접 쓰지 않는다.
 
 위험한 셸 명령(`rm -r`, `DROP`, `TRUNCATE`, force push, `reset --hard`, `git add -A`, `--no-verify`, 볼륨 삭제)은 `.claude/hooks/check-careful.sh`가 실행 전에 확인을 요청한다.

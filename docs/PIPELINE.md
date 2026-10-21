@@ -14,7 +14,7 @@
  │  ① /gf-spec NN      docs/specs/NN-<이름>.md 작성 (계획 잠금 포함)                        │
  │        │            ─ 관련 D-xx / INV-xx / SEC-xx, 수용 기준, 실패 모드, 테스트 계획        │
  │        ▼  [G1] 팀원이 명세를 읽고 상태를 APPROVED로 변경                                   │
- │  ② 구현 (Claude Code)  테스트 먼저(TDD), 명세 범위만, 수직 슬라이스, bisect 커밋              │
+ │  ② /gf-implement NN  테스트 먼저(TDD), 명세 범위만, 수직 슬라이스, bisect 커밋               │
  │        ▼  [G2] 빌드 + 전체 테스트 통과 (출력 첨부)                                        │
  │  ③ /gf-review       diff 리뷰: CRITICAL(INV, SEC, 경쟁 조건, LLM 출력, Gate Integrity)     │
  │        │            AUTO-FIX는 바로 수정, ASK는 사람에게 질문                               │
@@ -30,6 +30,7 @@
  │        ▼  [G6] 통과 → 명세 상태를 DONE으로                                               │
  └─────────────────────────────────────────────────────────────────────────────────────────┘
 
+ 자동 실행: G1 승인 후 /gf-run NN 하나로 ②~⑤를 연달아 실행 (멈춤 조건은 §8)
  언제든:  버그·이상 동작 → /gf-investigate (근본 원인 먼저, 3-strike)
           작업 넘기기/이어받기 → /gf-handoff save | load
           위험 명령(rm -rf, DROP, force-push…) → .claude/hooks/check-careful.sh가 자동으로 확인 요청
@@ -106,6 +107,7 @@ DRAFT ──(G1 사람 승인)──▶ APPROVED ──(구현 시작)──▶ 
 | 이 프로젝트 | gstack 원본 | 바꾼 점 |
 |---|---|---|
 | `/gf-spec` | `/spec` + `/plan-eng-review` | 아키텍처는 이미 잠겼으므로 기능별 계획 잠금을 명세 안에 흡수 |
+| `/gf-implement` | (없음) | gstack에는 구현 전용 스킬이 없음. 단계별 모델 지정을 위해 추가 |
 | `/gf-review` | `/review` | CRITICAL 체크리스트를 INV/SEC 기반으로 교체, Greptile·Codex 제거 |
 | `/gf-qa` | `/qa` | 브라우저 중심 → STOMP 다중 클라이언트 통합 시나리오 중심 |
 | `/gf-investigate` | `/investigate` | freeze 훅 대신 프롬프트 규칙으로 범위 고정 |
@@ -115,3 +117,44 @@ DRAFT ──(G1 사람 승인)──▶ APPROVED ──(구현 시작)──▶ 
 | `/gf-handoff` | `/context-save` + `/context-restore` | 팀원 간 공유를 위해 저장소에 커밋 |
 | `check-careful.sh` 훅 | `/careful` | 스킬 호출 없이 항상 켜짐 |
 | (제외) | `/office-hours`, `/plan-ceo-review`, `/autoplan`, `/retro` 등 | 설계 인터뷰로 이미 대체됐거나 MVP에 불필요 |
+
+## 7. 단계별 모델과 effort
+
+각 스킬의 `SKILL.md` frontmatter(`model`, `effort`)에 지정되어 있습니다. **사용자가 슬래시 명령으로 직접 호출할 때** 그 스킬이 끝날 때까지 적용되고, 다음 프롬프트부터는 세션에서 고른 모델로 돌아갑니다. 다른 스킬 안에서 이어 호출하면 적용되지 않으므로, 자동 실행(`/gf-run`)은 단계마다 서브에이전트를 씁니다(§8).
+
+| 단계 | 스킬 | 모델 | effort | 이유 |
+|---|---|---|---|---|
+| ① 명세 | `/gf-spec` | Opus 5.5 | medium | 설계 판단과 실패 모드 도출 |
+| ② 구현 | `/gf-implement` | Sonnet 5.5 | high | 코드 작성량이 가장 많은 단계 |
+| ③ 리뷰 | `/gf-review` | Opus 5.5 | medium | 경쟁 조건, 우회 경로 탐지 |
+| 디버깅 | `/gf-investigate` | Opus 5.5 | high | 근본 원인 추론이 가장 어려움 |
+| 보안 감사 | `/gf-security` | Opus 5.5 | medium | 증거 기반 판정 |
+| ④ QA | `/gf-qa` | Sonnet 5.5 | medium | 실행과 확인의 반복 |
+| ⑤ PR | `/gf-ship` | Sonnet 5.5 | low | 정해진 절차 확인 |
+| ⑦ 배포 확인, 인수인계 | `/gf-deploy-check`, `/gf-handoff` | Haiku 5.5 | medium | 읽기 전용 점검과 요약 |
+
+- 모델 ID: `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-5-5`
+- 사용할 수 있는 effort 단계는 모델마다 다를 수 있습니다. 지정한 단계를 모델이 지원하지 않으면 Claude Code의 기본 결정 순서를 따릅니다.
+- 바꿀 때는 해당 `SKILL.md`의 frontmatter와 이 표를 같은 커밋에서 고칩니다.
+
+## 8. 자동 실행 (`/gf-run`)
+
+```
+사람: /gf-spec NN → 팀원 검토 → APPROVED (G1)
+/gf-run NN ─▶ gf-run-implement ─▶ gf-run-review ─▶ gf-run-qa ─▶ gf-run-ship ─▶ PR 생성 후 정지
+              (Sonnet · high)     (Opus · medium)   (Sonnet · medium) (Sonnet · low)
+사람: 팀원 승인 → Rebase and merge (G5)
+```
+
+- `gf-run-*`는 `/gf-run` 전용 래퍼 스킬입니다. `context: fork`로 **단계마다 별도 서브에이전트**를 띄우고, 원래 스킬(`gf-implement` 등)의 절차를 무인 실행 규칙과 함께 따릅니다. 슬래시 메뉴에는 보이지 않습니다(`user-invocable: false`).
+- **멈추는 조건**: 서브에이전트가 `NEEDS_DECISION`(리뷰의 ASK 항목, Gate Integrity 등) / `BLOCKED`(테스트 실패, 환경 문제) / `NEEDS_CONTEXT`(결정 변경 필요)를 반환하면 정지합니다. 사용자가 결정한 뒤 `/gf-run NN --from <단계>`로 재개합니다.
+- **검증**: 오케스트레이터는 서브에이전트 보고를 그대로 믿지 않고 git 상태와 명세의 리뷰·QA 기록을 직접 확인한 뒤 다음 단계로 넘어갑니다.
+- 단계별 모델을 바꿀 때는 원래 스킬과 `gf-run-*` 래퍼의 frontmatter를 **함께** 고칩니다(§7 표와 같은 커밋).
+
+### 모델 적용 실험 (2026-10-21, Claude Code 2.1.299)
+| 방식 | 결과 |
+|---|---|
+| 사용자가 `/probe-a`(model: haiku) 직접 호출 | Haiku로 실행됨 ✅ |
+| 오케스트레이터 스킬이 `probe-a`를 Skill 도구로 이어 호출 (inline) | 지정 모델 무시, 세션 모델(Opus)로 실행됨 ❌ |
+| 오케스트레이터가 `context: fork` + `background: false`인 `probe-a`, `probe-b`를 이어 호출 | Haiku, Sonnet이 각각 사용됨, 순서대로 끝까지 실행됨 ✅ |
+
