@@ -1,0 +1,6 @@
+# Only the server code and the lock file go into the image; weights come from MODEL_DIR (SEC-17).
+*
+!serving/requirements.txt
+!serving/app/
+!models.lock
+**/__pycache__
