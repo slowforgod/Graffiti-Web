@@ -298,10 +298,33 @@ PageBootstrap (SmartLifecycle, 웹 서버보다 앞 단계)
 ## 7. 배포 구성
 
 ```
-GitHub (main 머지) ─▶ GitHub Actions: test → build images → push (GHCR) → SSH로 EC2에서 docker compose pull && up -d
-EC2 (메모리 4GB급, D-36) 보안 그룹: 80/443만 개방, 22는 팀원 IP만 (SEC-10)
-docker-compose: nginx, app, ml(mem_limit, 외부 포트 없음), mysql(볼륨), certbot
-ml 이미지 빌드 시 models.lock의 버전을 S3에서 받아 포함하거나, 컨테이너 시작 시 내려받음 (12-deploy에서 확정)
+GitHub main 머지 ─▶ CI 통과 ─▶ deploy.yml: bootJar, npm build ─▶ 이미지 2개를 GHCR에 push (태그 = 커밋 SHA)
+                                         └─▶ (저장소 변수 STAGING_HOST가 있을 때) SSH: compose pull && up -d ─▶ https 헬스체크
+
+EC2 (메모리 4GB급, D-36) 보안 그룹: 80/443, 22는 팀원과 배포용 (SEC-10)
+/opt/graffiti: compose.yml(deploy/compose.yml 복사본), .env(사람이 작성, SEC-06), image.env(배포가 작성)
+
+  web (nginx, :80 :443) ─┬─ /                 dist (SPA, index.html 폴백, assets 1년 캐시)
+                         ├─ /api /oauth2 /login ─▶ app:8080   limit_req, X-Forwarded-Proto/For
+                         ├─ /ws               ─▶ app:8080   Upgrade, IP당 연결 수 제한
+                         ├─ /actuator/health  ─▶ app:8080   (그 밖의 /actuator는 404)
+                         └─ /.well-known/acme-challenge ─▶ certbot webroot
+  app (Spring, 외부 포트 없음, mem 1g) ── mysql 8.4 (외부 포트 없음, 볼륨, mem 768m)
+  certbot (12시간마다 renew), web은 6시간마다 reload
+  ml (07b에서 추가: 내부망 전용, mem_limit, D-36)
 ```
 
-세부 절차는 `docs/specs/12-deploy.md`에서 확정합니다.
+- 이미지는 CI가 만든 산출물만 담습니다(`.dockerignore` 허용 목록). 소스, `node_modules`, `.env`는 들어가지 않습니다.
+- nginx는 Docker DNS로 `app`을 매 요청 다시 찾으므로 배포로 app 컨테이너가 바뀌어도 nginx를 다시 띄울 필요가 없습니다.
+- 앱은 `server.forward-headers-strategy: native`로 내부 주소(nginx)가 보낸 `X-Forwarded-Proto/For`만 믿습니다. 그래서 OAuth 리디렉션 URI가 `https://<도메인>/login/oauth2/code/google`이 됩니다.
+- TLS: 인증서가 없으면 nginx가 HTTP 전용 설정으로 떠서 Let's Encrypt 챌린지에 응답하고, 인증서가 생긴 뒤 재시작하면 HTTPS 설정(80 → 443 리다이렉트, HSTS)으로 바뀝니다.
+- nginx가 직접 내는 429, 413, 502도 API 에러 형식(`RATE_LIMITED`, `PAYLOAD_TOO_LARGE`, `INTERNAL`)입니다. 접근 로그에는 쿼리 문자열을 남기지 않습니다(SEC-13, OAuth `code`).
+
+| nginx 설정 (`deploy/nginx/`) | 값 | 근거 |
+|---|---|---|
+| `/api/` IP당 속도 | 20r/s, burst 40 | SEC-09 |
+| `/oauth2/`, `/login/` IP당 속도 | 10r/m, burst 10 | SEC-09 |
+| `/ws` IP당 동시 연결 | 10 | SEC-08 |
+| `client_max_body_size` | 3m (앱의 2MB 한도보다 크게 두어 앱이 413을 API 형식으로 응답) | D-30 |
+
+준비 절차(EC2, DNS, 서버 `.env`, GitHub 변수와 Secrets, 첫 인증서)는 `deploy/README.md`에 있습니다. 운영 공개, 백업과 복구 리허설(SEC-11)은 12b에서 정합니다.

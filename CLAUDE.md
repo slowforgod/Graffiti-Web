@@ -40,17 +40,18 @@ cd ml/eval && pytest && python evaluate.py --manifest <세트>/manifest.csv   # 
 
 **전체 검사** (PR 전, `/gf-ship`이 실행): `./gradlew test` + `npm test` + `npm run lint` + `npm run build` + `pytest`(ml/serving, ml/eval)
 
-CI(`.github/workflows/ci.yml`)는 PR과 main push마다 backend `./gradlew test`, frontend `npm ci` → lint → test → build, ml `pytest`(serving, eval), gitleaks 시크릿 스캔을 실행한다.
+CI(`.github/workflows/ci.yml`)는 PR과 main push마다 backend `./gradlew test`, frontend `npm ci` → lint → test → build, ml `pytest`(serving, eval), gitleaks 시크릿 스캔을 실행한다. main에서 CI가 통과하면 `deploy.yml`이 이어서 돈다.
 
 ### Test Coverage
 - Minimum: 도메인 패키지(`page`, `doodle`, `moderation`의 순수 로직) 라인 80% (D-32, PROPOSED)
 - 그 외 패키지: 목표값 없음. 대신 명세의 수용 기준과 SEC 거부 테스트가 전부 있어야 함
 
 ### 배포 설정 (`/gf-deploy-check`가 읽음)
-- 운영 URL: (12-deploy에서 기입)
+- 운영 URL: (12b에서 기입) / 스테이징 URL: 저장소 변수 `STAGING_HOST` (서버 준비 후 기입, `deploy/README.md`)
 - 헬스체크: `/actuator/health`
-- 배포 방식: main 머지 → GitHub Actions → EC2 `docker compose pull && up -d`
-- 환경변수 목록: `.env.example` (값은 GitHub Secrets와 EC2에만)
+- 배포 방식: main 머지 → CI 통과 → `.github/workflows/deploy.yml`이 GHCR에 `graffiti-app`, `graffiti-web` 이미지(태그 = 커밋 SHA) push → `STAGING_HOST`가 있으면 EC2 `/opt/graffiti`에서 `docker compose pull && up -d`
+- 배포 구성 파일: `deploy/` (Dockerfile 2개, `compose.yml`, nginx 설정, 준비 절차 `README.md`)
+- 환경변수 목록: `.env.example` (값은 GitHub Secrets와 EC2의 `/opt/graffiti/.env`에만)
 
 ## 3. 범위
 - **MVP에 없는 것을 만들지 않는다**: 아카이브 열람, 신고, 자동 차단, 잉크 시스템, 누적 접속자, 작성자 표시, 텍스트 수정, 게시된 doodle 부분 지우기. 있으면 좋을 것 같은 기능도 코드에 넣지 말고 `TODOS.md`에 추가한다.

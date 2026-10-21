@@ -31,6 +31,8 @@ spring:
     time-zone: UTC
 
 server:
+  # Behind nginx (12a): trust X-Forwarded-Proto/For from internal addresses only (Tomcat RemoteIpValve).
+  forward-headers-strategy: native
   servlet:
     session:
       timeout: ${graffiti.auth.session-timeout}

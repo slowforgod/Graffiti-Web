@@ -1,4 +1,4 @@
-# Local development only. Staging/production compose comes with 12a-deploy-staging.
+# Local development only. The staging/production stack is deploy/compose.yml (12a).
 # Values come from .env (copy .env.example; never commit .env — SEC-06).
 services:
   mysql:

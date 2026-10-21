@@ -39,6 +39,15 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
+// One fixed name for deploy/app.Dockerfile; the plain jar is not used.
+tasks.bootJar {
+    archiveFileName = "graffiti.jar"
+}
+
+tasks.jar {
+    enabled = false
+}
+
 tasks.withType<Test> {
     useJUnitPlatform()
     finalizedBy(tasks.jacocoTestReport)
