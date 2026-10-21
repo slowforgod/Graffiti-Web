@@ -1,5 +1,7 @@
 ---
 name: gf-deploy-check
+model: claude-haiku-5-5
+effort: medium
 description: graffiti 배포 후 확인. GitHub Actions 배포가 끝난 뒤 운영 환경의 헬스체크, 정적 파일, WebSocket 연결, 공개 API, 보안 헤더와 노출 포트를 점검하고 결과를 명세에 기록한다. 사용자가 명시적으로 /gf-deploy-check를 호출할 때만 사용.
 disable-model-invocation: true
 ---

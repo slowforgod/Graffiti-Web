@@ -1,5 +1,7 @@
 ---
 name: gf-handoff
+model: claude-haiku-5-5
+effort: medium
 description: graffiti 작업 인수인계. save는 현재 브랜치의 진행 상황(명세, 완료/남은 작업, 결정, 막힌 점, git 상태)을 .handoff/<브랜치>.md에 저장하고, load는 그 노트를 읽어 이어서 할 일을 제시한다. "저장해줘", "인수인계", "여기까지 정리", "이어서 하자", "어디까지 했지"에 사용.
 ---
 

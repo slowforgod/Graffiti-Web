@@ -1,5 +1,7 @@
 ---
 name: gf-investigate
+model: claude-opus-5-5
+effort: high
 description: graffiti 체계적 디버깅. 근본 원인을 찾기 전에는 수정하지 않는다(Iron Law). 조사 → 패턴 분석 → 가설 검증 → 최소 수정과 회귀 테스트 → 검증 보고. 가설 3개가 실패하면 멈춘다. 에러, 예외, 테스트 실패, "왜 안 돼", "어제는 됐는데", 이상 동작이 보고되면 직접 고치지 말고 이 스킬을 사용.
 ---
 

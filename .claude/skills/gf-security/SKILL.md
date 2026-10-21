@@ -1,5 +1,7 @@
 ---
 name: gf-security
+model: claude-opus-5-5
+effort: medium
 description: graffiti 배포 전 보안 감사. docs/SECURITY.md의 SEC-01~17을 코드, 설정, 테스트 기준으로 하나씩 점검하고, 규칙마다 증거(파일:줄, 테스트 이름, 실행 결과)를 남긴다. 첫 공개 배포 전, 그리고 인증·권한·모더레이션·실시간 인터셉터를 바꾼 변경을 배포하기 전에 사용. "보안 점검", "security audit", "배포 전 보안 확인"에 사용.
 ---
 
