@@ -1,0 +1,87 @@
+spring:
+  application:
+    name: graffiti
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/graffiti}
+    username: ${DB_USERNAME:graffiti}
+    password: ${DB_PASSWORD:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate   # schema changes go through Flyway only (SEC-01)
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+  jackson:
+    time-zone: UTC
+
+management:
+  endpoints:
+    access:
+      default: none        # SEC-10: only health is reachable
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      access: read-only
+      show-details: never
+      show-components: never
+
+# All tunable numbers live here (INV-10). Keys and sources: docs/ARCHITECTURE.md §6.
+graffiti:
+  canvas:
+    width: 7680
+    height: 4320
+    zoom-min: 0.5
+    zoom-max: 4.0
+    chunk-size: 480
+    cell-size: 48
+  page:
+    countdown-threshold: 0.70
+    countdown-duration: 6h
+    max-lifetime: 7d
+  doodle:
+    max-bbox: 1024
+    max-payload-bytes: 2097152
+    # D-07 order: black, white, red, orange, yellow, green, sky, blue, purple, pink, brown, gray
+    palette:
+      - "#000000"
+      - "#FFFFFF"
+      - "#E53935"
+      - "#FB8C00"
+      - "#FDD835"
+      - "#43A047"
+      - "#29B6F6"
+      - "#1E88E5"
+      - "#8E24AA"
+      - "#EC407A"
+      - "#795548"
+      - "#9E9E9E"
+    stroke-widths: [2, 4, 8, 16]
+    font-sizes: [10, 11, 12, 13, 14, 15, 16, 20, 24, 32, 36, 40, 48, 64, 96]
+    text-max-length: 50
+    draft-idle-timeout: 10m
+  post-cooldown: 30m
+  realtime:
+    max-messages-per-second: 20
+    max-subscriptions: 60
+    inbound-message-max-bytes: 65536
+  query:
+    max-chunks: 60
+    max-batch-delete: 50
+  moderation:
+    timeout: 5s
+    ml:
+      mode: SHADOW
+      base-url: http://ml:8000
+      timeout: 3s
+      # flag-threshold: set per model version after evaluation (D-37, D-39)
+  auth:
+    allowed-domain: khu.ac.kr
+    admin-emails: ${ADMIN_EMAILS:}
+  web:
+    allowed-origins: ${APP_ORIGIN:http://localhost:5173}
