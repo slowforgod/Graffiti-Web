@@ -119,18 +119,18 @@ critical gap: 0
 
 ## 7. 수용 기준 (테스트 가능하게)
 - [ ] AC-1 (D-14): 선분 (100,100)→(200,100) 굵기 8의 칸 집합 = x 96~204, y 96~104 bbox가 덮는 칸(칸 48px 기준 열 2~4, 행 2) — 표 기반 테스트로 굵기·대각선·경계 케이스 포함
-- [ ] AC-2: 텍스트 bbox (0,0,48,48)은 칸 1개, (47,47,2,2)는 칸 4개
+- [x] AC-2: 텍스트 bbox (0,0,48,48)은 칸 1개, (47,47,2,2)는 칸 4개
 - [ ] AC-3 (INV-12): 같은 footprint를 +1 후 -1 하면 그리드가 처음과 같다. 임의 순서의 footprint 집합을 적용한 결과가 순서와 무관하다
-- [ ] AC-4: `occupancyPermille` = 점유 칸 수 × 1000 / 14,400 (내림), `bitmap`은 1,800바이트, 칸 (col,row)의 비트 = `row*160+col`
+- [x] AC-4: `occupancyPermille` = 점유 칸 수 × 1000 / 14,400 (내림), `bitmap`은 1,800바이트, 칸 (col,row)의 비트 = `row*160+col`
 - [ ] AC-5 (D-15): 점유율이 700‰에 도달한 커맨드에서 상태가 COUNTDOWN, `countdown_started_at = now`, `scheduled_end_at = min(created+7d, now+6h)`
 - [ ] AC-6 (INV-03): COUNTDOWN에서 점유율이 내려가도 COUNTDOWN 유지, `countdown_started_at` 불변
-- [ ] AC-7: 7일이 지나면 낙서가 없어도 `end_reason=MAX_LIFETIME`으로 종료되고 seq+1 페이지가 ACTIVE로 생성된다
-- [ ] AC-8: 카운트다운 종료 시 `end_reason=OCCUPANCY`, `final_occupancy_permille`, `final_occupancy_bitmap` 저장
+- [x] AC-7: 7일이 지나면 낙서가 없어도 `end_reason=MAX_LIFETIME`으로 종료되고 seq+1 페이지가 ACTIVE로 생성된다
+- [x] AC-8: 카운트다운 종료 시 `end_reason=OCCUPANCY`, `final_occupancy_permille`, `final_occupancy_bitmap` 저장
 - [ ] AC-9 (INV-04): 끝난 pageId로 `ApplyFootprint` → `PAGE_ENDED`, 상태 변화 없음
 - [ ] AC-10 (INV-11, SEC-01): 동시에 두 전이를 시도하면 하나만 성공 / 비종료 페이지 2개 INSERT가 DB에서 거절됨
 - [ ] AC-11 (D-25): 재시작 시 PUBLISHED footprint로 그리드가 재계산되고, 지난 `scheduled_end_at`은 즉시 넘김, 아니면 예약된다. 이 과정이 웹 요청 수신 전에 끝난다
-- [ ] AC-12: DB 실패 시 메모리 상태와 이벤트가 바뀌지 않고, 이후 커맨드가 정상 처리된다
-- [ ] AC-13: 이벤트(`PageStatusChanged`, `OccupancyChanged`, `PageTurned`)는 커밋 후에만 발행된다
+- [x] AC-12: DB 실패 시 메모리 상태와 이벤트가 바뀌지 않고, 이후 커맨드가 정상 처리된다
+- [x] AC-13: 이벤트(`PageStatusChanged`, `OccupancyChanged`, `PageTurned`)는 커밋 후에만 발행된다
 - [ ] AC-14 (INV-10): `page` 코드에 7680, 4320, 48, 480, 0.7, 6h, 7d 같은 숫자가 없다(테스트 fixture 제외)
 - [ ] AC-15 (INV-07): `page` 행 DELETE 경로가 없다
 
@@ -161,8 +161,18 @@ PR revert. `V3__page.sql`은 새 테이블만 추가. 배포 전이므로 데이
 ---
 
 ## 리뷰 기록 (/gf-review가 추가)
+- 2026-10-21 · `4e50ee4` · CRITICAL 0 / INFO 3 · AUTO-FIX 2 · ASK 없음 · PASS
+  - AUTO-FIX 1 (경쟁 조건, 테스트가 잡음): 시작 시 이미 종료 시각이 지난 페이지는 `InstallPage`가 건 타이머와 `PageBootstrap`의 `EndPage`가 동시에 넘기려 해서, 타이머가 먼저 실행되면 기동이 `PAGE_ENDED`로 실패했음. 둘 다 큐에서 순서대로 실행되므로 두 번째의 `PAGE_ENDED`를 "이미 넘어감"으로 처리
+  - AUTO-FIX 2: 커맨드 시각을 밀리초로 잘라 DB `DATETIME(3)`과 메모리 값을 맞춤
+  - INFO-1: `@SuppressWarnings` 없이 타입 안전하게 디스패치하려고 `PageCommand.executeOn(handler)` 방식 사용 (Gate Integrity RH-13 회피)
+  - INFO-2: 점유율 변화만 있는 `ApplyFootprint`는 DB 쓰기가 없음(INV-12, 재계산 가능). 06에서 doodle INSERT와 같은 트랜잭션으로 묶을 예정
+  - INFO-3: 큐 스레드 종료 시 남은 커맨드는 실행하고 새 제출은 거절(`shutdown()`)
 
 ## QA 기록 (/gf-qa가 추가)
+- 2026-10-21 · `4e50ee4` · 통과 · 버그 1(위 AUTO-FIX 1, 회귀 테스트 `PageBootstrapIT.restartAfterTheScheduledEndTurnsThePageAtOnce`) · PASS
+  - 자동: backend `./gradlew test` 70개 통과(실패 0, 스킵 0). `page` 패키지 라인 커버리지: 순수 로직 `OccupancyGrid` 100%, `PageLifecycle` 100%, `Footprint` 93%, `CellGeometry` 85%, 큐 `PageCommandHandler` 98%
+  - 수동: 로컬 MySQL + `bootRun`(`GRAFFITI_PAGE_MAXLIFETIME=30s`) → 페이지 1, 2가 30초마다 `MAX_LIFETIME`으로 넘어가고 seq가 이어짐, `final_occupancy_bitmap` 1,800바이트 저장 / 서버를 끄고 종료 시각이 지난 뒤 재시작 → 로그상 Tomcat 시작 전에 페이지 3이 즉시 넘어가고 페이지 4가 ACTIVE
+  - 미검증: 실제 낙서로 70% 카운트다운을 일으키는 시나리오는 06(게시) 이후. 지금은 통합 테스트(`PageCommandProcessorIT`)로만 확인
 
 ## 보안 감사 기록 (/gf-security가 추가, 해당 시)
 
