@@ -21,13 +21,14 @@
 
 ## 2. 명령어와 설정
 
-> `00-bootstrap` 명세에서 확정한 뒤 이 절을 갱신한다. 아래는 예정 값이다.
+> backend, frontend 명령은 `00-bootstrap`에서 확정했다. `ml/` 명령은 ML 트랙에서 만들 예정 값이다.
+> 요구사항: Java 21, Node 22, Docker(로컬 MySQL과 Testcontainers). 비밀값은 `.env.example`을 복사한 `.env`에 사람이 채운다(SEC-06).
 
 ```bash
-docker compose up -d mysql                 # 로컬 DB
-cd backend && ./gradlew bootRun            # 백엔드 (localhost:8080)
+docker compose up -d mysql                 # 로컬 DB (.env의 DB_USERNAME/DB_PASSWORD/DB_ROOT_PASSWORD, 127.0.0.1:3306)
+cd backend && ./gradlew bootRun            # 백엔드 (localhost:8080, DB_URL/DB_USERNAME/DB_PASSWORD 환경변수 필요)
 cd backend && ./gradlew test               # 백엔드 전체 테스트 (Testcontainers 사용 → Docker 필요)
-cd backend && ./gradlew jacocoTestReport   # 커버리지
+cd backend && ./gradlew jacocoTestReport   # 커버리지 (test 후 자동 생성, build/reports/jacoco)
 cd frontend && npm ci && npm run dev       # 프론트 (localhost:5173, /api와 /ws는 8080으로 프록시)
 cd frontend && npm test                    # 프론트 테스트 (Vitest)
 cd frontend && npm run lint                # ESLint (dangerouslySetInnerHTML 금지 규칙 포함)
@@ -38,6 +39,8 @@ cd ml/eval && python evaluate.py            # 평가 세트로 지표 계산 (D-
 ```
 
 **전체 검사** (PR 전, `/gf-ship`이 실행): `./gradlew test` + `npm test` + `npm run lint` + `npm run build` + `pytest`(ml/serving)
+
+CI(`.github/workflows/ci.yml`)는 PR과 main push마다 backend `./gradlew test`, frontend `npm ci` → lint → test → build, gitleaks 시크릿 스캔을 실행한다. `ml/serving`이 생기면 pytest 단계를 추가한다.
 
 ### Test Coverage
 - Minimum: 도메인 패키지(`page`, `doodle`, `moderation`의 순수 로직) 라인 80% (D-32, PROPOSED)
