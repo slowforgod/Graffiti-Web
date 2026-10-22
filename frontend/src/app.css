@@ -1,0 +1,86 @@
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #d9dde3;
+  font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.app-header {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.app-header > * {
+  pointer-events: auto;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 18px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+}
+
+.app-header nav {
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+}
+
+.canvas-screen {
+  position: fixed;
+  inset: 0;
+  touch-action: none;
+}
+
+.canvas-error {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 12px 16px;
+  background: #fff;
+  border-radius: 8px;
+}
+
+.minimap {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  width: 160px;
+  height: 90px;
+  background: #fff;
+  border: 1px solid #b0b7c3;
+  border-radius: 4px;
+  overflow: hidden;
+  z-index: 10;
+}
+
+.minimap canvas {
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  display: block;
+}
+
+.minimap-view {
+  position: absolute;
+  border: 1.5px solid #e53935;
+  box-sizing: border-box;
+  pointer-events: none;
+}
