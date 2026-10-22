@@ -101,13 +101,22 @@ class RealtimeIT extends WebIntegrationTest {
     void tearDown() {
         clients.forEach(c -> {
             if (c.session.isConnected()) {
-                c.session.disconnect();
+                try {
+                    c.session.disconnect();
+                } catch (IllegalStateException e) {
+                    // The server closed it in the meantime (after an ERROR frame).
+                }
             }
         });
         receiptScheduler.shutdown();
     }
 
     // --- connection and subscription checks ---
+
+    @Test
+    void sessionsSendTheirBufferBeforeClosing() {
+        assertThat(context.getBean("subProtocolWebSocketHandler")).isInstanceOf(FlushBeforeClose.Handler.class);
+    }
 
     @Test
     void handshakeFromAnotherOriginIsRefused() {
