@@ -43,7 +43,9 @@ class PageController {
                 page.geometry().cellSize(), props.canvas().zoomMin(), props.canvas().zoomMax(),
                 doodle.palette(), doodle.strokeWidths(), doodle.fontSizes(), doodle.defaultFontSize(),
                 doodle.textMaxLength(), doodle.maxBbox(), props.query().maxChunks(),
-                props.postCooldown().toSeconds(), props.page().countdownWarning().toSeconds(), doodle.draftIdleTimeout().toSeconds());
+                props.postCooldown().toSeconds(), props.page().countdownWarning().toSeconds(),
+                doodle.draftIdleTimeout().toSeconds(), props.realtime().cursorInterval().toMillis(),
+                props.realtime().heartbeat().toMillis());
     }
 
     record CurrentPage(String id, int seq, PageStatus status, int occupancyPermille, Instant countdownStartedAt,
@@ -53,7 +55,7 @@ class PageController {
     record ClientConfig(int width, int height, int chunkSize, int cellSize, double zoomMin, double zoomMax,
             List<String> palette, List<Integer> strokeWidths, List<Integer> fontSizes, int defaultFontSize,
             int textMaxLength, int maxBbox, int maxChunks, long postCooldownSec, long countdownWarningSec,
-            long draftIdleTimeoutSec) {
+            long draftIdleTimeoutSec, long cursorIntervalMs, long heartbeatMs) {
     }
 
     record MinimapResponse(int cols, int rows, String bitmap, int occupancyPermille) {

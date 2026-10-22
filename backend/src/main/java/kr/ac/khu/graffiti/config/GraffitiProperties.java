@@ -98,7 +98,14 @@ public record GraffitiProperties(
     public record Realtime(
             @Positive int maxMessagesPerSecond,
             @Positive int maxSubscriptions,
-            @Positive int inboundMessageMaxBytes) {
+            @Positive int inboundMessageMaxBytes,
+            @NotNull Duration cursorInterval,
+            @NotNull Duration heartbeat) {
+
+        @AssertTrue(message = "cursor-interval and heartbeat must be positive")
+        public boolean isIntervalsPositive() {
+            return isPositive(cursorInterval) && isPositive(heartbeat);
+        }
     }
 
     public record Query(

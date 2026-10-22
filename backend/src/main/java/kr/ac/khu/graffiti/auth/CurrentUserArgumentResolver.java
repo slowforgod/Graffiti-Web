@@ -3,7 +3,6 @@ package kr.ac.khu.graffiti.auth;
 import java.util.Optional;
 import kr.ac.khu.graffiti.common.error.ApiException;
 import kr.ac.khu.graffiti.common.error.ErrorCode;
-import kr.ac.khu.graffiti.user.Role;
 import kr.ac.khu.graffiti.user.User;
 import kr.ac.khu.graffiti.user.UserAccountService;
 import org.springframework.core.MethodParameter;
@@ -39,7 +38,7 @@ class CurrentUserArgumentResolver implements HandlerMethodArgumentResolver {
             NativeWebRequest request, WebDataBinderFactory binderFactory) {
         Access access = parameter.getParameterAnnotation(CurrentUser.class).value();
         User user = currentUser().orElseThrow(() -> new ApiException(ErrorCode.UNAUTHENTICATED));
-        check(user, access);
+        AccessCheck.check(user, access);
         return new AuthUser(user.getId(), user.getRole(), user.hasConsented(), user.isBanned());
     }
 
@@ -49,20 +48,5 @@ class CurrentUserArgumentResolver implements HandlerMethodArgumentResolver {
             return Optional.empty();
         }
         return accounts.find(principal.userId());
-    }
-
-    static void check(User user, Access access) {
-        if (access == Access.SIGNED_IN) {
-            return;
-        }
-        if (!user.hasConsented()) {
-            throw new ApiException(ErrorCode.CONSENT_REQUIRED);
-        }
-        if (access == Access.AUTHOR && user.isBanned()) {
-            throw new ApiException(ErrorCode.BANNED);
-        }
-        if (access == Access.ADMIN && user.getRole() != Role.ADMIN) {
-            throw new ApiException(ErrorCode.FORBIDDEN);
-        }
     }
 }

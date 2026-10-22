@@ -15,6 +15,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import kr.ac.khu.graffiti.page.Footprint;
+import kr.ac.khu.graffiti.page.FreshPage;
 import kr.ac.khu.graffiti.page.PageCommand;
 import kr.ac.khu.graffiti.page.PageCommandProcessor;
 import kr.ac.khu.graffiti.page.PageSnapshot;
@@ -24,6 +25,7 @@ import kr.ac.khu.graffiti.user.UserAccountService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.SimpleJdbcInsert;
 import org.springframework.test.web.servlet.MockMvc;
@@ -44,6 +46,9 @@ class CanvasReadIT extends WebIntegrationTest {
     private MutableClock clock;
 
     @Autowired
+    private ApplicationContext context;
+
+    @Autowired
     private JdbcTemplate jdbc;
 
     @Autowired
@@ -57,9 +62,7 @@ class CanvasReadIT extends WebIntegrationTest {
 
     @BeforeEach
     void startOnFreshPage() {
-        PageSnapshot current = processor.submit(new PageCommand.GetPageSnapshot()).join();
-        clock.set(current.scheduledEndAt().plusSeconds(1));
-        page = processor.submit(new PageCommand.EndPage(current.id())).join();
+        page = FreshPage.start(context, clock);
         authorId = accounts.loginOrRegister("sub-" + UUID.randomUUID(), "r-" + UUID.randomUUID() + "@khu.ac.kr")
                 .getId();
     }
@@ -90,7 +93,9 @@ class CanvasReadIT extends WebIntegrationTest {
                 .andExpect(jsonPath("$.config.maxChunks").value(60))
                 .andExpect(jsonPath("$.config.postCooldownSec").value(1800))
                 .andExpect(jsonPath("$.config.countdownWarningSec").value(300))
-                .andExpect(jsonPath("$.config.draftIdleTimeoutSec").value(600));
+                .andExpect(jsonPath("$.config.draftIdleTimeoutSec").value(600))
+                .andExpect(jsonPath("$.config.cursorIntervalMs").value(100))
+                .andExpect(jsonPath("$.config.heartbeatMs").value(10000));
     }
 
     @Test
