@@ -38,6 +38,15 @@ public sealed interface PageCommand<R> {
         }
     }
 
+    /** Reads the occupancy bitmap of {@code pageId}, which must be the current page (D-08). */
+    record GetMinimap(long pageId) implements PageCommand<Minimap> {
+
+        @Override
+        public Minimap executeOn(PageCommandHandler handler) {
+            return handler.minimap(this);
+        }
+    }
+
     /** Startup only: returns the live page id, creating page seq 1 (or the next seq) when none exists. */
     record EnsureLivePage() implements PageCommand<Long> {
 

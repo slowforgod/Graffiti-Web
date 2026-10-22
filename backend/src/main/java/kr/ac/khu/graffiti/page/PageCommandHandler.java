@@ -46,6 +46,11 @@ class PageCommandHandler {
         return requireCurrent().snapshot();
     }
 
+    Minimap minimap(PageCommand.GetMinimap c) {
+        OccupancyGrid grid = requireCurrent(c.pageId()).grid();
+        return new Minimap(grid.geometry().cols(), grid.geometry().rows(), grid.bitmap(), grid.occupancyPermille());
+    }
+
     PageSnapshot applyFootprint(PageCommand.ApplyFootprint c) {
         PageState state = requireCurrent(c.pageId());
         OccupancyGrid grid = state.grid().copy();

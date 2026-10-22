@@ -27,8 +27,9 @@ import org.springframework.security.web.csrf.CsrfException;
 
 /**
  * Google OIDC login, session cookies and CSRF (SEC-03, SEC-04). Every {@code /api/**} path needs a
- * session except the public {@code GET /api/me}; finer checks (consent, ban, admin) live in
- * {@code @CurrentUser}. Other paths are the OAuth endpoints, health and the error page.
+ * session except the public reads {@code GET /api/me} and {@code GET /api/pages/**}; finer checks
+ * (consent, ban, admin) live in {@code @CurrentUser}. Other paths are the OAuth endpoints, health
+ * and the error page.
  */
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
@@ -51,7 +52,7 @@ class SecurityConfig {
 
         http
                 .authorizeHttpRequests(a -> a
-                        .requestMatchers(HttpMethod.GET, "/api/me").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/me", "/api/pages/**").permitAll()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll())
                 .csrf(c -> c

@@ -82,11 +82,13 @@
     "zoomMin": 0.5, "zoomMax": 4.0,
     "palette": ["#000000", "#FFFFFF", "..."], "strokeWidths": [2,4,8,16],
     "fontSizes": [10,11,12,13,14,15,16,20,24,32,36,40,48,64,96], "defaultFontSize": 24,
-    "textMaxLength": 50, "maxBbox": 1024,
+    "textMaxLength": 50, "maxBbox": 1024, "maxChunks": 60,
     "postCooldownSec": 1800, "countdownWarningSec": 300, "draftIdleTimeoutSec": 600
   }
 }
 ```
+- `width`, `height`, `chunkSize`, `cellSize`는 **현재 페이지 행의 스냅샷 값**입니다(D-06). 나머지는 서버 설정값입니다(INV-10).
+- 세 엔드포인트(`/current`, `/minimap`, `/doodles`) 모두 비로그인으로 호출할 수 있습니다.
 
 `GET /api/pages/{pageId}/minimap`
 ```json
@@ -105,7 +107,9 @@
 }
 ```
 - 작성자 정보는 **절대 포함하지 않습니다**(D-22).
-- 종료된 페이지 ID로 요청하면 `PAGE_ENDED`를 반환합니다(아카이브 미제공, D-17).
+- 종료된 페이지 ID(또는 없는 ID)로 요청하면 `PAGE_ENDED`를 반환합니다(아카이브 미제공, D-17). `/minimap`도 같습니다.
+- `chunks` 검증(SEC-02, SEC-09): 쉼표로 구분한 10진 정수, 각각 `0 ≤ i < 청크 수`(기본 144), 최대 `maxChunks`개(중복 포함 개수). 어기면 400 `VALIDATION_FAILED`, `details.field = "chunks"`, `details.reason`은 `required` / `too_many` / `not_a_number` / `out_of_range`. 중복은 한 번만 조회합니다.
+- 청크 번호 = `cy * 16 + cx`. doodle은 bbox(`[x, x+w) × [y, y+h)`)가 걸친 청크마다 한 번 조회되지만 응답에는 한 번만, id 오름차순으로 들어갑니다.
 
 ## 3. doodle
 
