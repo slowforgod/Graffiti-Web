@@ -12,6 +12,7 @@ import { fetchCurrentPage } from '../shared/pageConfig';
 import { clockOffset, cooldownLeft, endsAfter, minutesLeft } from '../tools/cooldown';
 import { draftBounds } from '../tools/draft';
 import { publishBody, publishDoodle } from '../tools/publish';
+import { sizeGuide } from '../tools/sizeGuide';
 import type { DraftNotice } from '../tools/useDraft';
 import { useDraft } from '../tools/useDraft';
 import DraftActions from '../ui/DraftActions';
@@ -28,7 +29,7 @@ import type { Doodle } from './doodles';
 import type { RemoteDraft } from './remoteDrafts';
 import { fetchChunkDoodles } from './doodles';
 import { useWindowSize } from './useWindowSize';
-import type { Point, Viewport } from './viewport';
+import type { Point, Rect, Viewport } from './viewport';
 import { centerOn, visibleWorldRect } from './viewport';
 
 // Waits for panning or zooming to settle before asking for new chunks.
@@ -192,6 +193,18 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
   const own = tools.draft;
   const bounds = own ? draftBounds(own) : null;
   const tool = access === 'ok' ? tools.tool : 'move';
+  // With the pen, a dashed square shows how big one drawing may be. It is kept here once the drawing
+  // has strokes so it does not move with the view.
+  const drawingBounds = own?.kind === 'DRAWING' ? bounds : null;
+  const [heldGuide, setHeldGuide] = useState<Rect | null>(null);
+  const guide =
+    tool === 'pen' || drawingBounds
+      ? sizeGuide(heldGuide, drawingBounds, visibleWorldRect(viewport, size), config)
+      : null;
+  const nextHeld = drawingBounds ? guide : null;
+  if (!sameRect(nextHeld, heldGuide)) {
+    setHeldGuide(nextHeld);
+  }
   const sendCursor = useMemo(
     () =>
       author &&
@@ -259,6 +272,7 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
         onPointerMove={sendCursor && !own ? (p) => sendCursor.push(p) : undefined}
         tool={publishing ? 'move' : tool}
         ownDraft={own}
+        sizeGuide={guide}
         otherDrafts={drafts}
         onDrawStart={tools.pointerDown}
         onDrawMove={tools.pointerMove}
@@ -312,4 +326,8 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
       <Minimap config={config} cells={cells} view={visibleWorldRect(viewport, size)} />
     </div>
   );
+}
+
+function sameRect(a: Rect | null, b: Rect | null): boolean {
+  return a === b || (!!a && !!b && a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h);
 }

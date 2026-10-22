@@ -1,6 +1,6 @@
 import type Konva from 'konva';
 import { useEffect, useRef, useState } from 'react';
-import { Layer, Stage } from 'react-konva';
+import { Layer, Rect, Stage } from 'react-konva';
 import type { ClientConfig } from '../shared/pageConfig';
 import type { Draft } from '../tools/draft';
 import type { Tool } from '../tools/useDraft';
@@ -11,7 +11,7 @@ import DraftLayer from './DraftLayer';
 import GridBackground from './GridBackground';
 import type { Doodle } from './doodles';
 import type { RemoteDraft } from './remoteDrafts';
-import type { Point, Size, Viewport } from './viewport';
+import type { Point, Rect as Box, Size, Viewport } from './viewport';
 import { clampPosition, clampScale, toWorld, visibleWorldRect, zoomAt } from './viewport';
 
 interface Props {
@@ -26,6 +26,8 @@ interface Props {
   // Pen, text and eraser take one finger or the mouse; `move` (or holding space) pans instead (D-07).
   tool?: Tool;
   ownDraft?: Draft | null;
+  // The dashed square of the largest drawing, shown with the pen.
+  sizeGuide?: Box | null;
   otherDrafts?: RemoteDraft[];
   onDrawStart?: (world: Point, scale: number) => void;
   onDrawMove?: (world: Point, scale: number) => void;
@@ -51,6 +53,7 @@ export default function CanvasView({
   onPointerMove,
   tool = 'move',
   ownDraft = null,
+  sizeGuide = null,
   otherDrafts = [],
   onDrawStart,
   onDrawMove,
@@ -186,6 +189,17 @@ export default function CanvasView({
         ))}
       </Layer>
       <Layer listening={false}>
+        {sizeGuide && (
+          <Rect
+            x={sizeGuide.x}
+            y={sizeGuide.y}
+            width={sizeGuide.w}
+            height={sizeGuide.h}
+            stroke="#000000"
+            strokeWidth={1.5 / viewport.scale}
+            dash={[8 / viewport.scale, 6 / viewport.scale]}
+          />
+        )}
         <DraftLayer own={ownDraft} others={otherDrafts} palette={config.palette} scale={viewport.scale} />
         <CursorLayer cursors={cursors} scale={viewport.scale} />
       </Layer>
