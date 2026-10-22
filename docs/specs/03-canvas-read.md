@@ -1,6 +1,6 @@
 # 03-canvas-read: 현재 페이지, 청크 조회, 미니맵 API와 Konva 뷰포트
 
-- **상태**: IN_PROGRESS
+- **상태**: IN_PROGRESS (PR 대기)
 - **승인자**: 현 (slowforgod) / 승인일: 2026-10-22 (standing 지시 "승인 받지말고 다 해"에 따라 결정 필요 1~3은 추천안으로 확정)
 - **브랜치**: `feat/03-canvas-read`
 - **선행 명세**: 01, 02
@@ -134,19 +134,19 @@ GET /api/pages/{p}/doodles?chunks=a,b
 critical gap: 0
 
 ## 7. 수용 기준 (테스트 가능하게)
-- [ ] AC-1: 비로그인 `GET /api/pages/current` → 200, `id`는 문자열, `config.width/height/chunkSize/cellSize`는 현재 페이지 행 값, `serverTime`은 주입된 `Clock` 시각, `config`에 palette 12색·strokeWidths·fontSizes·zoomMin/Max·maxChunks 포함
-- [ ] AC-2: 현재 페이지에서 칸 몇 개를 점유시킨 뒤 `GET /minimap` → `cols=160, rows=90`, base64 디코드 1,800바이트, 점유 칸 비트만 1, `occupancyPermille`이 스냅샷과 같음
-- [ ] AC-3: 청크 0과 1에 걸친 PUBLISHED doodle 1개, 청크 1의 DELETED doodle 1개가 있을 때 `chunks=0,1` → doodle 1개, `payload`는 저장한 JSON과 같은 구조, `bbox`, `kind`, `id`(문자열)만 있고 작성자 정보 없음
-- [ ] AC-4 (SEC-09, D-30): `chunks` 61개 → 400 `VALIDATION_FAILED`, `chunks=144`(범위 밖) → 400, `chunks=a` → 400, `chunks` 없음 → 400
-- [ ] AC-5 (INV-04, D-17): 페이지를 넘긴 뒤 옛 pageId로 `doodles`, `minimap` → 409 `PAGE_ENDED`
-- [ ] AC-6 (SEC-01): 청크 조회 SQL은 `NamedParameterJdbcTemplate` 바인딩만 사용 (코드 리뷰 + 테스트에서 `chunks`에 SQL 조각을 넣으면 400)
-- [ ] AC-7 (D-05, INV-10): `viewport` 줌은 config의 min/max로 고정, 포인터 아래 월드 좌표가 줌 전후로 같다
-- [ ] AC-8 (D-06): 1920×1080 화면, 줌 0.5에서 보이는 청크 수 ≤ 60. 3840×2160, 0.5배처럼 60개를 넘으면 중심에서 가까운 60개
-- [ ] AC-9: 청크 3, 4에 걸친 doodle은 청크 3이 화면에서 빠져도 청크 4가 보이면 유지, 둘 다 빠지면 해제
-- [ ] AC-10 (D-08): 미니맵 비트 순서 디코드가 서버와 같다(`row*cols+col`, MSB 먼저)
-- [ ] AC-11 (INV-10): `frontend/src`(테스트 제외)에 7680, 4320, 480, 48, 0.5, 4.0, 60 같은 캔버스 수치 리터럴이 없다
-- [ ] AC-12 (SEC-12): 텍스트 doodle은 Konva `Text`로 그리고 DOM에 사용자 텍스트가 없다 (`dangerouslySetInnerHTML` 린트 규칙 유지)
-- [ ] AC-13: 브라우저에서 캔버스가 열리고 휠 줌, 드래그 이동, 미니맵의 보는 영역 사각형이 따라 움직인다
+- [x] AC-1: 비로그인 `GET /api/pages/current` → 200, `id`는 문자열, `config.width/height/chunkSize/cellSize`는 현재 페이지 행 값, `serverTime`은 주입된 `Clock` 시각, `config`에 palette 12색·strokeWidths·fontSizes·zoomMin/Max·maxChunks 포함
+- [x] AC-2: 현재 페이지에서 칸 몇 개를 점유시킨 뒤 `GET /minimap` → `cols=160, rows=90`, base64 디코드 1,800바이트, 점유 칸 비트만 1, `occupancyPermille`이 스냅샷과 같음
+- [x] AC-3: 청크 0과 1에 걸친 PUBLISHED doodle 1개, 청크 1의 DELETED doodle 1개가 있을 때 `chunks=0,1` → doodle 1개, `payload`는 저장한 JSON과 같은 구조, `bbox`, `kind`, `id`(문자열)만 있고 작성자 정보 없음
+- [x] AC-4 (SEC-09, D-30): `chunks` 61개 → 400 `VALIDATION_FAILED`, `chunks=144`(범위 밖) → 400, `chunks=a` → 400, `chunks` 없음 → 400
+- [x] AC-5 (INV-04, D-17): 페이지를 넘긴 뒤 옛 pageId로 `doodles`, `minimap` → 409 `PAGE_ENDED`
+- [x] AC-6 (SEC-01): 청크 조회 SQL은 `NamedParameterJdbcTemplate` 바인딩만 사용 (코드 리뷰 + 테스트에서 `chunks`에 SQL 조각을 넣으면 400)
+- [x] AC-7 (D-05, INV-10): `viewport` 줌은 config의 min/max로 고정, 포인터 아래 월드 좌표가 줌 전후로 같다
+- [x] AC-8 (D-06): 1920×1080 화면, 줌 0.5에서 보이는 청크 수 ≤ 60. 3840×2160, 0.5배처럼 60개를 넘으면 중심에서 가까운 60개
+- [x] AC-9: 청크 3, 4에 걸친 doodle은 청크 3이 화면에서 빠져도 청크 4가 보이면 유지, 둘 다 빠지면 해제
+- [x] AC-10 (D-08): 미니맵 비트 순서 디코드가 서버와 같다(`row*cols+col`, MSB 먼저)
+- [x] AC-11 (INV-10): `frontend/src`(테스트 제외)에 7680, 4320, 480, 48, 0.5, 4.0, 60 같은 캔버스 수치 리터럴이 없다
+- [x] AC-12 (SEC-12): 텍스트 doodle은 Konva `Text`로 그리고 DOM에 사용자 텍스트가 없다 (`dangerouslySetInnerHTML` 린트 규칙 유지)
+- [x] AC-13: 브라우저에서 캔버스가 열리고 휠 줌, 드래그 이동, 미니맵의 보는 영역 사각형이 따라 움직인다
 
 ## 8. 테스트 계획
 | 층 | 대상 | 파일 (예정) |
@@ -175,8 +175,17 @@ PR revert. `V4__doodle.sql`은 빈 테이블 두 개만 만든다. 배포 후 �
 ---
 
 ## 리뷰 기록 (/gf-review가 추가)
+- 2026-10-22 · `9476957` · CRITICAL 0 / INFO 3 · AUTO-FIX 1 · ASK 없음 · PASS
+  - AUTO-FIX 1 (테스트 중 발견): IT의 doodle INSERT가 `LAST_INSERT_ID()`를 별도 커넥션에서 읽을 수 있어 `SimpleJdbcInsert`의 생성 키로 교체
+  - INFO-1: 공개 읽기 세 개가 모두 큐를 한 번 거친다(스냅샷 비교). 큐 작업은 복사 수준이라 수 μs. 공개 조회 폭탄은 nginx `limit_req`(12a)가 먼저 막음. 앱 내부 제한은 11에서 재검토
+  - INFO-2: 페이지 확인과 SQL 조회 사이에 페이지가 넘어가면 옛 페이지 doodle이 한 번 응답될 수 있음(명세 §6). 다음 요청이 `PAGE_ENDED`라 클라이언트가 새 페이지로 다시 로딩
+  - INFO-3: `doodle` 레이어 하나에 id 순서로 그림. 청크별 `Group`으로 나누면 겹친 doodle의 위아래가 청크 경계에서 뒤집혀서 바꿈. 비트맵 캐시는 성능 문제가 보이면 도입(ARCHITECTURE §3 갱신)
 
 ## QA 기록 (/gf-qa가 추가)
+- 2026-10-22 · `9476957` · 통과 · 버그 0 · PASS
+  - 자동: backend `./gradlew test` 135개 통과(실패 0, 스킵 0, 새 테스트 `ChunkListTest`, `CanvasReadIT` 포함). frontend `npm test` 38개 통과, `npm run lint` 통과, `npm run build` 통과
+  - 수동(헤드리스 Chromium 1280×720, 로컬 MySQL + `java -jar graffiti.jar` + Vite): SQL로 그림 1개(청크 4개 걸침), 두 줄 텍스트 1개, DELETED 1개를 넣음 → 첫 화면 중앙에 그림과 텍스트가 보이고 DELETED는 안 보임 / 휠 확대 시 포인터 아래 지점 고정 / 드래그 이동 후 축소 시 미니맵 사각형이 함께 움직임 / `chunks=999` → 400 `out_of_range`
+  - 미검증: 실제 터치 기기의 핀치 줌(코드와 수학만 확인, 브라우저 QA는 마우스). 미니맵의 점유 칸 표시는 게시(06)가 점유율을 갱신한 뒤에 확인 가능(지금은 IT로 비트맵 형식만 확인)
 
 ## 보안 감사 기록 (/gf-security가 추가, 해당 시)
 
