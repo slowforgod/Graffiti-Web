@@ -71,6 +71,7 @@ graffiti:
     countdown-threshold: 0.70
     countdown-duration: 6h
     max-lifetime: 7d
+    countdown-warning: 5m   # T-5 minutes warning, computed by the client (D-16)
   doodle:
     max-bbox: 1024
     max-payload-bytes: 2097152
@@ -90,6 +91,7 @@ graffiti:
       - "#9E9E9E"
     stroke-widths: [2, 4, 8, 16]
     font-sizes: [10, 11, 12, 13, 14, 15, 16, 20, 24, 32, 36, 40, 48, 64, 96]
+    default-font-size: 24
     text-max-length: 50
     draft-idle-timeout: 10m
   post-cooldown: 30m
