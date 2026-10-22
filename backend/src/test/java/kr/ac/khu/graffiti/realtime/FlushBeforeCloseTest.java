@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -44,7 +45,8 @@ class FlushBeforeCloseTest {
         return socket;
     }
 
-    @Test
+    // Repeated: the writer and the close race, and a wrong order showed up only now and then.
+    @RepeatedTest(20)
     void anErrorBufferedBehindAnotherWriteIsSentBeforeTheClose() throws Exception {
         FlushBeforeClose.Session session = new FlushBeforeClose.Session(socket(), SEND_TIME_LIMIT_MS, BUFFER_LIMIT);
         Thread connected = new Thread(() -> send(session, "CONNECTED"));
@@ -61,7 +63,7 @@ class FlushBeforeCloseTest {
         connected.join(SEND_TIME_LIMIT_MS);
         closing.join(SEND_TIME_LIMIT_MS);
 
-        assertThat(written).startsWith("CONNECTED", "ERROR").endsWith("close");
+        assertThat(written).containsExactly("CONNECTED", "ERROR", "close");
     }
 
     @Test
