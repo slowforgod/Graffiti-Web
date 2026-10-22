@@ -23,6 +23,7 @@ import kr.ac.khu.graffiti.support.MutableClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.boot.test.context.TestComponent;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.event.EventListener;
@@ -45,6 +46,9 @@ class PageCommandProcessorIT extends IntegrationTest {
     private MutableClock clock;
 
     @Autowired
+    private ApplicationContext context;
+
+    @Autowired
     private GraffitiProperties props;
 
     @Autowired
@@ -61,9 +65,7 @@ class PageCommandProcessorIT extends IntegrationTest {
     @BeforeEach
     void startOnFreshPage() {
         // Every test starts on a new, empty ACTIVE page created "now".
-        PageSnapshot current = run(new PageCommand.GetPageSnapshot());
-        clock.set(current.scheduledEndAt().plusSeconds(1));
-        page = run(new PageCommand.EndPage(current.id()));
+        page = FreshPage.start(context, clock);
         events.clear();
     }
 
