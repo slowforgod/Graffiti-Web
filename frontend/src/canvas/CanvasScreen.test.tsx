@@ -1,17 +1,54 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Me } from '../auth/me';
+import { FakeLink } from '../realtime/fakeLink';
+import { chunkTopic, metaTopic } from '../realtime/link';
+import type { RemoteCursor } from './cursors';
 import type { Doodle } from './doodles';
 import CanvasScreen from './CanvasScreen';
 import { TEST_CONFIG } from './testConfig';
 
+const links = vi.hoisted(() => ({ current: null as null | FakeLink }));
+
+vi.mock('../realtime/connection', async () => {
+  const { FakeLink: Link } = await import('../realtime/fakeLink');
+  return {
+    createConnection: () => {
+      const link = new Link();
+      links.current = link;
+      return Object.assign(link, { activate: vi.fn(), deactivate: vi.fn() });
+    },
+  };
+});
+
 // Konva needs a real canvas; the view is replaced by a list of the doodles it would draw.
 vi.mock('./CanvasView', () => ({
-  default: ({ doodles }: { doodles: Doodle[] }) => (
-    <ul aria-label="doodles">
-      {doodles.map((d) => (
-        <li key={d.id}>{d.id}</li>
-      ))}
-    </ul>
+  default: ({
+    doodles,
+    cursors,
+    onPointerMove,
+  }: {
+    doodles: Doodle[];
+    cursors: RemoteCursor[];
+    onPointerMove?: (p: { x: number; y: number }) => void;
+  }) => (
+    <>
+      <ul aria-label="doodles">
+        {doodles.map((d) => (
+          <li key={d.id}>{d.id}</li>
+        ))}
+      </ul>
+      <ul aria-label="cursors">
+        {cursors.map((c) => (
+          <li key={c.sid}>{c.nickname}</li>
+        ))}
+      </ul>
+      {onPointerMove && (
+        <button type="button" onClick={() => onPointerMove({ x: 3800, y: 2100 })}>
+          move
+        </button>
+      )}
+    </>
   ),
 }));
 
@@ -91,6 +128,73 @@ describe('CanvasScreen', () => {
     render(<CanvasScreen />);
 
     expect(await screen.findByText('40')).toBeInTheDocument();
+  });
+
+  it('loads the next page on page:turned', async () => {
+    let current = '3';
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === '/api/pages/current') return reply(page(current));
+      if (url.endsWith('/minimap')) return reply(minimap);
+      if (url.startsWith(`/api/pages/${current}/doodles`)) {
+        return reply({ pageId: current, doodles: [{ id: `${current}0`, kind: 'DRAWING', bbox: { x: 3800, y: 2100, w: 10, h: 10 }, payload: { v: 1, strokes: [] } }] });
+      }
+      return reply({}, 404);
+    });
+
+    render(<CanvasScreen />);
+    expect(await screen.findByText('30')).toBeInTheDocument();
+
+    current = '4';
+    act(() => {
+      links.current!.connect();
+      links.current!.readyAll();
+    });
+    act(() => links.current!.deliver(metaTopic('3'), { type: 'page:turned', newPageId: '4' }));
+    // The new page subscribes to its chunks (the link is connected now) and queries after the receipts.
+    await waitFor(() => {
+      act(() => links.current!.readyAll());
+      expect(screen.getByText('40')).toBeInTheDocument();
+    });
+  });
+
+  it('shows other cursors, hides its own and sends its cursor when it may draw', async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === '/api/pages/current') return reply(page('3'));
+      if (url.endsWith('/minimap')) return reply(minimap);
+      if (url.startsWith('/api/pages/3/doodles')) return reply({ pageId: '3', doodles: [] });
+      return reply({}, 404);
+    });
+    const me: Me = {
+      authenticated: true,
+      id: '1',
+      nickname: '나',
+      cursorColor: '#000000',
+      role: 'USER',
+      consentRequired: false,
+      banned: false,
+      cooldownEndsAt: null,
+    };
+
+    render(<CanvasScreen me={me} />);
+    const move = await screen.findByRole('button', { name: 'move' });
+    act(() => links.current!.connect());
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 150));
+    });
+    const chunk = links.current!.active().find((s) => s.destination.includes('.chunk.'))!.destination;
+    act(() => {
+      links.current!.deliver(chunk, { type: 'cursor', sid: 's-1', nickname: '나', color: '#000', x: 1, y: 1 });
+      links.current!.deliver(chunk, { type: 'cursor', sid: 's-2', nickname: '너', color: '#000', x: 1, y: 1 });
+    });
+    expect(screen.getByRole('list', { name: 'cursors' })).toHaveTextContent('너');
+    expect(screen.getByRole('list', { name: 'cursors' })).not.toHaveTextContent('나');
+
+    act(() => move.click());
+    expect(links.current!.sent).toEqual([{ destination: '/app/cursor', body: { pageId: '3', x: 3800, y: 2100 } }]);
+    expect(chunk).toMatch(/^\/topic\/page\.3\.chunk\.\d+$/);
+    expect(chunkTopic('3', 0)).toBe('/topic/page.3.chunk.0');
   });
 
   it('explains when the page cannot be loaded', async () => {

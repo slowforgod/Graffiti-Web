@@ -62,7 +62,7 @@ export default function App() {
 
   return (
     <main>
-      <CanvasScreen />
+      <CanvasScreen me={me} />
       <header className="app-header">
         <h1>경희 낙서장</h1>
         <AuthBar me={me} onLogout={() => void signOut()} />

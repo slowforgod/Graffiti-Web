@@ -22,9 +22,16 @@ export class DoodleStore {
     return [...this.loaded];
   }
 
-  // Marks the chunk loaded and keeps the given doodles that touch it.
+  // Marks the chunk loaded with exactly the given doodles that touch it: a doodle the store has in this
+  // chunk but the answer lacks was removed meanwhile (a reload after reconnecting).
   loadChunk(chunk: number, doodles: Doodle[]): void {
     this.loaded.add(chunk);
+    const answered = new Set(doodles.map((d) => d.id));
+    for (const [id, doodle] of this.byId) {
+      if (!answered.has(id) && this.chunksOf(doodle).includes(chunk)) {
+        this.byId.delete(id);
+      }
+    }
     for (const doodle of doodles) {
       if (this.chunksOf(doodle).includes(chunk)) {
         this.byId.set(doodle.id, doodle);

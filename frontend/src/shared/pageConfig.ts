@@ -18,6 +18,8 @@ export interface ClientConfig {
   postCooldownSec: number;
   countdownWarningSec: number;
   draftIdleTimeoutSec: number;
+  cursorIntervalMs: number;
+  heartbeatMs: number;
 }
 
 export type PageStatus = 'ACTIVE' | 'COUNTDOWN' | 'ENDED';
