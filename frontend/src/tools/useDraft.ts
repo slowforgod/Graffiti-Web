@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { Point } from '../canvas/viewport';
 import type { RealtimeLink } from '../realtime/link';
 import type { ClientConfig } from '../shared/pageConfig';
@@ -35,7 +35,21 @@ export function useDraft({ pageId, config, link, newId = () => crypto.randomUUID
   const [width, setWidth] = useState(config.strokeWidths[Math.min(1, config.strokeWidths.length - 1)]!);
   const [fontSize, setFontSizeState] = useState(config.defaultFontSize);
   const [notice, setNotice] = useState<DraftNotice | null>(null);
-  const [online, setOnline] = useState(() => link.connected());
+  // Read from the link itself, so a connect before this hook listened is not missed.
+  const online = useSyncExternalStore(
+    useCallback(
+      (changed: () => void) => {
+        const stopConnect = link.onConnect(changed);
+        const stopDisconnect = link.onDisconnect(changed);
+        return () => {
+          stopConnect();
+          stopDisconnect();
+        };
+      },
+      [link],
+    ),
+    () => link.connected(),
+  );
   const [version, setVersion] = useState(0);
   // The state is for rendering; handlers read the ref so they see the draft of the same event.
   const [shown, setShown] = useState<Draft | null>(null);
@@ -96,19 +110,14 @@ export function useDraft({ pageId, config, link, newId = () => crypto.randomUUID
   );
 
   useEffect(() => {
-    const stopConnect = link.onConnect(() => setOnline(true));
     const stopDisconnect = link.onDisconnect(() => {
-      setOnline(false);
       // The server cancels the draft for the dropped connection; this screen forgets it too (D-11).
       if (draft.current) {
         drop('close');
         setNotice('disconnected');
       }
     });
-    return () => {
-      stopConnect();
-      stopDisconnect();
-    };
+    return stopDisconnect;
   }, [link, drop]);
 
   // Leaving the page (a reload after the page turned) drops the draft.
