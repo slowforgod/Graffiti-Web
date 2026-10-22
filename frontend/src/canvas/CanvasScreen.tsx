@@ -19,7 +19,7 @@ import Minimap from '../ui/Minimap';
 import TextDraftEditor from '../ui/TextDraftEditor';
 import type { DrawAccess } from '../ui/Toolbar';
 import Toolbar from '../ui/Toolbar';
-import { fetchMinimap } from '../ui/minimap';
+import { fetchMinimap } from '../ui/minimapApi';
 import CanvasView from './CanvasView';
 import { ChunkSync } from './chunkSync';
 import { visibleChunks } from './chunks';

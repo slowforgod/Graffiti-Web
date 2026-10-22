@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/client';
-import type { MinimapBody } from '../ui/minimap';
+import type { MinimapBody } from '../ui/minimapApi';
 import { FakeLink } from './fakeLink';
 import { metaTopic } from './link';
 import type { PageMeta } from './metaSync';
