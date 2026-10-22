@@ -102,6 +102,12 @@ export class ChunkSync {
     }
   }
 
+  // The author's own doodle, shown at once; the doodle:published that follows is the same id.
+  addPublished(doodle: Doodle): void {
+    this.store.put(doodle);
+    this.emit();
+  }
+
   dispose(): void {
     this.disposed = true;
     this.states.forEach((s) => s.unsubscribe());
