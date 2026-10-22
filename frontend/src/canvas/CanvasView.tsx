@@ -2,6 +2,8 @@ import type Konva from 'konva';
 import { useRef } from 'react';
 import { Layer, Stage } from 'react-konva';
 import type { ClientConfig } from '../shared/pageConfig';
+import CursorLayer from './CursorLayer';
+import type { RemoteCursor } from './cursors';
 import DoodleShape from './DoodleShape';
 import GridBackground from './GridBackground';
 import type { Doodle } from './doodles';
@@ -13,7 +15,10 @@ interface Props {
   size: Size;
   viewport: Viewport;
   doodles: Doodle[];
+  cursors?: RemoteCursor[];
   onViewportChange: (viewport: Viewport) => void;
+  // The pointer's position in canvas coordinates, while it is over the canvas.
+  onPointerMove?: (world: Point) => void;
 }
 
 // One wheel notch zooms by this factor.
@@ -25,7 +30,15 @@ interface Pinch {
 }
 
 // 03 has no drawing tools, so a one-finger or mouse drag always pans (D-07); two fingers pan and zoom.
-export default function CanvasView({ config, size, viewport, doodles, onViewportChange }: Props) {
+export default function CanvasView({
+  config,
+  size,
+  viewport,
+  doodles,
+  cursors = [],
+  onViewportChange,
+  onPointerMove,
+}: Props) {
   const pinch = useRef<Pinch | null>(null);
   const view = visibleWorldRect(viewport, size);
 
@@ -72,6 +85,17 @@ export default function CanvasView({ config, size, viewport, doodles, onViewport
     onViewportChange(clampPosition(moved, size, config));
   };
 
+  const onMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    const pointer = e.target.getStage()?.getPointerPosition();
+    if (!pointer || !onPointerMove) {
+      return;
+    }
+    const world = toWorld(viewport, pointer);
+    if (world.x >= 0 && world.y >= 0 && world.x < config.width && world.y < config.height) {
+      onPointerMove({ x: Math.floor(world.x), y: Math.floor(world.y) });
+    }
+  };
+
   return (
     <Stage
       width={size.width}
@@ -84,6 +108,7 @@ export default function CanvasView({ config, size, viewport, doodles, onViewport
       onWheel={onWheel}
       onDragMove={onDragMove}
       onTouchMove={onTouchMove}
+      onMouseMove={onMouseMove}
       onTouchEnd={() => {
         pinch.current = null;
       }}
@@ -95,6 +120,9 @@ export default function CanvasView({ config, size, viewport, doodles, onViewport
         {doodles.map((d) => (
           <DoodleShape key={d.id} doodle={d} palette={config.palette} />
         ))}
+      </Layer>
+      <Layer listening={false}>
+        <CursorLayer cursors={cursors} scale={viewport.scale} />
       </Layer>
     </Stage>
   );
