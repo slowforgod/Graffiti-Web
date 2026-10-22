@@ -83,7 +83,8 @@
     "palette": ["#000000", "#FFFFFF", "..."], "strokeWidths": [2,4,8,16],
     "fontSizes": [10,11,12,13,14,15,16,20,24,32,36,40,48,64,96], "defaultFontSize": 24,
     "textMaxLength": 50, "maxBbox": 1024, "maxChunks": 60,
-    "postCooldownSec": 1800, "countdownWarningSec": 300, "draftIdleTimeoutSec": 600
+    "postCooldownSec": 1800, "countdownWarningSec": 300, "draftIdleTimeoutSec": 600,
+    "cursorIntervalMs": 100, "heartbeatMs": 10000
   }
 }
 ```
@@ -166,6 +167,7 @@
 - 핸드셰이크 때 세션 쿠키로 사용자를 식별합니다. 비로그인도 연결과 구독은 가능하고, 전송(SEND)은 `작성자` 권한이 필요합니다.
 - `Origin` 헤더가 `APP_ORIGIN`과 다르면 연결을 거절합니다(SEC-03).
 - 인바운드 메시지 최대 64KB(D-27), 세션당 구독 최대 60개(D-30)
+- 하트비트는 양방향 `heartbeatMs`(페이지 설정, 기본 10초)입니다. 클라이언트는 `/api/pages/current`의 `config.heartbeatMs`를 씁니다.
 
 ### 구독 (SUBSCRIBE)
 
@@ -174,13 +176,22 @@
 | `/topic/page.{pageId}.chunk.{index}` | 공개 | 해당 청크의 doodle, 초안, 커서 이벤트. 현재 페이지와 0~143 범위만 허용 |
 | `/topic/page.{pageId}.meta` | 공개 | 점유율, 상태, 미니맵 변경, 페이지 넘김 |
 | `/user/queue/notice` | 로그인 | 개인 알림 (차단됨 등) |
+| `/user/queue/errors` | 로그인 | 거절된 SEND의 에러 (연결은 유지) |
+
+- SUBSCRIBE에 `receipt` 헤더를 넣으면, 서버가 구독을 등록한 **뒤에** `RECEIPT`를 보냅니다. 클라이언트는 영수증을 받은 뒤 REST로 조회해야 그 사이 이벤트를 놓치지 않습니다(INV-09: 구독 → 조회 → 병합).
+- 허용되지 않은 목적지(지난 페이지, 범위 밖 청크, 비로그인의 `/user/**`)는 `ERROR` 프레임으로 거절하고 연결을 닫습니다. 61번째 구독은 `RATE_LIMITED`입니다.
 
 ### 전송 (SEND) — 모두 `작성자` 권한, 초당 20회 제한, 현재 페이지만(INV-04)
+
+- 목적지는 `/app/**`만 허용합니다. `/topic/**` 등으로 직접 보내면 `FORBIDDEN`으로 거절합니다.
+- 권한(`UNAUTHENTICATED`, `CONSENT_REQUIRED`, `BANNED`)과 초당 횟수(`RATE_LIMITED`)는 `ERROR` 프레임으로 거절하고 연결을 닫습니다.
+- 내용이 잘못된 메시지(`VALIDATION_FAILED`, 지난 페이지의 `PAGE_ENDED`)는 연결을 유지하고 `/user/queue/errors`로 `{ "type": "error", "code": "..." }`를 보냅니다.
 
 `/app/cursor`
 ```json
 { "pageId": "12", "x": 1200, "y": 800 }
 ```
+- 클라이언트는 `config.cursorIntervalMs`(기본 100ms)마다 최대 1번 보냅니다. 서버는 좌표가 속한 청크 토픽으로 중계하고, 다른 청크로 옮기거나 연결이 끊기면 이전 청크에 `cursor:leave`를 보냅니다. 커서는 저장하지 않습니다(INV-06).
 
 `/app/draft`
 ```json
@@ -208,7 +219,7 @@
 메타 토픽 (`/topic/page.{p}.meta`)
 ```json
 { "type": "page:status", "status": "COUNTDOWN", "occupancyPermille": 712, "countdownStartedAt": "...", "scheduledEndAt": "..." }
-{ "type": "minimap:diff", "set": [1203, 1204], "clear": [77] }        // 칸 인덱스 = row * 160 + col
+{ "type": "minimap:diff", "set": [1203, 1204], "clear": [77], "occupancyPermille": 713 }        // 칸 인덱스 = row * 160 + col
 { "type": "page:turned", "newPageId": "13" }
 ```
 
@@ -218,7 +229,7 @@
 ```
 
 ### STOMP 에러
-`ERROR` 프레임의 `message` 헤더에 REST와 같은 에러 코드(`UNAUTHENTICATED`, `BANNED`, `PAGE_ENDED`, `RATE_LIMITED`, `VALIDATION_FAILED`)를 넣습니다.
+`ERROR` 프레임의 `message` 헤더에 REST와 같은 에러 코드(`UNAUTHENTICATED`, `CONSENT_REQUIRED`, `BANNED`, `FORBIDDEN`, `PAGE_ENDED`, `RATE_LIMITED`, `VALIDATION_FAILED`)를 넣습니다. 본문은 같은 코드의 `text/plain`입니다. 클라이언트는 `PAGE_ENDED`를 받으면 현재 페이지를 다시 불러옵니다.
 
 ---
 

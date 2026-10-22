@@ -1,6 +1,6 @@
 # 04-realtime: STOMP 연결과 검증, 커서, 구독 → 조회 → 병합
 
-- **상태**: IN_PROGRESS
+- **상태**: IN_PROGRESS (PR 대기)
 - **승인자**: 현 (slowforgod) / 승인일: 2026-10-22 (standing 지시 "승인 받지말고 다 해"에 따라 결정 필요 1~4는 추천안으로 확정)
 - **브랜치**: `feat/04-realtime`
 - **선행 명세**: 03
@@ -65,7 +65,7 @@
 - 외부 브로커 → TODOS(이미 있음)
 
 ## 4. 현재 상태 (검증된 사실)
-- 03 브랜치(`feat/03-canvas-read`, PR #31) 위에서 작업: `PageReader`, `/api/pages/current`(config), 청크 조회, `ChunkLoader`, `DoodleStore.put/remove`
+- 03(PR #31, main에 머지됨) 위에서 작업: `PageReader`, `/api/pages/current`(config), 청크 조회, `ChunkLoader`, `DoodleStore.put/remove`
 - `page/event/*`: `PageStatusChanged`, `OccupancyChanged(set, clear, occupancyPermille)`, `PageTurned`가 커밋 후 큐 스레드에서 동기 발행
 - `GraffitiProperties.Realtime`: `maxMessagesPerSecond`, `maxSubscriptions`, `inboundMessageMaxBytes` 있음
 - `auth/SessionUser`(Principal, 이름 = userId), `UserAccountService.find`, `CurrentUserArgumentResolver.check`(동의·차단·역할 판정, 패키지 내부)
@@ -114,7 +114,10 @@ Disconnect → 마지막 청크에 cursor:leave
 | `backend/.../realtime/RealtimeDestinations.java` | 목적지 파싱 (순수) |
 | `backend/.../realtime/RealtimeInterceptor.java` | SEC-07/08/15 검증 |
 | `backend/.../realtime/SendRateLimiter.java` | 사용자별 초당 한도 (순수) |
-| `backend/.../realtime/StompErrorHandler.java`, `RealtimeException.java` | 에러 코드 → ERROR 프레임 |
+| `backend/.../realtime/StompErrorHandler.java` | 에러 코드 → ERROR 프레임 |
+| `backend/.../realtime/SubscribeReceipts.java` | SimpleBroker가 구독을 등록한 **뒤** RECEIPT 전송 (SimpleBroker는 RECEIPT를 지원하지 않음, INV-09에 필요) |
+| `backend/.../realtime/HeartbeatSchedulerConfig.java` | 브로커 하트비트용 스케줄러 |
+| `backend/.../auth/AccessCheck.java` | `작성자` 판정을 REST(`@CurrentUser`)와 STOMP가 같이 씀 |
 | `backend/.../realtime/Broadcaster.java`, `SimpBroadcaster.java` | 전송 |
 | `backend/.../realtime/PageEventRelay.java` | 페이지 이벤트 → 메타 토픽 |
 | `backend/.../realtime/CursorController.java` | 커서 중계, 연결 종료 시 leave |
@@ -123,8 +126,13 @@ Disconnect → 마지막 청크에 cursor:leave
 | `frontend/src/canvas/chunkSync.ts`, `doodleStore.ts` | 청크 동기화 (`chunkLoader.ts` 대체) |
 | `frontend/src/realtime/metaSync.ts` | 메타 동기화 |
 | `frontend/src/canvas/cursors.ts`, `CursorLayer.tsx` | 커서 상태, 그리기 |
+| `frontend/src/realtime/throttle.ts` | 커서 전송 간격 |
+| `frontend/src/realtime/fakeLink.ts` | 테스트용 가짜 연결 |
+| `backend/src/test/.../page/FreshPage.java` | 테스트 지원: 컨텍스트가 여러 개라 DB 기준으로 복구한 뒤 새 페이지 시작 |
 
-- 설정값: `graffiti.realtime.cursor-interval` = 100ms 추가(INV-10). 나머지는 기존 `graffiti.realtime.*`
+- 설정값: `graffiti.realtime.cursor-interval` = 100ms, `graffiti.realtime.heartbeat` = 10s 추가(INV-10), config에 `cursorIntervalMs`, `heartbeatMs`. 나머지는 기존 `graffiti.realtime.*`
+- 브로커 전송 순서는 `setPreservePublishOrder(true)`로 보장(같은 연결에 이벤트가 순서대로 감). `setPreserveReceiveOrder`는 ERROR 프레임을 막아 쓰지 않음
+- 프론트 SUBSCRIBE는 모두 `receipt` 헤더를 달고, 청크 묶음의 RECEIPT가 다 온 뒤 REST로 조회한다
 
 ## 6. 실패 모드
 
@@ -147,24 +155,24 @@ Disconnect → 마지막 청크에 cursor:leave
 | 프론트 | 조회 실패 | 그 청크 구독 해제, 다음 뷰포트 변경 때 재시도 | `chunkSync.test` |
 | 프론트 | 연결 안 된 상태에서 뷰포트 변경 | REST 조회는 하되(03처럼 보임), 연결되면 resync로 구독 | `chunkSync.test` |
 | 프론트 | `page:turned` 수신 | `/api/pages/current` 다시 받아 새 페이지 로딩 | `CanvasScreen.test` |
-| 프론트 | ERROR 프레임 수신 | stompjs 재연결에 맡기고 resync. 콘솔에 코드만 기록(사용자 메시지 없음) | `connection.test` |
+| 프론트 | ERROR 프레임 수신 | `PAGE_ENDED`면 현재 페이지 다시 로딩, 그 밖은 stompjs 재연결 후 resync(사용자 메시지 없음) | `connection.test` |
 
 critical gap: 0
 
 ## 7. 수용 기준 (테스트 가능하게)
-- [ ] AC-1 (SEC-03): `Origin: https://evil.example`로 `/ws` 핸드셰이크 → 실패. 허용 Origin은 성공
-- [ ] AC-2 (SEC-07, INV-04): 비로그인 연결도 현재 페이지 청크·메타 구독 가능. 끝난 페이지, 범위 밖 청크, 알 수 없는 목적지 구독은 ERROR(코드 포함)
-- [ ] AC-3 (SEC-08, D-30): 한 연결에서 61번째 SUBSCRIBE는 ERROR `RATE_LIMITED`. UNSUBSCRIBE 후에는 다시 가능
-- [ ] AC-4 (SEC-07, SEC-15): 비로그인·동의 전·차단 사용자의 `/app/cursor`는 ERROR, 브로드캐스트 없음. 차단은 연결 중 DB를 바꿔도 다음 SEND부터 적용
-- [ ] AC-5 (SEC-08, D-12): 같은 사용자가 1초에 21번 SEND하면 21번째가 ERROR `RATE_LIMITED`
-- [ ] AC-6: 클라이언트가 `/topic/page.p.chunk.0`에 직접 SEND하면 ERROR `FORBIDDEN`, 그 토픽 구독자는 아무것도 받지 않음
-- [ ] AC-7 (D-22): 작성자 A가 `/app/cursor {x:500,y:10}` → 청크 1 구독자 B가 `{type:"cursor", sid, nickname, color, x, y}`를 받고, 사용자 ID·이메일은 없다. A가 청크 0으로 옮기면 청크 1에 `cursor:leave`, A 연결이 끊기면 마지막 청크에 `cursor:leave`
-- [ ] AC-8: 끝난 `pageId` 커서 → A의 `/user/queue/errors`에 `PAGE_ENDED`, 연결 유지
-- [ ] AC-9: 점유율 변화 → 메타 구독자에게 `minimap:diff {set, clear, occupancyPermille}`, 카운트다운 시작 → `page:status`, 넘김 → 옛 페이지 메타에 `page:turned {newPageId}`
-- [ ] AC-10 (INV-09): 프론트 `chunkSync`는 SUBSCRIBE를 REST 조회보다 먼저 하고, 조회 중 받은 `published`/`removed`를 응답 뒤에 재생한다. 조회 응답에 이미 있는 doodle의 `published`는 중복되지 않고, 대기 중 `removed`된 doodle은 응답에 있어도 보이지 않는다
-- [ ] AC-11: 재연결 시 보이는 청크를 다시 구독·조회하고 응답에 없는 doodle은 지운다(다른 live 청크 이벤트로 다시 오는 것은 유지)
-- [ ] AC-12 (INV-10): 프론트 커서 전송 간격은 `config.cursorIntervalMs`, 구독 상한은 서버가 강제(클라이언트는 `maxChunks` 이하만 구독)
-- [ ] AC-13: 브라우저 두 개(작성자 1, 비로그인 1)에서 작성자의 커서가 다른 창에 닉네임과 함께 보이고, 창을 닫으면 사라진다
+- [x] AC-1 (SEC-03): `Origin: https://evil.example`로 `/ws` 핸드셰이크 → 실패. 허용 Origin은 성공
+- [x] AC-2 (SEC-07, INV-04): 비로그인 연결도 현재 페이지 청크·메타 구독 가능. 끝난 페이지, 범위 밖 청크, 알 수 없는 목적지 구독은 ERROR(코드 포함)
+- [x] AC-3 (SEC-08, D-30): 한 연결에서 61번째 SUBSCRIBE는 ERROR `RATE_LIMITED`. UNSUBSCRIBE 후에는 다시 가능
+- [x] AC-4 (SEC-07, SEC-15): 비로그인·동의 전·차단 사용자의 `/app/cursor`는 ERROR, 브로드캐스트 없음. 차단은 연결 중 DB를 바꿔도 다음 SEND부터 적용
+- [x] AC-5 (SEC-08, D-12): 같은 사용자가 1초에 21번 SEND하면 21번째가 ERROR `RATE_LIMITED`
+- [x] AC-6: 클라이언트가 `/topic/page.p.chunk.0`에 직접 SEND하면 ERROR `FORBIDDEN`, 그 토픽 구독자는 아무것도 받지 않음
+- [x] AC-7 (D-22): 작성자 A가 `/app/cursor {x:500,y:10}` → 청크 1 구독자 B가 `{type:"cursor", sid, nickname, color, x, y}`를 받고, 사용자 ID·이메일은 없다. A가 청크 0으로 옮기면 청크 1에 `cursor:leave`, A 연결이 끊기면 마지막 청크에 `cursor:leave`
+- [x] AC-8: 끝난 `pageId` 커서 → A의 `/user/queue/errors`에 `PAGE_ENDED`, 연결 유지
+- [x] AC-9: 점유율 변화 → 메타 구독자에게 `minimap:diff {set, clear, occupancyPermille}`, 카운트다운 시작 → `page:status`, 넘김 → 옛 페이지 메타에 `page:turned {newPageId}`
+- [x] AC-10 (INV-09): 프론트 `chunkSync`는 SUBSCRIBE를 REST 조회보다 먼저 하고, 조회 중 받은 `published`/`removed`를 응답 뒤에 재생한다. 조회 응답에 이미 있는 doodle의 `published`는 중복되지 않고, 대기 중 `removed`된 doodle은 응답에 있어도 보이지 않는다
+- [x] AC-11: 재연결 시 보이는 청크를 다시 구독·조회하고 응답에 없는 doodle은 지운다(다른 live 청크 이벤트로 다시 오는 것은 유지)
+- [x] AC-12 (INV-10): 프론트 커서 전송 간격은 `config.cursorIntervalMs`, 구독 상한은 서버가 강제(클라이언트는 `maxChunks` 이하만 구독)
+- [x] AC-13: 브라우저 두 개(작성자 1, 비로그인 1)에서 작성자의 커서가 다른 창에 닉네임과 함께 보이고, 창을 닫으면 사라진다
 
 ## 8. 테스트 계획
 | 층 | 대상 | 파일 (예정) |
@@ -172,7 +180,8 @@ critical gap: 0
 | 단위 | 목적지 파싱, 속도 제한(가짜 `Clock`), `LivePage` 캐시 | `RealtimeDestinationsTest`, `SendRateLimiterTest`, `LivePageTest` |
 | 통합 | 실제 포트 + `WebSocketStompClient` 다중 클라이언트: Origin, 구독 검증, 구독 상한, SEND 권한, 속도 제한, `/topic` 직접 SEND, 커서 중계·leave, 메타 이벤트 | `realtime/RealtimeIT` |
 | 단위(프론트) | `chunkSync` 순서·버퍼·재연결·실패, `metaSync`, 커서 상태 | `chunkSync.test.ts`, `metaSync.test.ts`, `cursors.test.ts` |
-| 컴포넌트(프론트) | `page:turned` 뒤 새 페이지 로딩 | `CanvasScreen.test.tsx` |
+| 컴포넌트(프론트) | `page:turned` 뒤 새 페이지 로딩, 내 커서 숨김과 커서 전송 | `CanvasScreen.test.tsx` |
+| 단위(프론트) | 연결 래퍼(receipt, PAGE_ENDED, 하트비트), 전송 간격 | `connection.test.ts`, `throttle.test.ts` |
 | QA | 헤드리스 Chromium 두 개(로그인 세션 1, 비로그인 1)로 커서 표시와 사라짐, SQL로 doodle 상태를 바꾼 뒤 재연결 시 반영 | 수동 체크리스트 |
 
 ## 9. 구현 에이전트 규칙 (이 명세 전용)
@@ -193,8 +202,21 @@ PR revert. DB 변경 없음. 프론트는 03의 REST 전용 로딩으로 돌아�
 ---
 
 ## 리뷰 기록 (/gf-review가 추가)
+- 2026-10-22 자체 리뷰 (전체 diff)
+  - INV-09: SimpleBroker는 SUBSCRIBE `receipt`를 무시해 "구독 등록 → 조회" 순서를 클라이언트가 알 수 없었다 → `SubscribeReceipts`가 브로커 처리 **뒤** RECEIPT를 보냄. `RealtimeIT`가 영수증을 기다린 뒤 이벤트를 받는 것으로 확인
+  - 이벤트 순서: 브로커 전송이 스레드 풀이라 `minimap:diff` 둘이 뒤바뀔 수 있었다 → `setPreservePublishOrder(true)`. `setPreserveReceiveOrder`는 ERROR 프레임이 나가지 않아 제외
+  - `chunkSync`: 영수증을 기다리는 동안 화면을 벗어나거나 재연결로 상태가 바뀐 청크는 그 묶음의 조회에서 뺀다. 연결 없이 조회한 청크는 조회 중 연결되면 바로 구독 → 조회
+  - 큐 스레드 리스너(`PageEventRelay`, `LivePage`)는 큐를 기다리지 않음(전송과 세대 증가만)
+  - 커서·이벤트 본문에 사용자 ID·이메일 없음(`RealtimeIT`가 키 집합을 정확히 비교). 로그에 세션 ID 없음. 프론트 `console` 출력 없음
+  - 테스트 안정성: Spring 컨텍스트 여러 개가 DB를 공유해, 다른 컨텍스트가 넘긴 페이지를 메모리는 ACTIVE로 알고 있어 전체 실행 때 `RealtimeIT` 준비가 실패했다 → `FreshPage`가 DB 기준으로 복구한 뒤 새 페이지를 시작(`PageCommandProcessorIT`, `CanvasReadIT`, `RealtimeIT`)
+  - 결과: 백엔드 `./gradlew test` 전체 통과, 프론트 tsc·eslint·vitest(55개)·build 통과
 
 ## QA 기록 (/gf-qa가 추가)
+- 2026-10-22 로컬 스택(MySQL 8.4 컨테이너, 04 백엔드 + 테스트 로그인 엔드포인트, Vite) + 헤드리스 Chromium 컨텍스트 두 개(작성자 1, 비로그인 1)
+  - 작성자 창에서 포인터를 움직이면 비로그인 창에 파란 점과 "익명의 QA #1" 라벨이 보임. 작성자 창에는 자기 커서가 그려지지 않음
+  - 작성자 창을 닫으면 1.5초 안에 비로그인 창에서 커서가 사라짐(연결 종료 → `cursor:leave`)
+  - 기존 doodle, 미니맵, 확대·이동은 03과 같게 동작. 콘솔 에러는 favicon 404뿐
+  - doodle 게시·삭제 이벤트의 실제 발행은 06/08에서 확인(04는 가짜 이벤트로 병합 단위 테스트)
 
 ## 보안 감사 기록 (/gf-security가 추가, 해당 시)
 - `realtime/` 변경이라 배포 전 `/gf-security` 대상(PIPELINE §2). 스테이징 배포가 아직 없으므로 11-security-pass에서 함께 감사
