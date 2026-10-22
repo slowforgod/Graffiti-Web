@@ -84,7 +84,7 @@
     "fontSizes": [10,11,12,13,14,15,16,20,24,32,36,40,48,64,96], "defaultFontSize": 24,
     "textMaxLength": 50, "maxBbox": 1024, "maxChunks": 60,
     "postCooldownSec": 1800, "countdownWarningSec": 300, "draftIdleTimeoutSec": 600,
-    "cursorIntervalMs": 100, "heartbeatMs": 10000
+    "cursorIntervalMs": 100, "draftIntervalMs": 100, "heartbeatMs": 10000
   }
 }
 ```
@@ -193,15 +193,18 @@
 ```
 - 클라이언트는 `config.cursorIntervalMs`(기본 100ms)마다 최대 1번 보냅니다. 서버는 좌표가 속한 청크 토픽으로 중계하고, 다른 청크로 옮기거나 연결이 끊기면 이전 청크에 `cursor:leave`를 보냅니다. 커서는 저장하지 않습니다(INV-06).
 
-`/app/draft`
+`/app/draft` (05-draft)
 ```json
-{ "pageId": "12", "draftId": "uuid", "op": "start",  "kind": "DRAWING", "bbox": { "x":1190,"y":330,"w":10,"h":10 } }
-{ "pageId": "12", "draftId": "uuid", "op": "points", "strokeIndex": 0, "c": 3, "w": 8, "points": [1200,340,1203,342], "bbox": { ... } }
-{ "pageId": "12", "draftId": "uuid", "op": "erase",  "strokeIndex": 2 }      // 초안 편집 중 지우개
-{ "pageId": "12", "draftId": "uuid", "op": "text",   "text": "안녕", "c": 0, "size": 24, "x": 1500, "y": 900, "bbox": { ... } }
+{ "pageId": "12", "draftId": "uuid", "op": "points", "strokeIndex": 0, "c": 3, "w": 8, "points": [1200,340,1203,342] }
+{ "pageId": "12", "draftId": "uuid", "op": "erase",  "strokeIndex": 2 }      // 초안 편집 중 지우개, 획을 통째로
+{ "pageId": "12", "draftId": "uuid", "op": "text",   "bbox": { "x": 1500, "y": 900, "w": 52, "h": 34 } }
 { "pageId": "12", "draftId": "uuid", "op": "cancel" }
 ```
-- 서버는 bbox가 1024² 이내이고 캔버스 범위 안인지 검사합니다. 텍스트 초안은 **AI 검사 전이므로** 다른 사용자에게 보내지 않고 "텍스트 작성 중" 박스만 중계합니다(`text` 필드 제거, SEC-05 보완).
+- `draftId`는 UUID입니다. 따로 시작 메시지는 없고, 연결에서 처음 보는 `draftId`의 메시지가 초안을 시작합니다(`points`/`erase`는 그림, `text`는 텍스트). 연결당 초안은 하나이며, 다른 `draftId`가 오면 이전 초안을 `draft:cancel`합니다.
+- 클라이언트는 `config.draftIntervalMs`(기본 100ms)마다 최대 1번 보냅니다. 같은 획의 다음 묶음은 앞 묶음의 마지막 점으로 시작합니다. 그리는 동안 `/app/cursor`는 보내지 않습니다(초당 20회 한도).
+- 서버 검증(SEC-02): op마다 정해진 필드만(그 밖의 필드는 `VALIDATION_FAILED`), 좌표는 캔버스 안, `c`는 팔레트 인덱스, `w`는 허용 굵기, 한 묶음의 bbox(굵기의 절반만큼 확장)는 `maxBbox` 이하, `text`의 bbox는 캔버스 안이고 `maxBbox` 이하. 한 초안의 누적 본문이 2MB(`max-payload-bytes`)를 넘으면 `PAYLOAD_TOO_LARGE`. 거절은 모두 `/user/queue/errors`로 가고 연결은 유지됩니다.
+- 텍스트 초안의 글자는 **서버로도 보내지 않습니다**. 다른 사용자에게는 "작성 중" 상자만 보입니다(D-33).
+- 서버는 초안 내용을 보관하지 않습니다. 연결 상태에 초안 id, 종류, 닿은 청크, 누적 바이트만 둡니다(INV-06). 연결이 끊기면 닿았던 청크에 `draft:cancel`을 보냅니다.
 
 ### 브로드캐스트 이벤트 (서버 → 클라이언트)
 
@@ -209,12 +212,15 @@
 ```json
 { "type": "doodle:published", "doodle": { "id", "kind", "bbox", "payload" } }
 { "type": "doodle:removed", "id": "9001" }
-{ "type": "draft:update", "sid": "s-ab12", "draftId": "uuid", "op": "points", "...": "..." }
+{ "type": "draft:update", "sid": "s-ab12", "draftId": "uuid", "op": "points", "strokeIndex": 0, "c": 3, "w": 8, "points": [1200,340,1203,342] }
+{ "type": "draft:update", "sid": "s-ab12", "draftId": "uuid", "op": "erase", "strokeIndex": 0 }
+{ "type": "draft:update", "sid": "s-ab12", "draftId": "uuid", "op": "text", "bbox": { "x": 1500, "y": 900, "w": 52, "h": 34 } }
 { "type": "draft:cancel", "sid": "s-ab12", "draftId": "uuid" }
 { "type": "cursor", "sid": "s-ab12", "nickname": "익명의 펭귄 #3842", "color": "#4F8EF7", "x": 1200, "y": 800 }
 { "type": "cursor:leave", "sid": "s-ab12" }
 ```
 - `sid`는 연결별 임시 ID입니다. 사용자 ID는 노출하지 않습니다.
+- `points`와 `text`는 그 묶음(상자)이 닿는 청크에, `erase`와 `draft:cancel`은 그 초안이 닿았던 모든 청크에 갑니다. 두 청크를 보는 사람은 같은 묶음을 두 번 받을 수 있습니다(클라이언트가 거름). 보는 쪽은 `draftIdleTimeoutSec` 동안 소식이 없는 초안을 지웁니다.
 
 메타 토픽 (`/topic/page.{p}.meta`)
 ```json

@@ -66,7 +66,8 @@ backend/src/main/java/kr/ac/khu/graffiti/
 │                  ModerationService(병렬 호출과 판정 합성), MlPredictionRecorder
 ├── realtime/      STOMP 설정(WebSocketConfig, 하트비트), RealtimeInterceptor(구독 목적지 검증, SEND 권한·속도 제한),
 │                  SubscribeReceipts(구독 등록 후 RECEIPT, INV-09), StompErrorHandler(ERROR 프레임 = 에러 코드),
-│                  Broadcaster + PageEventRelay(page/event → 메타 토픽), CursorController(/app/cursor 중계)
+│                  Broadcaster + PageEventRelay(page/event → 메타 토픽), CursorController(/app/cursor 중계),
+│                  DraftController + DraftRules(/app/draft 검증·중계, 연결 종료 시 취소), RealtimeErrorAdvice
 ├── admin/         관리자 API, moderation_action 기록
 └── common/        에러 응답 형식(ApiError), 예외 → 에러 코드 매핑, 시계(Clock) 주입
 ```
@@ -101,9 +102,11 @@ frontend/src/
 │                  미니맵·점유율·page:turned), 커서 전송 간격 제한(throttle.ts)
 ├── canvas/        Konva Stage(CanvasView), 뷰포트(viewport.ts: 팬/줌, config의 min~max), 청크 계산(chunks.ts),
 │                  보이는 청크 동기화(chunkSync.ts: 구독 → 조회 → 병합, INV-09) + doodle 저장소(doodleStore.ts),
-│                  다른 사람 커서(cursors.ts, CursorLayer), 배경 격자
-├── tools/         펜, 텍스트, 지우개(초안 전용), 선택, 이동 + 초안 상태 머신
-├── ui/            툴바, 상단 상태바(점유율, 남은 시간), T−5분 카운트다운, 미니맵, 토스트
+│                  다른 사람 커서(cursors.ts, CursorLayer), 다른 사람 초안(remoteDrafts.ts) + 초안 레이어(DraftLayer), 배경 격자
+├── tools/         내 초안 모델(draft.ts: 1px 점 버림, bbox 상한, 지우개 판정), 묶음 전송(draftSender.ts),
+│                  텍스트 크기 측정(textMeasure.ts), 도구·초안 훅(useDraft.ts: 무동작·연결 끊김 취소). 선택은 08
+├── ui/            툴바(이동/펜/텍스트/지우개, 색, 굵기, 글자 크기), ✓/✗(DraftActions), 텍스트 입력 상자,
+│                  상단 상태바(점유율, 남은 시간), T−5분 카운트다운, 미니맵, 토스트
 ├── admin/         관리자 화면
 └── shared/        설정 상수(서버의 /api/pages/current 응답으로 받음), 타입
 ```
@@ -160,11 +163,17 @@ Client                         REST(Controller)          PageCommandProcessor(�
 ### 4.3 초안 중계 (저장 안 함, INV-06)
 
 ```
-펜 다운 → draftId(UUID) 생성 → SEND /app/draft {op:"start"}
-그리는 중 50ms마다 → SEND /app/draft {op:"points", points:[...], bbox}
-서버: 인증·차단·속도 제한(초당 20회)·bbox 상한 검사 → bbox와 겹치는 청크 토픽으로 중계 (큐를 거치지 않음)
-✗ / 10분 무동작 / 연결 끊김 → draft:cancel 브로드캐스트 (연결 끊김은 서버가 세션 종료 이벤트에서 발행)
-✓ → REST 게시(4.1). 성공하면 클라이언트가 draft:cancel을 보내 반투명 초안을 지움
+펜 다운 → draftId(UUID) 생성 (시작 메시지 없음, 첫 메시지가 초안을 시작)
+그리는 중 draftIntervalMs(100ms)마다 → SEND /app/draft {op:"points", strokeIndex, c, w, points}  (그동안 커서 전송 멈춤)
+지우개 → {op:"erase", strokeIndex} / 텍스트 → {op:"text", bbox} (글자는 보내지 않음, D-33)
+서버: 인터셉터(작성자, 초당 20회, 64KB) → DraftController: 현재 페이지, DraftRules 검증, 초안당 2MB
+      → 묶음 bbox가 닿는 청크 토픽으로 draft:update 중계 (큐를 거치지 않음)
+      연결 상태엔 draftId·종류·닿은 청크·누적 바이트만. 한 연결의 프레임은 순서가 바뀔 수 있어 synchronized,
+      방금 취소한 draftId의 늦은 프레임은 버림
+✗ / 10분 무동작(작성자 화면) → {op:"cancel"} → 닿았던 모든 청크에 draft:cancel
+연결 끊김 → 서버가 세션 종료 이벤트에서 draft:cancel, 작성자 화면도 초안 폐기
+보는 쪽: 10분 동안 소식 없는 초안은 스스로 지움 (서버 타이머 없음)
+✓ → REST 게시(4.1). 성공하면 클라이언트가 cancel을 보내 반투명 초안을 지움
 ```
 
 ### 4.4 페이지 넘김
@@ -293,8 +302,9 @@ PageBootstrap (SmartLifecycle, 웹 서버보다 앞 단계)
 | `graffiti.post-cooldown` | 30m | D-12 |
 | `graffiti.realtime.max-messages-per-second` | 20 | D-12 |
 | `graffiti.realtime.max-subscriptions` | 60 | D-30 |
-| `graffiti.realtime.inbound-message-max-bytes` | 65536 | D-27 |
+| `graffiti.realtime.inbound-message-max-bytes` | 65536 (STOMP 프레임 한도와 WebSocket 컨테이너 버퍼에 같이 사용) | D-27 |
 | `graffiti.realtime.cursor-interval` | 100ms (클라이언트 커서 전송 간격, `cursorIntervalMs`) | 04 |
+| `graffiti.realtime.draft-interval` | 100ms (클라이언트 초안 전송 간격, `draftIntervalMs`. 초당 20회 한도 안) | 05, D-12 |
 | `graffiti.realtime.heartbeat` | 10s (STOMP 양방향 하트비트, `heartbeatMs`) | 04 |
 | `graffiti.query.max-chunks` / `max-batch-delete` | 60 / 50 | D-30 |
 | `graffiti.moderation.timeout` | 5s | D-18 |

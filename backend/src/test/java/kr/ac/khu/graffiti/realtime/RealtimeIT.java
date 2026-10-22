@@ -12,7 +12,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -265,6 +267,170 @@ class RealtimeIT extends WebIntegrationTest {
         assertThat(author.errors).isEmpty();
     }
 
+    // --- drafts (05-draft) ---
+
+    @Test
+    void draftPointsReachEveryChunkTheyTouchWithoutUserIds() throws Exception {
+        Client watcher = connect(null, ORIGIN);
+        BlockingQueue<JsonNode> chunk0 = watcher.subscribe(chunk(0)).events;
+        BlockingQueue<JsonNode> chunk1 = watcher.subscribe(chunk(1)).events;
+        BlockingQueue<JsonNode> chunk16 = watcher.subscribe(chunk(16)).events;
+        Client author = connect(cookie(author()), ORIGIN);
+        String id = UUID.randomUUID().toString();
+
+        author.send("/app/draft", points(id, 0, 3, 4, 470, 10, 490, 12));
+
+        JsonNode update = next(chunk0);
+        assertThat(update.properties()).extracting(Map.Entry::getKey)
+                .containsExactly("type", "sid", "draftId", "op", "strokeIndex", "c", "w", "points");
+        assertThat(update.get("type").asText()).isEqualTo("draft:update");
+        assertThat(update.get("sid").asText()).startsWith("s-");
+        assertThat(update.get("draftId").asText()).isEqualTo(id);
+        assertThat(update.get("op").asText()).isEqualTo("points");
+        assertThat(update.get("points").toString()).isEqualTo("[470,10,490,12]");
+        assertThat(next(chunk1)).isEqualTo(update);
+        assertThat(chunk16.poll(500, TimeUnit.MILLISECONDS)).isNull();
+    }
+
+    @Test
+    void textDraftsRelayOnlyTheirBox() throws Exception {
+        Client watcher = connect(null, ORIGIN);
+        BlockingQueue<JsonNode> chunk0 = watcher.subscribe(chunk(0)).events;
+        Client author = connect(cookie(author()), ORIGIN);
+        BlockingQueue<JsonNode> errors = author.subscribe("/user/queue/errors").events;
+        String id = UUID.randomUUID().toString();
+
+        author.send("/app/draft", Map.of("pageId", pageId(), "draftId", id, "op", "text",
+                "bbox", Map.of("x", 100, "y", 100, "w", 52, "h", 34)));
+        JsonNode update = next(chunk0);
+        assertThat(update.toString()).isEqualTo("{\"type\":\"draft:update\",\"sid\":\"" + update.get("sid").asText()
+                + "\",\"draftId\":\"" + id + "\",\"op\":\"text\",\"bbox\":{\"x\":100,\"y\":100,\"w\":52,\"h\":34}}");
+
+        author.send("/app/draft", Map.of("pageId", pageId(), "draftId", id, "op", "text", "text", "안녕",
+                "bbox", Map.of("x", 100, "y", 100, "w", 52, "h", 34)));
+        assertThat(next(errors).get("code").asText()).isEqualTo("VALIDATION_FAILED");
+        assertThat(chunk0.poll(500, TimeUnit.MILLISECONDS)).isNull();
+    }
+
+    @Test
+    void aCancelReachesEveryChunkTheDraftTouched() throws Exception {
+        Client watcher = connect(null, ORIGIN);
+        BlockingQueue<JsonNode> chunk0 = watcher.subscribe(chunk(0)).events;
+        BlockingQueue<JsonNode> chunk1 = watcher.subscribe(chunk(1)).events;
+        Client author = connect(cookie(author()), ORIGIN);
+        String id = UUID.randomUUID().toString();
+
+        author.send("/app/draft", points(id, 0, 0, 2, 10, 10));
+        String sid = next(chunk0).get("sid").asText();
+        author.send("/app/draft", points(id, 1, 0, 2, 600, 10));
+        next(chunk1);
+        author.send("/app/draft", Map.of("pageId", pageId(), "draftId", id, "op", "erase", "strokeIndex", 0));
+        assertThat(next(chunk0).get("op").asText()).isEqualTo("erase");
+        assertThat(next(chunk1).get("op").asText()).isEqualTo("erase");
+        author.send("/app/draft", cancel(id));
+
+        String expected = "{\"type\":\"draft:cancel\",\"sid\":\"" + sid + "\",\"draftId\":\"" + id + "\"}";
+        assertThat(next(chunk0).toString()).isEqualTo(expected);
+        assertThat(next(chunk1).toString()).isEqualTo(expected);
+    }
+
+    @Test
+    void aNewDraftCancelsTheOpenOneAndADisconnectCancelsTheLast() throws Exception {
+        Client watcher = connect(null, ORIGIN);
+        BlockingQueue<JsonNode> chunk0 = watcher.subscribe(chunk(0)).events;
+        Client author = connect(cookie(author()), ORIGIN);
+        String first = UUID.randomUUID().toString();
+        String second = UUID.randomUUID().toString();
+
+        author.send("/app/draft", points(first, 0, 0, 2, 10, 10));
+        next(chunk0);
+        author.send("/app/draft", Map.of("pageId", pageId(), "draftId", second, "op", "text",
+                "bbox", Map.of("x", 20, "y", 20, "w", 30, "h", 30)));
+        JsonNode cancelled = next(chunk0);
+        assertThat(cancelled.get("type").asText()).isEqualTo("draft:cancel");
+        assertThat(cancelled.get("draftId").asText()).isEqualTo(first);
+        assertThat(next(chunk0).get("draftId").asText()).isEqualTo(second);
+
+        author.session.disconnect();
+        JsonNode last = next(chunk0);
+        assertThat(last.get("type").asText()).isEqualTo("draft:cancel");
+        assertThat(last.get("draftId").asText()).isEqualTo(second);
+    }
+
+    @Test
+    void framesOfACancelledDraftThatArriveLateAreDropped() throws Exception {
+        Client watcher = connect(null, ORIGIN);
+        BlockingQueue<JsonNode> chunk0 = watcher.subscribe(chunk(0)).events;
+        Client author = connect(cookie(author()), ORIGIN);
+        String id = UUID.randomUUID().toString();
+
+        author.send("/app/draft", cancel(id));
+        Thread.sleep(300);
+        author.send("/app/draft", points(id, 0, 0, 2, 10, 10));
+
+        assertThat(chunk0.poll(1, TimeUnit.SECONDS)).isNull();
+    }
+
+    @Test
+    void refusedDraftsAreReportedToTheirSenderOnly() throws Exception {
+        Client author = connect(cookie(author()), ORIGIN);
+        BlockingQueue<JsonNode> errors = author.subscribe("/user/queue/errors").events;
+        Client watcher = connect(null, ORIGIN);
+        BlockingQueue<JsonNode> chunk0 = watcher.subscribe(chunk(0)).events;
+        String id = UUID.randomUUID().toString();
+
+        Map<String, Object> endedPage = new HashMap<>(points(id, 0, 0, 2, 10, 10));
+        endedPage.put("pageId", "999999");
+        author.send("/app/draft", endedPage);
+        assertThat(next(errors).get("code").asText()).isEqualTo("PAGE_ENDED");
+        for (Map<String, Object> bad : List.<Map<String, Object>>of(points(id, 0, 12, 2, 10, 10), points(id, 0, 0, 3, 10, 10),
+                points(id, 0, 0, 2, 7680, 10), points(id, 0, 0, 2, 10, 10, 11), points(id, 0, 0, 2, 10, 10, 1100, 10),
+                points("draft-1", 0, 0, 2, 10, 10), Map.of("pageId", pageId(), "draftId", id, "op", "start"),
+                Map.of("pageId", pageId(), "draftId", id, "op", "cancel", "userId", "1"))) {
+            author.send("/app/draft", bad);
+            assertThat(next(errors).get("code").asText()).as("%s", bad).isEqualTo("VALIDATION_FAILED");
+        }
+        assertThat(chunk0.poll(500, TimeUnit.MILLISECONDS)).isNull();
+
+        author.send("/app/draft", points(id, 0, 0, 2, 10, 10));
+        assertThat(next(chunk0).get("type").asText()).isEqualTo("draft:update");
+        assertThat(author.errors).isEmpty();
+    }
+
+    @Test
+    void anonymousConnectionsCannotSendDrafts() throws Exception {
+        Client anonymous = connect(null, ORIGIN);
+        anonymous.send("/app/draft", points(UUID.randomUUID().toString(), 0, 0, 2, 10, 10));
+        assertThat(anonymous.nextError()).isEqualTo("UNAUTHENTICATED");
+    }
+
+    @Test
+    void aDraftStopsBeingRelayedAfterTwoMegabytes() throws Exception {
+        Client author = connect(cookie(author()), ORIGIN);
+        BlockingQueue<JsonNode> errors = author.subscribe("/user/queue/errors").events;
+        Client watcher = connect(null, ORIGIN);
+        BlockingQueue<JsonNode> chunk0 = watcher.subscribe(chunk(0)).events;
+        String id = UUID.randomUUID().toString();
+        // About 60 KB per frame, under the 64 KB frame limit: the 35th frame passes 2 MiB.
+        int[] many = IntStream.range(0, 15_000).map(i -> 100 + i % 300).toArray();
+
+        for (int i = 0; i < 40; i++) {
+            if (i > 0 && i % 15 == 0) {
+                Thread.sleep(200);
+                clock.advance(Duration.ofSeconds(1));   // stay under 20 SENDs per second
+            }
+            author.send("/app/draft", points(id, i, 0, 2, many));
+        }
+        int relayed = 0;
+        while (chunk0.poll(1, TimeUnit.SECONDS) != null) {
+            relayed++;
+        }
+        String code = next(errors).get("code").asText();
+        assertThat(code).isEqualTo("PAYLOAD_TOO_LARGE");
+        assertThat(relayed).isBetween(30, 35);
+        assertThat(author.errors).isEmpty();
+    }
+
     // --- page events ---
 
     @Test
@@ -331,6 +497,19 @@ class RealtimeIT extends WebIntegrationTest {
 
     private Map<String, Object> cursor(int x, int y) {
         return Map.of("pageId", Long.toString(page.id()), "x", x, "y", y);
+    }
+
+    private String pageId() {
+        return Long.toString(page.id());
+    }
+
+    private Map<String, Object> points(String draftId, int stroke, int c, int w, int... points) {
+        return Map.of("pageId", pageId(), "draftId", draftId, "op", "points", "strokeIndex", stroke, "c", c,
+                "w", w, "points", points);
+    }
+
+    private Map<String, Object> cancel(String draftId) {
+        return Map.of("pageId", pageId(), "draftId", draftId, "op", "cancel");
     }
 
     private static JsonNode next(BlockingQueue<JsonNode> queue) throws InterruptedException {

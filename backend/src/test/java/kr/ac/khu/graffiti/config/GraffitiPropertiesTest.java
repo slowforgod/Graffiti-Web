@@ -59,6 +59,7 @@ class GraffitiPropertiesTest {
             assertThat(p.realtime().maxSubscriptions()).isEqualTo(60);
             assertThat(p.realtime().inboundMessageMaxBytes()).isEqualTo(65_536);
             assertThat(p.realtime().cursorInterval()).isEqualTo(Duration.ofMillis(100));
+            assertThat(p.realtime().draftInterval()).isEqualTo(Duration.ofMillis(100));
             assertThat(p.realtime().heartbeat()).isEqualTo(Duration.ofSeconds(10));
 
             assertThat(p.query().maxChunks()).isEqualTo(60);
