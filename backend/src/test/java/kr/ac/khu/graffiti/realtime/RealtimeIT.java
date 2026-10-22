@@ -103,7 +103,7 @@ class RealtimeIT extends WebIntegrationTest {
             if (c.session.isConnected()) {
                 try {
                     c.session.disconnect();
-                } catch (IllegalStateException e) {
+                } catch (IllegalStateException | MessageDeliveryException e) {
                     // The server closed it in the meantime (after an ERROR frame).
                 }
             }
