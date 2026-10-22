@@ -3,6 +3,9 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 
+// The canvas has its own tests; here it would only add requests to the mocked fetch.
+vi.mock('./canvas/CanvasScreen', () => ({ default: () => null }));
+
 const signedIn = {
   authenticated: true,
   id: '42',

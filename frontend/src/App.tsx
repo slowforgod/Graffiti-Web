@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import AuthBar from './auth/AuthBar';
+import CanvasScreen from './canvas/CanvasScreen';
 import ConsentScreen from './auth/ConsentScreen';
 import LoginErrorBanner from './auth/LoginErrorBanner';
 import type { Me } from './auth/me';
@@ -61,9 +62,12 @@ export default function App() {
 
   return (
     <main>
-      <h1>경희 낙서장</h1>
+      <CanvasScreen />
+      <header className="app-header">
+        <h1>경희 낙서장</h1>
+        <AuthBar me={me} onLogout={() => void signOut()} />
+      </header>
       <LoginErrorBanner code={loginError} onClose={() => setLoginError(null)} />
-      <AuthBar me={me} onLogout={() => void signOut()} />
       {me?.authenticated && me.consentRequired && (
         <ConsentScreen onAgree={agree} onCancel={() => void signOut()} />
       )}
