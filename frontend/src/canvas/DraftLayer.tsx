@@ -42,7 +42,8 @@ export default function DraftLayer({ own, others, palette, scale }: Props) {
                 strokeWidth={1 / scale}
                 dash={[4 / scale, 4 / scale]}
               />
-              <Text x={d.box.x} y={d.box.y} text="작성 중…" fontSize={12 / scale} padding={2 / scale} fill="#5C6BC0" />
+              {/* Above the box: the author's cursor label sits at its top-left corner. */}
+              <Text x={d.box.x} y={d.box.y - 16 / scale} text="작성 중…" fontSize={12 / scale} padding={2 / scale} fill="#5C6BC0" />
             </>
           )}
         </Group>
