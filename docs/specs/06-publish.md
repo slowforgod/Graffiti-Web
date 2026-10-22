@@ -1,6 +1,6 @@
 # 06-publish: ✓로 게시, 쿨다운, 점유율 갱신, 게시 브로드캐스트
 
-- **상태**: APPROVED
+- **상태**: IN_PROGRESS (PR 대기)
 - **승인자**: 현 (slowforgod) / 승인일: 2026-10-22 (standing 지시 "승인 받지말고 다 해"에 따라 결정 필요 1~6은 추천안으로 확정)
 - **브랜치**: `feat/06-publish`
 - **선행 명세**: 05
@@ -105,6 +105,7 @@ Client ✓                     DoodleController / PublishService           큐 (
 | `backend/.../moderation/ModerationService.java`, `Verdict.java` | 임시 검사 (07이 교체) |
 | `frontend/src/tools/publish.ts` | 초안 → 요청 본문, `POST` 호출 |
 | `frontend/src/tools/cooldown.ts` | 서버 시각 보정, 남은 분 |
+| `backend/.../moderation/ModerationState.java` | PASSED/REJECTED/UNCHECKED |
 | `frontend/src/canvas/CanvasScreen.tsx`, `chunkSync.ts`, `ui/DraftActions.tsx` | ✓ 연결, 게시한 doodle 바로 추가, 안내 |
 
 설정값 추가 없음(`post-cooldown`, `max-payload-bytes`, 목록들은 이미 있음).
@@ -116,36 +117,35 @@ Client ✓                     DoodleController / PublishService           큐 (
 | ② | 알 수 없는 필드, 범위 밖 좌표, 팔레트 밖 색, 1025px, 51자, 제어 문자 | 400 `VALIDATION_FAILED` `details.field`, 쿨다운 소모 없음 | `DoodleValidatorTest`, `PublishIT` |
 | ③ | 두 탭에서 동시에 ✓ | 큐가 순서대로 처리, 두 번째는 원자적 UPDATE 0행 → 429 `COOLDOWN` | `PublishIT` |
 | ③ | ✓ 직전에 차단됨 | 인자 해석에서 403 `BANNED` (예약 UPDATE 조건으로 한 번 더) | `PublishIT` |
-| ④ | 검사 중 예외 | 쿨다운 되돌림, 500 `INTERNAL` | `PublishServiceTest` |
+| ④ | 검사 중 예외 | 쿨다운 되돌림, 500 `INTERNAL` | `PublishIT` |
 | ⑤ | 검사 중 페이지 넘어감 | 쿨다운 되돌림, 409 `PAGE_ENDED` → 클라이언트가 새 페이지 로딩 | `PublishIT` |
-| ⑤ | DB INSERT 실패 | 트랜잭션 롤백, 메모리·이벤트 그대로, 쿨다운 되돌림, 500 | `PageCommandHandlerTest` |
+| ⑤ | DB INSERT 실패 | 트랜잭션 롤백, 메모리·이벤트 그대로, 쿨다운 되돌림, 500 | `PublishIT` |
 | ⑤ | 이 게시로 70% 도달 | 같은 트랜잭션에서 COUNTDOWN, `page:status` | `PublishIT` |
 | 재시작 | PUBLISHED doodle의 payload | 저장된 payload로 footprint 재계산, 점유율이 재시작 전과 같음 | `PublishIT` |
 | 프론트 | 응답 전에 ✓ 연타 | 보내는 동안 ✓/✗ 비활성 | `CanvasScreen.test` |
 | 프론트 | 쿨다운 중 ✓ | ✓ 비활성 + 남은 시간. 서버 429면 안내 + 쿨다운 갱신 | `CanvasScreen.test` |
 
 ## 7. 수용 기준 (테스트 가능하게)
-- [ ] AC-1: 작성자가 유효한 그림을 게시하면 201 `{doodle:{id,kind,bbox,payload}, cooldownEndsAt}`(= 예약 시각 + 30분). `doodle`은 PUBLISHED/UNCHECKED, `submitted_at` = 예약 시각, bbox는 서버 계산값, `doodle_chunk`는 bbox가 걸치는 청크마다 1행
-- [ ] AC-2: 그 청크를 구독한 다른 클라이언트가 `{type:"doodle:published", doodle:{id,kind,bbox,payload}}`를 받는다(키는 정확히 그것뿐, 작성자 정보 없음). 메타 토픽에 `minimap:diff`
-- [ ] AC-3 (D-12, INV-08): 30분 안의 두 번째 게시는 429 `COOLDOWN` `details.retryAfterSec`. 관리자는 쿨다운 없이 게시되고 `last_posted_at`이 바뀌지 않음
-- [ ] AC-4 (D-28): 예약 뒤 게시 전에 페이지가 넘어가면 409 `PAGE_ENDED`이고 `last_posted_at`이 이전 값으로 돌아간다
-- [ ] AC-5 (INV-04): 끝난 `pageId`로 게시 → 409 `PAGE_ENDED`, 쿨다운 소모 없음
-- [ ] AC-6 (SEC-02): 알 수 없는 필드, 빈 획 목록, 홀수 개 좌표, 캔버스 밖 좌표, 팔레트 밖 색, 없는 굵기, 1,024px 넘는 bbox, 그림에 `bbox`, 0자·51자·공백만·제어 문자 텍스트, 목록 밖 글자 크기, D-31 상한을 넘는 텍스트 bbox → 400 `VALIDATION_FAILED`, 쿨다운 소모 없음
-- [ ] AC-7 (SEC-08): 2MB 넘는 본문 → 413 `PAYLOAD_TOO_LARGE`
-- [ ] AC-8 (SEC-07/15): 비로그인 401, 동의 전 403 `CONSENT_REQUIRED`, 차단 403 `BANNED`, CSRF 토큰 없으면 403
-- [ ] AC-9 (INV-03): 게시로 점유율이 70%를 넘으면 같은 처리에서 페이지가 COUNTDOWN이 되고 `page:status`가 나간다
-- [ ] AC-10 (D-25, INV-12): 재시작(복구)하면 PUBLISHED doodle로 계산한 점유율이 게시 직후와 같다
-- [ ] AC-11: ✓를 누르면 초안이 내 화면에서 바로 doodle로 바뀌고(`cancel` 전송), 다른 창에도 보인다
-- [ ] AC-12 (D-12): 쿨다운 중엔 ✓가 비활성이고 남은 분이 보인다. 초안은 계속 그릴 수 있다. 서버 시각 기준
-- [ ] AC-13: 게시 실패(쿨다운, 검증, 크기, 차단, 서버 오류)면 안내가 보이고 초안은 남는다. `PAGE_ENDED`면 새 페이지를 불러온다
+- [x] AC-1: 작성자가 유효한 그림을 게시하면 201 `{doodle:{id,kind,bbox,payload}, cooldownEndsAt}`(= 예약 시각 + 30분). `doodle`은 PUBLISHED/UNCHECKED, `submitted_at` = 예약 시각, bbox는 서버 계산값, `doodle_chunk`는 bbox가 걸치는 청크마다 1행
+- [x] AC-2: 그 청크를 구독한 다른 클라이언트가 `{type:"doodle:published", doodle:{id,kind,bbox,payload}}`를 받는다(키는 정확히 그것뿐, 작성자 정보 없음). 메타 토픽에 `minimap:diff`
+- [x] AC-3 (D-12, INV-08): 30분 안의 두 번째 게시는 429 `COOLDOWN` `details.retryAfterSec`. 관리자는 쿨다운 없이 게시되고 `last_posted_at`이 바뀌지 않음
+- [x] AC-4 (D-28): 예약 뒤 게시 전에 페이지가 넘어가면 409 `PAGE_ENDED`이고 `last_posted_at`이 이전 값으로 돌아간다
+- [x] AC-5 (INV-04): 끝난 `pageId`로 게시 → 409 `PAGE_ENDED`, 쿨다운 소모 없음
+- [x] AC-6 (SEC-02): 알 수 없는 필드, 빈 획 목록, 홀수 개 좌표, 캔버스 밖 좌표, 팔레트 밖 색, 없는 굵기, 1,024px 넘는 bbox, 그림에 `bbox`, 0자·51자·공백만·제어 문자 텍스트, 목록 밖 글자 크기, D-31 상한을 넘는 텍스트 bbox → 400 `VALIDATION_FAILED`, 쿨다운 소모 없음
+- [x] AC-7 (SEC-08): 2MB 넘는 본문 → 413 `PAYLOAD_TOO_LARGE`
+- [x] AC-8 (SEC-07/15): 비로그인 401, 동의 전 403 `CONSENT_REQUIRED`, 차단 403 `BANNED`, CSRF 토큰 없으면 403
+- [x] AC-9 (INV-03): 게시로 점유율이 70%를 넘으면 같은 처리에서 페이지가 COUNTDOWN이 되고 `page:status`가 나간다
+- [x] AC-10 (D-25, INV-12): 재시작(복구)하면 PUBLISHED doodle로 계산한 점유율이 게시 직후와 같다
+- [x] AC-11: ✓를 누르면 초안이 내 화면에서 바로 doodle로 바뀌고(`cancel` 전송), 다른 창에도 보인다
+- [x] AC-12 (D-12): 쿨다운 중엔 ✓가 비활성이고 남은 분이 보인다. 초안은 계속 그릴 수 있다. 서버 시각 기준
+- [x] AC-13: 게시 실패(쿨다운, 검증, 크기, 차단, 서버 오류)면 안내가 보이고 초안은 남는다. `PAGE_ENDED`면 새 페이지를 불러온다
 
 ## 8. 테스트 계획
 | 층 | 대상 | 파일 (예정) |
 |---|---|---|
 | 단위 | 검증 규칙, bbox, 정규화 payload, 청크 | `doodle/DoodleValidatorTest` |
-| 단위 | 큐 명령(예약, 되돌림, 게시, 카운트다운, DB 실패) | `page/PageCommandHandlerTest` |
-| 단위 | 순서와 되돌림(검사 예외, PAGE_ENDED) | `doodle/PublishServiceTest` |
-| 통합 | REST + MySQL + STOMP: AC-1~AC-10 | `doodle/PublishIT` |
+| 통합 | REST + MySQL: AC-1~AC-10, 큐 명령(예약, 되돌림, 게시, 카운트다운, DB 실패), 검사 예외와 PAGE_ENDED 되돌림 | `doodle/PublishIT` |
+| 통합 | STOMP: `doodle:published`가 닿는 모든 청크에, 키 정확히 | `realtime/RealtimeIT` |
 | 단위(프론트) | 요청 본문 만들기, 쿨다운 계산 | `publish.test.ts`, `cooldown.test.ts` |
 | 컴포넌트(프론트) | ✓ 성공·실패·쿨다운·보내는 중 | `CanvasScreen.test.tsx` |
 | QA | 헤드리스 Chromium 두 개: 작성자가 ✓ → 두 창 모두 doodle, 쿨다운 표시, 재시작 뒤에도 남음 | 수동 체크리스트 |
@@ -170,8 +170,19 @@ PR revert. 스키마 변경 없음. 이미 게시된 doodle 행은 남지만(INV
 ---
 
 ## 리뷰 기록 (/gf-review가 추가)
+- 2026-10-22 자체 리뷰 (전체 diff)
+  - 시간대: JDBC로 쓰는 `last_posted_at`, `submitted_at`, `published_at`은 `LocalDateTime`(UTC)으로 바인딩. `Timestamp`는 JVM 시간대로 바뀌어 JPA(UTC)와 어긋날 수 있었다. `PublishIT`를 JVM 시간대 Asia/Seoul로도 돌려 `/api/me`의 `cooldownEndsAt`과 DB 값이 맞는 것 확인
+  - 예약 UPDATE는 읽은 값과 `<=>` 비교라 두 탭 동시 ✓도 하나만 성공(큐가 한 줄로 처리하므로 0행은 사이에 차단된 경우뿐 → `BANNED`)
+  - 커밋 뒤에만 메모리 교체와 이벤트. INSERT 실패 테스트에서 점유율, 이벤트, 쿨다운이 모두 그대로인 것 확인
+  - 게시 응답과 `doodle:published`에 작성자 정보 없음(키 정확히 비교). 로그에 payload나 글자 없음
+  - 남은 위험: 게시 커밋 뒤 이벤트 리스너가 예외를 던지면 `ReleasePost`가 쿨다운을 되돌린다(게시는 됨). 현재 리스너는 브로커에 넘기기만 해서 던지지 않음
+- 테스트: 백엔드 `./gradlew test` 210개 통과(실패 0, 스킵 0), 프론트 `npm test` 93개 통과, `npm run lint`·`npm run build` 통과
 
 ## QA 기록 (/gf-qa가 추가)
+- 2026-10-22 로컬 스택(MySQL 8.4 컨테이너, 06 백엔드 + 테스트 로그인 엔드포인트, Vite) + 헤드리스 Chromium 두 개(작성자 1, 비로그인 1)
+  - 작성자가 곡선을 그리고 ✓ → 201, 작성자 화면에서 초안이 바로 doodle로 바뀜. 비로그인 창은 `doodle:published`를 받아(두 청크라 2번) 같은 곡선을 그림
+  - 다음 초안은 그릴 수 있지만 ✓ 비활성 + "30분 뒤에 게시할 수 있어요"
+  - 비로그인 창을 새로고침해도 doodle이 남아 있음(청크 조회). 콘솔 에러는 favicon 404뿐
 
 ## 보안 감사 기록 (/gf-security가 추가, 해당 시)
 
