@@ -1,7 +1,7 @@
 import { ApiError } from '../api/client';
 import type { PageStatus } from '../shared/pageConfig';
-import type { MinimapBody } from '../ui/minimap';
-import { decodeBitmap } from '../ui/minimap';
+import type { MinimapBody } from '../ui/minimapApi';
+import { decodeBitmap } from '../ui/minimapApi';
 import type { RealtimeLink } from './link';
 import { metaTopic } from './link';
 

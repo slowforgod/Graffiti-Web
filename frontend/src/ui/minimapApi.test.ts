@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decodeBitmap } from './minimap';
+import { decodeBitmap } from './minimapApi';
 
 describe('decodeBitmap', () => {
   it('reads cell row * cols + col from the most significant bit first (API.md §2)', () => {
