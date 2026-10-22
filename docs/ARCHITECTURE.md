@@ -52,6 +52,7 @@ backend/src/main/java/kr/ac/khu/graffiti/
 │   ├── PageCommandProcessor (인터페이스) + SingleThreadPageCommandProcessor
 │   │                        커맨드: ApplyFootprint, EndPage, GetPageSnapshot, GetMinimap, EnsureLivePage, InstallPage
 │   ├── PageReader           요청 스레드용 읽기(큐를 거쳐 스냅샷·미니맵), PageController(/api/pages/current, /minimap)
+│   ├── LivePage             STOMP 검증용 현재 페이지 캐시 (페이지 이벤트마다 무효화, 큐 왕복을 줄임)
 │   ├── PageState            메모리 상태 (cellCount, status, scheduledEndAt)
 │   ├── Footprint            선분 bbox(굵기 포함)/텍스트 박스 → 칸 집합 (순수 로직)
 │   ├── OccupancyGrid        참조 카운트, 점유율, 비트맵 (순수 로직)
@@ -63,7 +64,9 @@ backend/src/main/java/kr/ac/khu/graffiti/
 │                  청크 조회(ChunkList 순수 검증, ChunkDoodleQuery JDBC, ChunkDoodleController)
 ├── moderation/    ModerationProvider 인터페이스, 구현체 4개(WordFilter, KhuChat, OpenAi, Ml), DoodleRenderer,
 │                  ModerationService(병렬 호출과 판정 합성), MlPredictionRecorder
-├── realtime/      STOMP 설정, ChannelInterceptor(인증·구독 검증·속도 제한), Broadcaster 인터페이스
+├── realtime/      STOMP 설정(WebSocketConfig, 하트비트), RealtimeInterceptor(구독 목적지 검증, SEND 권한·속도 제한),
+│                  SubscribeReceipts(구독 등록 후 RECEIPT, INV-09), StompErrorHandler(ERROR 프레임 = 에러 코드),
+│                  Broadcaster + PageEventRelay(page/event → 메타 토픽), CursorController(/app/cursor 중계)
 ├── admin/         관리자 API, moderation_action 기록
 └── common/        에러 응답 형식(ApiError), 예외 → 에러 코드 매핑, 시계(Clock) 주입
 ```
@@ -94,9 +97,11 @@ ml/
 frontend/src/
 ├── api/           REST 클라이언트(CSRF 헤더 자동 첨부), 에러 코드 타입
 ├── auth/          /api/me 상태, 로그인·로그아웃 바, 동의 화면, 로그인 실패 안내
-├── realtime/      STOMP 클라이언트, 청크 구독 관리자(구독 → 조회 → 병합, INV-09)
+├── realtime/      STOMP 연결(connection.ts, 구독마다 receipt), RealtimeLink 인터페이스, 메타 토픽 동기화(metaSync.ts:
+│                  미니맵·점유율·page:turned), 커서 전송 간격 제한(throttle.ts)
 ├── canvas/        Konva Stage(CanvasView), 뷰포트(viewport.ts: 팬/줌, config의 min~max), 청크 계산(chunks.ts),
-│                  보이는 청크 로딩(chunkLoader.ts) + doodle 저장소(doodleStore.ts), 배경 격자
+│                  보이는 청크 동기화(chunkSync.ts: 구독 → 조회 → 병합, INV-09) + doodle 저장소(doodleStore.ts),
+│                  다른 사람 커서(cursors.ts, CursorLayer), 배경 격자
 ├── tools/         펜, 텍스트, 지우개(초안 전용), 선택, 이동 + 초안 상태 머신
 ├── ui/            툴바, 상단 상태바(점유율, 남은 시간), T−5분 카운트다운, 미니맵, 토스트
 ├── admin/         관리자 화면
@@ -141,13 +146,16 @@ Client                         REST(Controller)          PageCommandProcessor(�
 
 ```
 뷰포트 변경 → 보이는 청크 집합 계산 (최대 60개)
-   ├─ 새로 보이는 청크: ① STOMP SUBSCRIBE /topic/page.{p}.chunk.{i}
-   │                       (도착하는 이벤트는 청크별 대기열에 쌓음)
-   │                    ② GET /api/pages/{p}/doodles?chunks=i,j,...
+   ├─ 새로 보이는 청크: ① STOMP SUBSCRIBE /topic/page.{p}.chunk.{i} (receipt 헤더 포함)
+   │                       (도착하는 이벤트는 청크별 대기열에 쌓음, 커서는 바로 표시)
+   │                    ② 모든 RECEIPT를 받은 뒤 GET /api/pages/{p}/doodles?chunks=i,j,...
    │                    ③ 응답 + 대기열 병합: doodle ID로 중복 제거,
    │                       대기열의 doodle:removed는 응답에서도 제거
    └─ 벗어난 청크:     UNSUBSCRIBE, 해당 청크에만 있던 doodle은 메모리에서 해제
 ```
+
+- 메타 토픽도 같은 순서입니다: SUBSCRIBE(receipt) → GET /minimap → 대기열의 `minimap:diff` 재적용. `page:turned`나 `PAGE_ENDED`를 받으면 `/api/pages/current`부터 다시 불러옵니다.
+- 연결이 없으면 REST로만 불러오고, (재)연결되면 보이는 청크와 메타 토픽을 모두 다시 구독 → 조회합니다. 끊긴 사이의 이벤트는 다시 조회한 응답이 대신합니다.
 
 ### 4.3 초안 중계 (저장 안 함, INV-06)
 
@@ -286,6 +294,8 @@ PageBootstrap (SmartLifecycle, 웹 서버보다 앞 단계)
 | `graffiti.realtime.max-messages-per-second` | 20 | D-12 |
 | `graffiti.realtime.max-subscriptions` | 60 | D-30 |
 | `graffiti.realtime.inbound-message-max-bytes` | 65536 | D-27 |
+| `graffiti.realtime.cursor-interval` | 100ms (클라이언트 커서 전송 간격, `cursorIntervalMs`) | 04 |
+| `graffiti.realtime.heartbeat` | 10s (STOMP 양방향 하트비트, `heartbeatMs`) | 04 |
 | `graffiti.query.max-chunks` / `max-batch-delete` | 60 / 50 | D-30 |
 | `graffiti.moderation.timeout` | 5s | D-18 |
 | `graffiti.moderation.ml.mode` | SHADOW | D-34, D-39 |
