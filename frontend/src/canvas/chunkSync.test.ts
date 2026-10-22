@@ -5,6 +5,7 @@ import { chunkTopic } from '../realtime/link';
 import { ChunkSync } from './chunkSync';
 import type { RemoteCursor } from './cursors';
 import type { Doodle } from './doodles';
+import type { RemoteDraft } from './remoteDrafts';
 import { TEST_CONFIG } from './testConfig';
 
 // Chunk 0 is the top-left 480×480 square, chunk 1 the one to its right.
@@ -33,6 +34,8 @@ function setup(connected = true) {
   });
   let doodles: Doodle[] = [];
   let cursors: RemoteCursor[] = [];
+  let drafts: RemoteDraft[] = [];
+  let now = 0;
   const onPageEnded = vi.fn();
   const sync = new ChunkSync({
     pageId: '7',
@@ -41,9 +44,12 @@ function setup(connected = true) {
     fetchChunks,
     onDoodles: (d) => (doodles = d),
     onCursors: (c) => (cursors = c),
+    onDrafts: (d) => (drafts = d),
+    now: () => now,
     onPageEnded,
   });
-  return { link, sync, fetchChunks, answers, onPageEnded, ids: () => doodles.map((d) => d.id), cursors: () => cursors };
+  return { link, sync, fetchChunks, answers, onPageEnded, ids: () => doodles.map((d) => d.id), cursors: () => cursors,
+    drafts: () => drafts.map((d) => d.draftId), setNow: (t: number) => (now = t) };
 }
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
@@ -88,6 +94,22 @@ describe('ChunkSync', () => {
 
     sync.setVisible([1]);
     expect(cursors()).toEqual([]);
+  });
+
+  it('shows drafts before the chunk is loaded, drops them with their chunk and when they go quiet', () => {
+    const { link, sync, drafts, setNow } = setup();
+    sync.setVisible([0, 1]);
+    const update = (draftId: string) => ({ type: 'draft:update', sid: 's-a', draftId, op: 'points', strokeIndex: 0, c: 0, w: 2, points: [5, 5] });
+    link.deliver(chunkTopic('7', 0), update('a'));
+    link.deliver(chunkTopic('7', 1), update('b'));
+    expect(drafts()).toEqual(['a', 'b']);
+
+    sync.setVisible([1]);
+    expect(drafts()).toEqual(['b']);
+
+    setNow(600_000);
+    sync.expireDrafts(600_000);
+    expect(drafts()).toEqual([]);
   });
 
   it('ignores a leave from a chunk the cursor already left', () => {

@@ -19,5 +19,6 @@ export const TEST_CONFIG: ClientConfig = {
   countdownWarningSec: 300,
   draftIdleTimeoutSec: 600,
   cursorIntervalMs: 100,
+  draftIntervalMs: 100,
   heartbeatMs: 10000,
 };

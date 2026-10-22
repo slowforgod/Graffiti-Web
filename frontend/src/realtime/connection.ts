@@ -18,11 +18,22 @@ export function brokerUrl(location: Pick<Location, 'protocol' | 'host'>): string
 export function createConnection(factory: (url: string) => Client = (url) => new Client({ brokerURL: url })): Connection {
   const client = factory(brokerUrl(window.location));
   const connectListeners = new Set<() => void>();
+  const disconnectListeners = new Set<() => void>();
   const pageEndedListeners = new Set<() => void>();
   let receiptSeq = 0;
+  let open = false;
 
   client.reconnectDelay = RECONNECT_DELAY_MS;
-  client.onConnect = () => connectListeners.forEach((l) => l());
+  client.onConnect = () => {
+    open = true;
+    connectListeners.forEach((l) => l());
+  };
+  client.onWebSocketClose = () => {
+    if (open) {
+      open = false;
+      disconnectListeners.forEach((l) => l());
+    }
+  };
   client.onStompError = (frame) => {
     if (frame.headers.message === 'PAGE_ENDED') {
       pageEndedListeners.forEach((l) => l());
@@ -57,6 +68,10 @@ export function createConnection(factory: (url: string) => Client = (url) => new
     onConnect(listener) {
       connectListeners.add(listener);
       return () => connectListeners.delete(listener);
+    },
+    onDisconnect(listener) {
+      disconnectListeners.add(listener);
+      return () => disconnectListeners.delete(listener);
     },
     onPageEnded(listener) {
       pageEndedListeners.add(listener);

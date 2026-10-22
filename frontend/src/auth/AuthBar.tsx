@@ -6,7 +6,7 @@ interface Props {
   onLogout: () => void;
 }
 
-// Temporary top bar until the toolbar lands in 05-draft.
+// Account bar: the login link, or the nickname and logout. Drawing tools are in the toolbar.
 export default function AuthBar({ me, onLogout }: Props) {
   if (me === undefined) {
     return null;
