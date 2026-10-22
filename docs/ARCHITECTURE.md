@@ -58,15 +58,17 @@ backend/src/main/java/kr/ac/khu/graffiti/
 │   ├── OccupancyGrid        참조 카운트, 점유율, 비트맵 (순수 로직)
 │   ├── PageLifecycle        상태 전이, 종료 시각 계산 (순수 로직)
 │   ├── PageTimer            종료 예약 (PageStatusChanged마다 재예약)
-│   ├── PageBootstrap        재시작 복구 (웹 서버 시작 전)
-│   └── event/               PageStatusChanged, OccupancyChanged, PageTurned (커밋 후 발행 → 04가 STOMP로 중계)
-├── doodle/        Doodle 엔티티, DoodleValidator(순수 로직), 게시/삭제 유스케이스,
-│                  청크 조회(ChunkList 순수 검증, ChunkDoodleQuery JDBC, ChunkDoodleController)
+│   ├── PageBootstrap        재시작 복구 (웹 서버 시작 전, PublishedFootprintSource로 점유율 재계산)
+│   ├── PostStore            큐 안에서 쓰는 게시 저장 포트 (쿨다운 예약·되돌림, doodle INSERT). doodle 패키지가 구현
+│   └── event/               PageStatusChanged, OccupancyChanged, PageTurned, DoodlePublished (커밋 후 발행 → STOMP로 중계)
+├── doodle/        게시(DoodleController: 본문 2MB 상한·엄격한 JSON, DoodleValidator 순수 검증·bbox·칸·청크,
+│                  PublishService: 예약 → 검사 → 게시 → 실패 시 되돌림, JdbcPostStore, PublishedDoodleFootprints),
+│                  청크 조회(ChunkList 순수 검증, ChunkDoodleQuery JDBC, ChunkDoodleController). 삭제는 08
 ├── moderation/    ModerationProvider 인터페이스, 구현체 4개(WordFilter, KhuChat, OpenAi, Ml), DoodleRenderer,
-│                  ModerationService(병렬 호출과 판정 합성), MlPredictionRecorder
+│                  ModerationService(병렬 호출과 판정 합성), MlPredictionRecorder. 06에는 항상 UNCHECKED인 임시 ModerationService만
 ├── realtime/      STOMP 설정(WebSocketConfig, 하트비트), RealtimeInterceptor(구독 목적지 검증, SEND 권한·속도 제한),
 │                  SubscribeReceipts(구독 등록 후 RECEIPT, INV-09), StompErrorHandler(ERROR 프레임 = 에러 코드),
-│                  Broadcaster + PageEventRelay(page/event → 메타 토픽), CursorController(/app/cursor 중계),
+│                  Broadcaster + PageEventRelay(page/event → 메타 토픽, DoodlePublished → 청크 토픽), CursorController(/app/cursor 중계),
 │                  DraftController + DraftRules(/app/draft 검증·중계, 연결 종료 시 취소), RealtimeErrorAdvice
 ├── admin/         관리자 API, moderation_action 기록
 └── common/        에러 응답 형식(ApiError), 예외 → 에러 코드 매핑, 시계(Clock) 주입
@@ -142,6 +144,10 @@ Client                         REST(Controller)          PageCommandProcessor(�
 ```
 
 - ③과 ⑤는 큐 안에서, ④는 큐 밖에서 실행합니다(INV-01, INV-02).
+- ③ 예약(06): `ReservePost`가 DB에서 차단·역할·`last_posted_at`을 읽고, 쿨다운이 지났으면 `UPDATE users SET last_posted_at = now WHERE id = ? AND banned_at IS NULL AND last_posted_at <=> 읽은 값`. 관리자는 아무것도 쓰지 않음. 예약 시각 = `submitted_at`
+- 되돌림(D-28): ④에서 예외가 나거나 ⑤가 `PAGE_ENDED`·DB 오류로 실패하면 `ReleasePost`가 `last_posted_at`을 예약 전 값으로(그사이 바뀌지 않았을 때만). AI 거부(07)는 되돌리지 않음
+- ⑤ 게시(06): doodle과 `doodle_chunk`(bbox가 걸치는 청크) INSERT와 카운트다운 UPDATE가 한 트랜잭션. 커밋 뒤 `DoodlePublished` → 청크마다 `doodle:published`, 이어서 `minimap:diff`, `page:status`
+- 06의 ④는 임시 구현으로 항상 `UNCHECKED`. 06만 배포하지 않음(PIPELINE)
 - 거부되면 `RecordReject`가 `status=REJECTED`로 저장하고 `moderation_action(AI, REJECT)`를 기록합니다. 쿨다운은 그대로 소모됩니다(D-12).
 - DB 쓰기는 큐 작업 안에서 트랜잭션 하나로 묶고, 커밋이 성공한 **뒤에** 메모리 상태 갱신과 브로드캐스트를 합니다. DB가 실패하면 메모리는 그대로입니다.
 

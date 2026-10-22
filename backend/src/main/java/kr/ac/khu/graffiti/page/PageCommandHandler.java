@@ -1,11 +1,15 @@
 package kr.ac.khu.graffiti.page;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Map;
+import java.util.function.Function;
 import kr.ac.khu.graffiti.common.error.ApiException;
 import kr.ac.khu.graffiti.common.error.ErrorCode;
 import kr.ac.khu.graffiti.config.GraffitiProperties;
+import kr.ac.khu.graffiti.page.event.DoodlePublished;
 import kr.ac.khu.graffiti.page.event.OccupancyChanged;
 import kr.ac.khu.graffiti.page.event.PageStatusChanged;
 import kr.ac.khu.graffiti.page.event.PageTurned;
@@ -26,6 +30,7 @@ class PageCommandHandler {
     private static final Logger log = LoggerFactory.getLogger(PageCommandHandler.class);
 
     private final PageRepository pages;
+    private final PostStore posts;
     private final TransactionTemplate tx;
     private final ApplicationEventPublisher events;
     private final GraffitiProperties props;
@@ -33,9 +38,10 @@ class PageCommandHandler {
 
     private PageState current;
 
-    PageCommandHandler(PageRepository pages, TransactionTemplate tx, ApplicationEventPublisher events,
+    PageCommandHandler(PageRepository pages, PostStore posts, TransactionTemplate tx, ApplicationEventPublisher events,
             GraffitiProperties props, Clock clock) {
         this.pages = pages;
+        this.posts = posts;
         this.tx = tx;
         this.events = events;
         this.props = props;
@@ -52,30 +58,47 @@ class PageCommandHandler {
     }
 
     PageSnapshot applyFootprint(PageCommand.ApplyFootprint c) {
-        PageState state = requireCurrent(c.pageId());
-        OccupancyGrid grid = state.grid().copy();
-        OccupancyGrid.CellChanges changes = grid.apply(c.footprint(), c.delta());
+        return commitFootprint(requireCurrent(c.pageId()), c.footprint(), c.delta(), null, at -> null).state()
+                .snapshot();
+    }
 
-        PageState next;
-        if (PageLifecycle.shouldStartCountdown(state.status(), grid.occupancyPermille(), state.rules())) {
-            Instant now = now();
-            Instant endAt = PageLifecycle.scheduledEnd(state.createdAt(), now, state.rules());
-            tx.executeWithoutResult(s -> requireOneRow(pages.startCountdown(state.id(), now, endAt), state));
-            next = state.withCountdown(now, endAt, grid);
-        } else {
-            // Occupancy itself is not stored: it is rebuilt from published doodles (INV-12).
-            next = state.withGrid(grid);
+    PageCommand.Reservation reservePost(PageCommand.ReservePost c) {
+        requireCurrent(c.pageId());
+        PostStore.Poster poster = posts.poster(c.userId())
+                .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHENTICATED));
+        if (poster.banned()) {
+            throw new ApiException(ErrorCode.BANNED);
         }
+        Instant now = now();
+        if (poster.admin()) {
+            return new PageCommand.Reservation(c.userId(), now, poster.lastPostedAt(), true);
+        }
+        Instant last = poster.lastPostedAt();
+        if (last != null && last.plus(props.postCooldown()).isAfter(now)) {
+            throw cooldown(last.plus(props.postCooldown()), now);
+        }
+        Boolean taken = tx.execute(s -> posts.reserve(c.userId(), last, now));
+        if (!Boolean.TRUE.equals(taken)) {
+            // Banned (or otherwise changed) between the read and the update.
+            throw new ApiException(ErrorCode.BANNED);
+        }
+        return new PageCommand.Reservation(c.userId(), now, last, false);
+    }
 
-        current = next;
-        if (!changes.isEmpty()) {
-            events.publishEvent(new OccupancyChanged(next.id(), changes.set(), changes.clear(),
-                    grid.occupancyPermille()));
+    PageCommand.Published publish(PageCommand.PublishDoodle c) {
+        PostStore.NewDoodle doodle = c.doodle();
+        PageState state = requireCurrent(doodle.pageId());
+        Committed<Long> done = commitFootprint(state, c.footprint(), +1, doodle,
+                at -> posts.insertPublished(doodle, at));
+        return new PageCommand.Published(done.result(), done.at());
+    }
+
+    boolean release(PageCommand.ReleasePost c) {
+        PageCommand.Reservation r = c.reservation();
+        if (r.exempt()) {
+            return false;
         }
-        if (next.status() != state.status()) {
-            publishStatus(next);
-        }
-        return next.snapshot();
+        return Boolean.TRUE.equals(tx.execute(s -> posts.restore(r.userId(), r.reservedAt(), r.previous())));
     }
 
     PageSnapshot endPage(PageCommand.EndPage c) {
@@ -115,6 +138,59 @@ class PageCommandHandler {
         current = PageState.of(page, c.grid());
         publishStatus(current);
         return current.snapshot();
+    }
+
+    private record Committed<T>(PageState state, Instant at, T result) {
+    }
+
+    /**
+     * Adds or removes one footprint. {@code writes} run in the same transaction as a countdown start;
+     * {@code published}, when given, is announced before the cell changes. Memory and events change only
+     * after the commit.
+     */
+    private <T> Committed<T> commitFootprint(PageState state, Footprint footprint, int delta,
+            PostStore.NewDoodle published, Function<Instant, T> writes) {
+        OccupancyGrid grid = state.grid().copy();
+        OccupancyGrid.CellChanges changes = grid.apply(footprint, delta);
+        Instant now = now();
+        boolean countdown = PageLifecycle.shouldStartCountdown(state.status(), grid.occupancyPermille(),
+                state.rules());
+        Instant endAt = countdown ? PageLifecycle.scheduledEnd(state.createdAt(), now, state.rules()) : null;
+
+        T result = null;
+        if (countdown || published != null) {
+            result = tx.execute(s -> {
+                T written = writes.apply(now);
+                if (countdown) {
+                    requireOneRow(pages.startCountdown(state.id(), now, endAt), state);
+                }
+                return written;
+            });
+        }
+        // Occupancy itself is not stored: it is rebuilt from published doodles (INV-12).
+        PageState next = countdown ? state.withCountdown(now, endAt, grid) : state.withGrid(grid);
+
+        current = next;
+        if (published != null) {
+            events.publishEvent(new DoodlePublished(next.id(), published.chunks(), (Long) result,
+                    published.kind(), published.x(), published.y(), published.w(), published.h(),
+                    published.payload()));
+        }
+        if (!changes.isEmpty()) {
+            events.publishEvent(new OccupancyChanged(next.id(), changes.set(), changes.clear(),
+                    grid.occupancyPermille()));
+        }
+        if (next.status() != state.status()) {
+            publishStatus(next);
+        }
+        return new Committed<>(next, now, result);
+    }
+
+    private static ApiException cooldown(Instant endsAt, Instant now) {
+        long seconds = (Duration.between(now, endsAt).toMillis() + 999) / 1000;
+        long minutes = (seconds + 59) / 60;
+        return new ApiException(ErrorCode.COOLDOWN, "다음 게시까지 " + minutes + "분 남았어요.",
+                Map.of("retryAfterSec", seconds));
     }
 
     private Page newPageFromConfig(int seq, Instant now) {

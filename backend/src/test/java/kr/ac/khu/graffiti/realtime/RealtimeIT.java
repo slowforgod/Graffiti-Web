@@ -25,6 +25,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.IntStream;
+import kr.ac.khu.graffiti.doodle.DoodleValidator;
+import kr.ac.khu.graffiti.doodle.PublishService;
 import kr.ac.khu.graffiti.page.Footprint;
 import kr.ac.khu.graffiti.page.FreshPage;
 import kr.ac.khu.graffiti.page.PageCommand;
@@ -290,6 +292,25 @@ class RealtimeIT extends WebIntegrationTest {
         assertThat(update.get("points").toString()).isEqualTo("[470,10,490,12]");
         assertThat(next(chunk1)).isEqualTo(update);
         assertThat(chunk16.poll(500, TimeUnit.MILLISECONDS)).isNull();
+    }
+
+    @Test
+    void aPublishedDoodleReachesEveryChunkItTouchesWithoutItsAuthor() throws Exception {
+        Client watcher = connect(null, ORIGIN);
+        BlockingQueue<JsonNode> chunk0 = watcher.subscribe(chunk(0)).events;
+        BlockingQueue<JsonNode> chunk1 = watcher.subscribe(chunk(1)).events;
+        DoodleValidator.Validated doodle = DoodleValidator.drawing(new DoodleValidator.DrawingPayload(1,
+                List.of(new DoodleValidator.StrokeInput(3, 8, new int[] {470, 10, 490, 12}))), null,
+                new DoodleValidator.Limits(page.geometry(), page.chunkSize(), 12, List.of(2, 4, 8, 16), List.of(24),
+                        1024, 50));
+
+        long id = context.getBean(PublishService.class).publish(page.id(), author().getId(), doodle).id();
+
+        String expected = "{\"type\":\"doodle:published\",\"doodle\":{\"id\":\"" + id
+                + "\",\"kind\":\"DRAWING\",\"bbox\":{\"x\":466,\"y\":6,\"w\":28,\"h\":10},"
+                + "\"payload\":{\"v\":1,\"strokes\":[{\"c\":3,\"w\":8,\"p\":[470,10,490,12]}]}}}";
+        assertThat(next(chunk0).toString()).isEqualTo(expected);
+        assertThat(next(chunk1).toString()).isEqualTo(expected);
     }
 
     @Test

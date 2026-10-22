@@ -200,6 +200,13 @@ WHERE dc.page_id = ? AND dc.chunk_index IN (?, ?, ...) AND d.status = 'PUBLISHED
 SELECT kind, payload, bbox_x, bbox_y, bbox_w, bbox_h FROM doodle
 WHERE page_id = ? AND status = 'PUBLISHED';
 
+-- 게시 예약 (06, INV-08, 큐 안): 읽은 last_posted_at 그대로이고 차단되지 않았을 때만. <=>는 NULL끼리도 같음
+UPDATE users SET last_posted_at = :now
+WHERE id = :id AND banned_at IS NULL AND last_posted_at <=> :readValue;
+
+-- 게시 되돌림 (D-28): 예약한 값이 그대로일 때만 이전 값으로
+UPDATE users SET last_posted_at = :previous WHERE id = :id AND last_posted_at = :reservedAt;
+
 -- 상태 전이 (INV-03): 영향받은 행이 0이면 예외
 UPDATE page SET status = 'COUNTDOWN', countdown_started_at = ?, scheduled_end_at = ?
 WHERE id = ? AND status = 'ACTIVE';

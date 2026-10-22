@@ -13,6 +13,11 @@ public final class FreshPage {
     private FreshPage() {
     }
 
+    /** Runs the startup recovery again, as after a restart (D-25). */
+    public static PageSnapshot recover(ApplicationContext context) {
+        return context.getBean(PageBootstrap.class).recover();
+    }
+
     public static PageSnapshot start(ApplicationContext context, MutableClock clock) {
         PageSnapshot current = context.getBean(PageBootstrap.class).recover();
         clock.set(current.scheduledEndAt().plusSeconds(1));

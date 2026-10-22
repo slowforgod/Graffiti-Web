@@ -1,6 +1,7 @@
 package kr.ac.khu.graffiti.realtime;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonRawValue;
 import java.time.Instant;
 import java.util.List;
 import kr.ac.khu.graffiti.page.PageStatus;
@@ -51,6 +52,17 @@ public final class RealtimeEvents {
         public DraftCancel(String sid, String draftId) {
             this("draft:cancel", sid, draftId);
         }
+    }
+
+    /** {@code doodle:published}: the public shape of a doodle, as the chunk lookup returns it (no author). */
+    public record DoodlePublishedEvent(String type, PublishedDoodle doodle) {
+
+        public DoodlePublishedEvent(PublishedDoodle doodle) {
+            this("doodle:published", doodle);
+        }
+    }
+
+    public record PublishedDoodle(String id, String kind, Box bbox, @JsonRawValue String payload) {
     }
 
     public record PageStatusEvent(String type, PageStatus status, int occupancyPermille, Instant countdownStartedAt,
