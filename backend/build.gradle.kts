@@ -52,6 +52,10 @@ tasks.jar {
 tasks.withType<Test> {
     useJUnitPlatform()
     finalizedBy(tasks.jacocoTestReport)
+    // CI cannot always fetch the report artifact, so the log carries the assertion message.
+    testLogging {
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    }
 }
 
 // Report only; the 80% domain threshold waits for D-32 to be accepted.
