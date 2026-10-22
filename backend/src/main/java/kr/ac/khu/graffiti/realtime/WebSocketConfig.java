@@ -1,11 +1,14 @@
 package kr.ac.khu.graffiti.realtime;
 
+import jakarta.websocket.server.ServerContainer;
 import kr.ac.khu.graffiti.config.GraffitiProperties;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.scheduling.TaskScheduler;
+import org.springframework.web.context.ServletContextAware;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
@@ -60,5 +63,19 @@ class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void configureWebSocketTransport(WebSocketTransportRegistration registration) {
         registration.setMessageSizeLimit(props.realtime().inboundMessageMaxBytes());
+    }
+
+    // STOMP reads whole WebSocket messages, so the container's buffer (Tomcat: 8 KB by default) is the
+    // real inbound limit; it must match inbound-message-max-bytes (D-27). Tests without a real server
+    // (mock servlet context) have no container to configure.
+    @Bean
+    ServletContextAware webSocketBufferLimits() {
+        int limit = props.realtime().inboundMessageMaxBytes();
+        return servletContext -> {
+            if (servletContext.getAttribute(ServerContainer.class.getName()) instanceof ServerContainer container) {
+                container.setDefaultMaxTextMessageBufferSize(limit);
+                container.setDefaultMaxBinaryMessageBufferSize(limit);
+            }
+        };
     }
 }

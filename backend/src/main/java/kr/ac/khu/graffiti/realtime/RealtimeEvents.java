@@ -1,5 +1,6 @@
 package kr.ac.khu.graffiti.realtime;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.Instant;
 import java.util.List;
 import kr.ac.khu.graffiti.page.PageStatus;
@@ -21,6 +22,34 @@ public final class RealtimeEvents {
 
         public CursorLeave(String sid) {
             this("cursor:leave", sid);
+        }
+    }
+
+    /** One draft change; only the fields of its {@code op} are present (D-11, D-33: no text). */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record DraftUpdate(String type, String sid, String draftId, String op, Integer strokeIndex, Integer c,
+            Integer w, int[] points, Box bbox) {
+
+        public static DraftUpdate points(String sid, String draftId, int strokeIndex, int c, int w, int[] points) {
+            return new DraftUpdate("draft:update", sid, draftId, "points", strokeIndex, c, w, points, null);
+        }
+
+        public static DraftUpdate erase(String sid, String draftId, int strokeIndex) {
+            return new DraftUpdate("draft:update", sid, draftId, "erase", strokeIndex, null, null, null, null);
+        }
+
+        public static DraftUpdate text(String sid, String draftId, Box bbox) {
+            return new DraftUpdate("draft:update", sid, draftId, "text", null, null, null, null, bbox);
+        }
+    }
+
+    public record Box(int x, int y, int w, int h) {
+    }
+
+    public record DraftCancel(String type, String sid, String draftId) {
+
+        public DraftCancel(String sid, String draftId) {
+            this("draft:cancel", sid, draftId);
         }
     }
 

@@ -6,19 +6,17 @@ import kr.ac.khu.graffiti.common.error.ErrorCode;
 import kr.ac.khu.graffiti.page.LivePage;
 import kr.ac.khu.graffiti.page.PageSnapshot;
 import org.springframework.context.event.EventListener;
-import org.springframework.messaging.converter.MessageConversionException;
-import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
-import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
 /**
  * Relays cursors to the chunk under them (API.md §6). Nothing is stored except the chunk of the
  * connection's last cursor, used to send {@code cursor:leave} when it moves away or disconnects.
- * The sender is already checked by {@link RealtimeInterceptor}.
+ * The sender is already checked by {@link RealtimeInterceptor}; refusals go to the sender only
+ * ({@link RealtimeErrorAdvice}).
  */
 @Controller
 class CursorController {
@@ -70,27 +68,14 @@ class CursorController {
         });
     }
 
-    // A refused cursor keeps the connection open: the error goes to this connection only.
-    @MessageExceptionHandler(ApiException.class)
-    @SendToUser(destinations = RealtimeDestinations.ERRORS_QUEUE, broadcast = false)
-    RealtimeEvents.ErrorEvent onRefused(ApiException e) {
-        return new RealtimeEvents.ErrorEvent(e.code().name());
-    }
-
-    @MessageExceptionHandler(MessageConversionException.class)
-    @SendToUser(destinations = RealtimeDestinations.ERRORS_QUEUE, broadcast = false)
-    RealtimeEvents.ErrorEvent onUnreadable(MessageConversionException e) {
-        return new RealtimeEvents.ErrorEvent(ErrorCode.VALIDATION_FAILED.name());
-    }
-
-    private static long parsePageId(String raw) {
+    static long parsePageId(String raw) {
         if (raw == null || raw.isEmpty() || raw.length() > 18 || !raw.chars().allMatch(c -> c >= '0' && c <= '9')) {
             throw invalid("pageId");
         }
         return Long.parseLong(raw);
     }
 
-    private static ApiException invalid(String field) {
+    static ApiException invalid(String field) {
         return new ApiException(ErrorCode.VALIDATION_FAILED, Map.of("field", field));
     }
 }

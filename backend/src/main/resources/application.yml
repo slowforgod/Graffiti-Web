@@ -100,6 +100,7 @@ graffiti:
     max-subscriptions: 60
     inbound-message-max-bytes: 65536
     cursor-interval: 100ms   # the client sends its cursor at most this often
+    draft-interval: 100ms    # the client sends new draft points at most this often (stays under max-messages-per-second)
     heartbeat: 10s           # STOMP heart-beat both ways; finds dead connections for cursor:leave
   query:
     max-chunks: 60

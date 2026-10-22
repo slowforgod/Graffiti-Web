@@ -95,6 +95,7 @@ class CanvasReadIT extends WebIntegrationTest {
                 .andExpect(jsonPath("$.config.countdownWarningSec").value(300))
                 .andExpect(jsonPath("$.config.draftIdleTimeoutSec").value(600))
                 .andExpect(jsonPath("$.config.cursorIntervalMs").value(100))
+                .andExpect(jsonPath("$.config.draftIntervalMs").value(100))
                 .andExpect(jsonPath("$.config.heartbeatMs").value(10000));
     }
 

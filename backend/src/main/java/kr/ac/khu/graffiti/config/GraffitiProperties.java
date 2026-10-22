@@ -100,11 +100,12 @@ public record GraffitiProperties(
             @Positive int maxSubscriptions,
             @Positive int inboundMessageMaxBytes,
             @NotNull Duration cursorInterval,
+            @NotNull Duration draftInterval,
             @NotNull Duration heartbeat) {
 
-        @AssertTrue(message = "cursor-interval and heartbeat must be positive")
+        @AssertTrue(message = "cursor-interval, draft-interval and heartbeat must be positive")
         public boolean isIntervalsPositive() {
-            return isPositive(cursorInterval) && isPositive(heartbeat);
+            return isPositive(cursorInterval) && isPositive(draftInterval) && isPositive(heartbeat);
         }
     }
 
