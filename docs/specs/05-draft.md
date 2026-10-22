@@ -1,6 +1,6 @@
 # 05-draft: 그리기 도구, 초안 편집, 초안 중계
 
-- **상태**: APPROVED
+- **상태**: IN_PROGRESS (PR 대기)
 - **승인자**: 현 (slowforgod) / 승인일: 2026-10-22 (standing 지시 "승인 받지말고 다 해"에 따라 결정 필요 1~6은 추천안으로 확정)
 - **브랜치**: `feat/05-draft`
 - **선행 명세**: 04
@@ -113,8 +113,7 @@
 | `backend/.../config/GraffitiProperties.java`, `application.yml`, `page/PageController.java` | `draft-interval` → `draftIntervalMs` |
 | `frontend/src/tools/draft.ts` | 내 초안 모델: 점 추가(1px, bbox 상한), 지우기 판정, bbox, 텍스트 상자 |
 | `frontend/src/tools/draftSender.ts` | 묶음 전송(간격, 이어지는 첫 점), 취소 |
-| `frontend/src/tools/idleTimer.ts` | 무동작 타이머 |
-| `frontend/src/tools/useDraft.ts` | 위 셋을 묶은 React 훅 (도구 상태, 연결 끊김, 무동작) |
+| `frontend/src/tools/useDraft.ts` | 위를 묶은 React 훅 (도구 상태, 연결 끊김, 무동작 타이머) |
 | `frontend/src/tools/textMeasure.ts` | 텍스트 상자 크기 측정 (Konva, 측정 불가면 D-31 상한식) |
 | `frontend/src/canvas/remoteDrafts.ts` | 다른 사람 초안 상태 |
 | `frontend/src/canvas/DraftLayer.tsx` | 내 초안 + 다른 사람 초안 그리기 |
@@ -152,29 +151,29 @@
 critical gap: 0
 
 ## 7. 수용 기준 (테스트 가능하게)
-- [ ] AC-1 (D-11, D-29): 작성자 A가 `/app/draft {op:"points", ...}`를 보내면 그 점 묶음이 닿는 청크 구독자 B가 `{type:"draft:update", sid, draftId, op:"points", strokeIndex, c, w, points}`를 받는다. 키는 정확히 그것뿐(사용자 ID 없음)
-- [ ] AC-2: A가 `cancel`을 보내거나 연결을 끊으면, 초안이 닿았던 모든 청크에 `draft:cancel {sid, draftId}`가 간다. 다른 `draftId`로 새로 그리면 이전 초안이 취소된다
-- [ ] AC-3 (D-33): `text` 메시지는 bbox만 중계되고, 본문에 `text` 필드가 오면 `VALIDATION_FAILED`
-- [ ] AC-4 (SEC-02): 캔버스 밖 좌표, 팔레트 밖 색, 없는 굵기, 홀수 개 점, 굵기 포함 1025px 묶음, UUID가 아닌 `draftId`, 알 수 없는 op나 필드 → 보낸 사람의 `/user/queue/errors`에 `VALIDATION_FAILED`, 구독자는 아무것도 받지 않음, 연결 유지
-- [ ] AC-5 (INV-04): 끝난 `pageId` → `PAGE_ENDED` (errors 큐)
-- [ ] AC-6 (D-11): 한 초안의 누적 본문이 2MB를 넘으면 그 메시지부터 `PAYLOAD_TOO_LARGE`, 중계 없음
-- [ ] AC-7 (SEC-07): 비로그인의 `/app/draft`는 ERROR `UNAUTHENTICATED`
-- [ ] AC-8 (D-11): 클라이언트는 이전 점과 1px 미만인 점을 버리고, 초안 bbox(굵기 포함)가 `maxBbox`를 넘게 하는 점을 버린다
-- [ ] AC-9: 묶음 전송은 `draftIntervalMs`마다 한 번 이하이고, 두 번째 묶음부터는 앞 묶음의 마지막 점으로 시작한다. 그리는 동안 커서는 보내지 않는다
-- [ ] AC-10 (D-11): 지우개가 닿은 내 초안 획은 통째로 사라지고 `erase`가 나간다. 게시된 doodle은 지워지지 않는다
-- [ ] AC-11 (D-11): ✗를 누르면 초안이 사라지고 `cancel`이 나간다. 마지막 동작 후 `draftIdleTimeoutSec`가 지나면 같은 일이 일어나고 안내가 보인다. 연결이 끊기면 초안이 사라진다
-- [ ] AC-12 (D-21): 비로그인 사용자가 펜·텍스트·지우개를 누르면 로그인 주소로 이동한다. 차단된 사용자와 연결 전에는 버튼이 비활성
-- [ ] AC-13 (D-10): 초안이 있으면 bbox 오른쪽 위에 ✓/✗가 보인다. ✓는 06 전까지 비활성. 그림 초안이 있는 동안 텍스트 도구는 비활성(반대도)
-- [ ] AC-14 (D-07, INV-10): 팔레트, 굵기, 글자 크기 목록과 기본값, 50자 제한은 config에서 온다
-- [ ] AC-15: 보는 쪽은 다른 사람 초안을 반투명으로 그리고, 텍스트 초안은 "작성 중…" 상자로만 보이며 글자는 없다. 내 초안의 메아리는 그리지 않는다
-- [ ] AC-16: 브라우저 두 개(작성자 1, 비로그인 1)에서 작성자가 그리는 선이 다른 창에 반투명으로 따라 나오고, ✗나 창 닫기로 사라진다
+- [x] AC-1 (D-11, D-29): 작성자 A가 `/app/draft {op:"points", ...}`를 보내면 그 점 묶음이 닿는 청크 구독자 B가 `{type:"draft:update", sid, draftId, op:"points", strokeIndex, c, w, points}`를 받는다. 키는 정확히 그것뿐(사용자 ID 없음)
+- [x] AC-2: A가 `cancel`을 보내거나 연결을 끊으면, 초안이 닿았던 모든 청크에 `draft:cancel {sid, draftId}`가 간다. 다른 `draftId`로 새로 그리면 이전 초안이 취소된다
+- [x] AC-3 (D-33): `text` 메시지는 bbox만 중계되고, 본문에 `text` 필드가 오면 `VALIDATION_FAILED`
+- [x] AC-4 (SEC-02): 캔버스 밖 좌표, 팔레트 밖 색, 없는 굵기, 홀수 개 점, 굵기 포함 1025px 묶음, UUID가 아닌 `draftId`, 알 수 없는 op나 필드 → 보낸 사람의 `/user/queue/errors`에 `VALIDATION_FAILED`, 구독자는 아무것도 받지 않음, 연결 유지
+- [x] AC-5 (INV-04): 끝난 `pageId` → `PAGE_ENDED` (errors 큐)
+- [x] AC-6 (D-11): 한 초안의 누적 본문이 2MB를 넘으면 그 메시지부터 `PAYLOAD_TOO_LARGE`, 중계 없음
+- [x] AC-7 (SEC-07): 비로그인의 `/app/draft`는 ERROR `UNAUTHENTICATED`
+- [x] AC-8 (D-11): 클라이언트는 이전 점과 1px 미만인 점을 버리고, 초안 bbox(굵기 포함)가 `maxBbox`를 넘게 하는 점을 버린다
+- [x] AC-9: 묶음 전송은 `draftIntervalMs`마다 한 번 이하이고, 두 번째 묶음부터는 앞 묶음의 마지막 점으로 시작한다. 그리는 동안 커서는 보내지 않는다
+- [x] AC-10 (D-11): 지우개가 닿은 내 초안 획은 통째로 사라지고 `erase`가 나간다. 게시된 doodle은 지워지지 않는다
+- [x] AC-11 (D-11): ✗를 누르면 초안이 사라지고 `cancel`이 나간다. 마지막 동작 후 `draftIdleTimeoutSec`가 지나면 같은 일이 일어나고 안내가 보인다. 연결이 끊기면 초안이 사라진다
+- [x] AC-12 (D-21): 비로그인 사용자가 펜·텍스트·지우개를 누르면 로그인 주소로 이동한다. 차단된 사용자와 연결 전에는 버튼이 비활성
+- [x] AC-13 (D-10): 초안이 있으면 bbox 오른쪽 위에 ✓/✗가 보인다. ✓는 06 전까지 비활성. 그림 초안이 있는 동안 텍스트 도구는 비활성(반대도)
+- [x] AC-14 (D-07, INV-10): 팔레트, 굵기, 글자 크기 목록과 기본값, 50자 제한은 config에서 온다
+- [x] AC-15: 보는 쪽은 다른 사람 초안을 반투명으로 그리고, 텍스트 초안은 "작성 중…" 상자로만 보이며 글자는 없다. 내 초안의 메아리는 그리지 않는다
+- [x] AC-16: 브라우저 두 개(작성자 1, 비로그인 1)에서 작성자가 그리는 선이 다른 창에 반투명으로 따라 나오고, ✗나 창 닫기로 사라진다
 
 ## 8. 테스트 계획
 | 층 | 대상 | 파일 (예정) |
 |---|---|---|
 | 단위 | 메시지 검증, 청크 계산 | `realtime/DraftRulesTest` |
 | 통합 | 실제 STOMP: 중계 키, 청크 범위, 취소·연결 종료·초안 교체, 거절 코드, 2MB, 늦은 메시지 | `realtime/RealtimeIT` |
-| 단위(프론트) | 초안 모델(1px, bbox 상한, 지우기, 텍스트 상자), 묶음 전송, 무동작 타이머, 다른 사람 초안 | `draft.test.ts`, `draftSender.test.ts`, `idleTimer.test.ts`, `remoteDrafts.test.ts` |
+| 단위(프론트) | 초안 모델(1px, bbox 상한, 지우기, 텍스트 상자), 묶음 전송, 무동작 타이머, 다른 사람 초안 | `draft.test.ts`, `draftSender.test.ts`, `remoteDrafts.test.ts` (무동작 타이머는 `CanvasScreen.test.tsx`) |
 | 단위(프론트) | `ChunkSync`가 `draft:*`를 버퍼 없이 넘김 | `chunkSync.test.ts` |
 | 컴포넌트(프론트) | 툴바 권한·비활성, ✗와 무동작 취소, 연결 끊김, 메아리 거르기, 그리는 동안 커서 멈춤 | `Toolbar.test.tsx`, `CanvasScreen.test.tsx` |
 | QA | 헤드리스 Chromium 두 개(작성자 1, 비로그인 1): 펜으로 그리면 다른 창에 반투명으로 보임, 지우개, 텍스트 상자, ✗, 창 닫기 | 수동 체크리스트 |
@@ -199,8 +198,21 @@ PR revert. DB 변경 없음. 프론트는 04의 보기 전용 화면으로 돌�
 ---
 
 ## 리뷰 기록 (/gf-review가 추가)
+- 2026-10-22 자체 리뷰 (전체 diff)
+  - 04에서 숨어 있던 문제: Tomcat WebSocket 텍스트 버퍼 기본값 8KB가 실제 수신 한도였다(D-27의 64KB보다 작음, 8KB 넘는 프레임은 1009로 연결 종료). `WebSocketConfig`가 컨테이너 버퍼를 `inbound-message-max-bytes`로 맞춤. 서블릿 컨테이너가 없는 테스트 컨텍스트에선 건너뜀
+  - 한 연결의 프레임은 인바운드 스레드 풀에서 순서가 바뀔 수 있다 → 초안 상태 변경은 `ConnectionState`에 `synchronized`, 방금 취소한 `draftId`의 늦은 프레임은 버림(`RealtimeIT`)
+  - 초안 점·글자는 서버 필드, 캐시, 로그 어디에도 없음. 연결 상태엔 id, 종류, 닿은 청크, 누적 바이트만(INV-06). 중계 본문 키는 정확히 비교(사용자 ID 없음)
+  - 그리는 동안 커서 전송을 멈춰 초당 SEND가 10회 안팎(D-12 20회 한도). 2MB 테스트는 `MutableClock`을 1초씩 넘겨 속도 제한에 걸리지 않게 함
+  - 수치(팔레트, 굵기, 글자 크기, 50자, 무동작 10분, 전송 간격)는 config에서 읽음. 화면 표시용 크기(지우개 반경 8px 화면 기준)만 상수
+- 테스트: 백엔드 `./gradlew test` 188개 통과(실패 0, 스킵 0), 프론트 `npm test` 82개 통과, `npm run lint`·`npm run build` 통과
 
 ## QA 기록 (/gf-qa가 추가)
+- 2026-10-22 로컬 스택(MySQL 8.4 컨테이너, 05 백엔드 + 테스트 로그인 엔드포인트, Vite) + 헤드리스 Chromium 컨텍스트 두 개(작성자 1, 비로그인 1)
+  - 작성자가 펜으로 그린 곡선이 비로그인 창에 반투명으로 따라 나옴(`draft:update` 14~17개). ✗를 누르면 사라짐(`draft:cancel`, 두 청크라 2번)
+  - 텍스트 도구: 작성자 창엔 입력 상자와 "안녕", 비활성 ✓와 ✗. 비로그인 창엔 점선 상자와 "작성 중…"만, 받은 프레임 어디에도 글자 없음
+  - 처음엔 "작성 중…"이 작성자 커서 라벨에 가려져 상자 위로 옮김
+  - 작성자 창을 닫으면 1.5초 안에 비로그인 창에서 텍스트 상자가 사라짐(연결 종료 → `draft:cancel`)
+  - 콘솔 에러는 favicon 404뿐
 
 ## 보안 감사 기록 (/gf-security가 추가, 해당 시)
 
