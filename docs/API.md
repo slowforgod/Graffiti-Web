@@ -57,7 +57,7 @@
   "role": "USER",
   "consentRequired": false,
   "banned": false,
-  "cooldownEndsAt": "2026-10-21T05:30:00Z"   // 쿨다운 없으면 null (06 전에는 항상 null)
+  "cooldownEndsAt": "2026-10-21T05:30:00Z"   // last_posted_at + post-cooldown, 지났으면 null (관리자는 늘 null)
 }
 ```
 
@@ -127,14 +127,16 @@
 { "kind": "TEXT", "payload": { "v": 1, "text": "안녕", "c": 0, "size": 24, "x": 1500, "y": 900 }, "bbox": { "w": 52, "h": 34 } }
 ```
 응답
-- `201` `{ "doodle": { "id", "kind", "bbox", "payload" }, "cooldownEndsAt": "..." }`
+- `201` `{ "doodle": { "id", "kind", "bbox", "payload" }, "cooldownEndsAt": "..." }`. `bbox`는 서버 값(그림은 캔버스로 자른 값), `payload`는 검증한 필드만 다시 만든 것. 관리자는 `cooldownEndsAt: null`
 - `422 MODERATION_REJECTED` (쿨다운 소모됨, `details.cooldownEndsAt` 포함)
-- `429 COOLDOWN` / `409 PAGE_ENDED` / `400 VALIDATION_FAILED` / `413 PAYLOAD_TOO_LARGE` / `403 BANNED`
+- `429 COOLDOWN` (`message` "다음 게시까지 N분 남았어요.", `details.retryAfterSec`) / `409 PAGE_ENDED` / `400 VALIDATION_FAILED` / `413 PAYLOAD_TOO_LARGE` / `403 BANNED`
+- 검증 실패, 크기 초과, 끝난 페이지는 쿨다운을 쓰지 않습니다. 검사 중 페이지가 넘어가거나 서버 오류가 나면 쿨다운을 되돌립니다(D-28)
 
 검증 규칙(`DoodleValidator`, SEC-02)
-- 그림: 획 1개 이상, 각 획 점 1개 이상, 좌표는 캔버스 범위 안, `c`는 팔레트 인덱스, `w`는 허용 굵기, 서버가 계산한 bbox ≤ 1024²
-- 텍스트: 1~50자(줄바꿈 제외), 제어 문자 금지, `size`는 허용 목록 값, bbox 상한 검증(D-31)
-- payload 본문 2MB 이하, 알 수 없는 필드는 거절
+- `v`는 1. 그림: 획 1개 이상, 각 획 점 1개 이상(짝수 개 정수), 좌표는 캔버스 범위 안, `c`는 팔레트 인덱스, `w`는 허용 굵기, 서버가 계산한 bbox(점 최소·최대를 굵기 절반만큼 넓혀 `floor`/`ceil`) ≤ 1024². 그림에 `bbox`를 보내면 거절
+- 텍스트: 1~50자(줄바꿈 제외, 코드 포인트 기준), 공백만은 거절, 줄바꿈 외 제어 문자 금지, `size`는 허용 목록 값, `(x, y)`와 상자 전체가 캔버스 안, bbox 상한(D-31: 너비 ≤ `size` × 가장 긴 줄 글자 수, 높이 ≤ `size` × 1.4 × 줄 수, 각각 1~1024) + `size` × 줄 수 ≤ 1024
+- 요청 본문 2MB 이하(넘으면 읽기를 멈추고 413), 알 수 없는 필드·중복 키·문자열 숫자·소수 좌표는 거절
+- 실패하면 `details.field`(`strokes`, `p`, `c`, `w`, `text`, `size`, `x`, `bbox`, `kind`, `v`, 알 수 없는 필드 이름, 형식 오류는 `body`)와 `details.reason`
 
 ## 4. 관리자 (`/api/admin/**`, 관리자 전용)
 
@@ -210,7 +212,7 @@
 
 청크 토픽 (`/topic/page.{p}.chunk.{i}`)
 ```json
-{ "type": "doodle:published", "doodle": { "id", "kind", "bbox", "payload" } }
+{ "type": "doodle:published", "doodle": { "id": "9001", "kind": "DRAWING", "bbox": { "x": 466, "y": 6, "w": 28, "h": 10 }, "payload": { ... } } }   // bbox가 걸치는 청크마다, 작성자 정보 없음
 { "type": "doodle:removed", "id": "9001" }
 { "type": "draft:update", "sid": "s-ab12", "draftId": "uuid", "op": "points", "strokeIndex": 0, "c": 3, "w": 8, "points": [1200,340,1203,342] }
 { "type": "draft:update", "sid": "s-ab12", "draftId": "uuid", "op": "erase", "strokeIndex": 0 }

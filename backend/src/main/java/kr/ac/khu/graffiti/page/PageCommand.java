@@ -1,5 +1,7 @@
 package kr.ac.khu.graffiti.page;
 
+import java.time.Instant;
+
 /**
  * Work for the page command queue (INV-01). Each command names the page it targets; a command for a
  * page that is not current fails with {@code PAGE_ENDED} (INV-04).
@@ -18,6 +20,43 @@ public sealed interface PageCommand<R> {
         public PageSnapshot executeOn(PageCommandHandler handler) {
             return handler.applyFootprint(this);
         }
+    }
+
+    /**
+     * Takes the author's post for {@code pageId} (D-12, INV-08): {@code BANNED} or {@code COOLDOWN} when they
+     * may not post now. Admins are exempt and leave no trace.
+     */
+    record ReservePost(long pageId, long userId) implements PageCommand<Reservation> {
+
+        @Override
+        public Reservation executeOn(PageCommandHandler handler) {
+            return handler.reservePost(this);
+        }
+    }
+
+    /** Publishes a checked doodle on its page: inserts it, adds its cells and may start the countdown. */
+    record PublishDoodle(PostStore.NewDoodle doodle, Footprint footprint) implements PageCommand<Published> {
+
+        @Override
+        public Published executeOn(PageCommandHandler handler) {
+            return handler.publish(this);
+        }
+    }
+
+    /** Gives a reserved post back when it was not published for reasons not the author's (D-28). */
+    record ReleasePost(Reservation reservation) implements PageCommand<Boolean> {
+
+        @Override
+        public Boolean executeOn(PageCommandHandler handler) {
+            return handler.release(this);
+        }
+    }
+
+    /** A post taken at {@code reservedAt}; {@code previous} is the {@code last_posted_at} it replaced. */
+    record Reservation(long userId, Instant reservedAt, Instant previous, boolean exempt) {
+    }
+
+    record Published(long doodleId, Instant publishedAt) {
     }
 
     /** Ends the page when its scheduled end has passed and opens the next one. */
