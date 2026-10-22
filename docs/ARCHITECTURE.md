@@ -50,7 +50,8 @@ backend/src/main/java/kr/ac/khu/graffiti/
 ├── user/          User 엔티티, UserAccountService(첫 로그인 가입, 역할 동기화, 동의), NicknameGenerator(순수 로직)
 ├── page/          ★ 핵심 도메인
 │   ├── PageCommandProcessor (인터페이스) + SingleThreadPageCommandProcessor
-│   │                        커맨드: ApplyFootprint, EndPage, GetPageSnapshot, EnsureLivePage, InstallPage
+│   │                        커맨드: ApplyFootprint, EndPage, GetPageSnapshot, GetMinimap, EnsureLivePage, InstallPage
+│   ├── PageReader           요청 스레드용 읽기(큐를 거쳐 스냅샷·미니맵), PageController(/api/pages/current, /minimap)
 │   ├── PageState            메모리 상태 (cellCount, status, scheduledEndAt)
 │   ├── Footprint            선분 bbox(굵기 포함)/텍스트 박스 → 칸 집합 (순수 로직)
 │   ├── OccupancyGrid        참조 카운트, 점유율, 비트맵 (순수 로직)
@@ -58,7 +59,8 @@ backend/src/main/java/kr/ac/khu/graffiti/
 │   ├── PageTimer            종료 예약 (PageStatusChanged마다 재예약)
 │   ├── PageBootstrap        재시작 복구 (웹 서버 시작 전)
 │   └── event/               PageStatusChanged, OccupancyChanged, PageTurned (커밋 후 발행 → 04가 STOMP로 중계)
-├── doodle/        Doodle 엔티티, DoodleValidator(순수 로직), 게시/삭제 유스케이스, 청크 조회
+├── doodle/        Doodle 엔티티, DoodleValidator(순수 로직), 게시/삭제 유스케이스,
+│                  청크 조회(ChunkList 순수 검증, ChunkDoodleQuery JDBC, ChunkDoodleController)
 ├── moderation/    ModerationProvider 인터페이스, 구현체 4개(WordFilter, KhuChat, OpenAi, Ml), DoodleRenderer,
 │                  ModerationService(병렬 호출과 판정 합성), MlPredictionRecorder
 ├── realtime/      STOMP 설정, ChannelInterceptor(인증·구독 검증·속도 제한), Broadcaster 인터페이스
@@ -93,14 +95,15 @@ frontend/src/
 ├── api/           REST 클라이언트(CSRF 헤더 자동 첨부), 에러 코드 타입
 ├── auth/          /api/me 상태, 로그인·로그아웃 바, 동의 화면, 로그인 실패 안내
 ├── realtime/      STOMP 클라이언트, 청크 구독 관리자(구독 → 조회 → 병합, INV-09)
-├── canvas/        Konva Stage, 뷰포트(팬/줌, 0.5~4배), 청크 계산, 청크별 레이어 캐시
+├── canvas/        Konva Stage(CanvasView), 뷰포트(viewport.ts: 팬/줌, config의 min~max), 청크 계산(chunks.ts),
+│                  보이는 청크 로딩(chunkLoader.ts) + doodle 저장소(doodleStore.ts), 배경 격자
 ├── tools/         펜, 텍스트, 지우개(초안 전용), 선택, 이동 + 초안 상태 머신
 ├── ui/            툴바, 상단 상태바(점유율, 남은 시간), T−5분 카운트다운, 미니맵, 토스트
 ├── admin/         관리자 화면
 └── shared/        설정 상수(서버의 /api/pages/current 응답으로 받음), 타입
 ```
 
-- 확정된 doodle은 **청크별 Konva 레이어에 캐시**해서 그립니다. 초안과 커서는 별도의 동적 레이어에 둡니다.
+- 확정된 doodle은 배경 레이어와 분리된 doodle 레이어 하나에 **id 순서(게시 순서)**로 그립니다(겹칠 때 최신이 위). 보이는 청크의 doodle만 메모리에 둡니다. 초안과 커서는 별도의 동적 레이어에 둡니다. 청크별 비트맵 캐시는 성능 문제가 확인되면 도입합니다.
 - 사용자 입력 텍스트는 Konva로 캔버스에 그리고, HTML로 넣지 않습니다(SEC-12).
 
 ## 4. 핵심 흐름
@@ -270,11 +273,13 @@ PageBootstrap (SmartLifecycle, 웹 서버보다 앞 단계)
 | `graffiti.page.countdown-threshold` | 0.70 | D-15 |
 | `graffiti.page.countdown-duration` | 6h | D-15 |
 | `graffiti.page.max-lifetime` | 7d | D-15 |
+| `graffiti.page.countdown-warning` | 5m (클라이언트가 T−5분 경고에 사용, `countdownWarningSec`) | D-16 |
 | `graffiti.doodle.max-bbox` | 1024 | D-11 |
 | `graffiti.doodle.max-payload-bytes` | 2097152 | D-11 |
 | `graffiti.doodle.palette` | 12색 hex 배열 | D-07 |
 | `graffiti.doodle.stroke-widths` | [2,4,8,16] | D-07 |
 | `graffiti.doodle.font-sizes` | [10,11,12,13,14,15,16,20,24,32,36,40,48,64,96] | D-07 |
+| `graffiti.doodle.default-font-size` | 24 (font-sizes 안의 값이어야 함) | D-07 |
 | `graffiti.doodle.text-max-length` | 50 | D-07 |
 | `graffiti.doodle.draft-idle-timeout` | 10m | D-11 |
 | `graffiti.post-cooldown` | 30m | D-12 |
