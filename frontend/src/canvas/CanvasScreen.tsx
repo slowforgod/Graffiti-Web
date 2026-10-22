@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ApiError } from '../api/client';
 import type { Me } from '../auth/me';
 import { LOGIN_URL } from '../auth/me';
 import type { RealtimeLink } from '../realtime/link';
@@ -8,7 +9,9 @@ import { MetaSync } from '../realtime/metaSync';
 import { throttle } from '../realtime/throttle';
 import type { CurrentPage } from '../shared/pageConfig';
 import { fetchCurrentPage } from '../shared/pageConfig';
+import { clockOffset, cooldownLeft, endsAfter, minutesLeft } from '../tools/cooldown';
 import { draftBounds } from '../tools/draft';
+import { publishBody, publishDoodle } from '../tools/publish';
 import type { DraftNotice } from '../tools/useDraft';
 import { useDraft } from '../tools/useDraft';
 import DraftActions from '../ui/DraftActions';
@@ -40,6 +43,12 @@ const NOTICES: Record<DraftNotice, string> = {
   idle: '10분 동안 움직임이 없어 초안을 지웠어요.',
   disconnected: '연결이 끊겨 그리던 초안이 사라졌어요.',
 };
+
+// Shown when a post fails for a reason the server did not word itself (a dropped connection).
+const PUBLISH_FAILED = '게시하지 못했어요. 잠시 후 다시 시도해 주세요.';
+
+// Longest wait between redraws of the cooldown note.
+const COOLDOWN_TICK_MS = 30_000;
 
 function drawAccess(me: Me | undefined, online: boolean): DrawAccess {
   if (!me) {
@@ -122,6 +131,12 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
   const [otherDrafts, setOtherDrafts] = useState<RemoteDraft[]>([]);
   const sync = useRef<ChunkSync | null>(null);
   const tools = useDraft({ pageId: page.id, config, link });
+  const [offset] = useState(() => clockOffset(page.serverTime));
+  // The cooldown this screen learned from its own posts; until then the one from /api/me.
+  const [postedCooldown, setPostedCooldown] = useState<string | null>();
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     const chunks = new ChunkSync({
@@ -184,6 +199,50 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
     [author, config.cursorIntervalMs, link, page.id],
   );
   useEffect(() => () => sendCursor?.cancel(), [sendCursor]);
+  const cooldownEndsAt = postedCooldown !== undefined ? postedCooldown : (author?.cooldownEndsAt ?? null);
+  const waitMs = cooldownLeft(cooldownEndsAt, offset, now);
+
+  // Redraws the note as minutes pass and enables ✓ when the cooldown ends.
+  useEffect(() => {
+    if (waitMs <= 0) {
+      return;
+    }
+    const timer = setTimeout(() => setNow(Date.now()), Math.min(waitMs, COOLDOWN_TICK_MS));
+    return () => clearTimeout(timer);
+  }, [waitMs]);
+
+  const publish = async () => {
+    const body = own && publishBody(own);
+    if (!body || publishing) {
+      return;
+    }
+    setPublishing(true);
+    setPublishError(null);
+    try {
+      const published = await publishDoodle(page.id, body);
+      sync.current?.addPublished(published.doodle);
+      setPostedCooldown(published.cooldownEndsAt);
+      // Tells the viewers to drop the half-transparent draft (ARCHITECTURE.md §4.3).
+      tools.cancel();
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'PAGE_ENDED') {
+        onPageEnded();
+        return;
+      }
+      if (e instanceof ApiError && e.code === 'COOLDOWN' && typeof e.details.retryAfterSec === 'number') {
+        setPostedCooldown(endsAfter(e.details.retryAfterSec, offset));
+      }
+      setPublishError(e instanceof ApiError && e.message ? e.message : PUBLISH_FAILED);
+    } finally {
+      setPublishing(false);
+      setNow(Date.now());
+    }
+  };
+
+  const canPost = own !== null && publishBody(own) !== null && waitMs <= 0;
+  const publishNote = waitMs > 0 ? `${minutesLeft(waitMs)}분 뒤에 게시할 수 있어요` : undefined;
+  const notice = publishError ?? (tools.notice ? NOTICES[tools.notice] : null);
+
   const others = author ? cursors.filter((c) => c.nickname !== author.nickname) : cursors;
   // The author's own draft comes back from the chunk topics too.
   const drafts = own ? otherDrafts.filter((d) => d.draftId !== own.id) : otherDrafts;
@@ -198,7 +257,7 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
         cursors={others}
         onViewportChange={setViewport}
         onPointerMove={sendCursor && !own ? (p) => sendCursor.push(p) : undefined}
-        tool={tool}
+        tool={publishing ? 'move' : tool}
         ownDraft={own}
         otherDrafts={drafts}
         onDrawStart={tools.pointerDown}
@@ -214,7 +273,15 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
         />
       )}
       {own && bounds && (
-        <DraftActions bounds={bounds} viewport={viewport} screen={size} onCancel={tools.cancel} />
+        <DraftActions
+          bounds={bounds}
+          viewport={viewport}
+          screen={size}
+          onPublish={canPost ? () => void publish() : undefined}
+          publishNote={publishNote}
+          busy={publishing}
+          onCancel={tools.cancel}
+        />
       )}
       <Toolbar
         config={config}
@@ -230,9 +297,16 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
         fontSize={tools.fontSize}
         onFontSize={tools.setFontSize}
       />
-      {tools.notice && (
-        <p role="status" className="draft-notice" onClick={tools.clearNotice}>
-          {NOTICES[tools.notice]}
+      {notice && (
+        <p
+          role="status"
+          className="draft-notice"
+          onClick={() => {
+            setPublishError(null);
+            tools.clearNotice();
+          }}
+        >
+          {notice}
         </p>
       )}
       <Minimap config={config} cells={cells} view={visibleWorldRect(viewport, size)} />

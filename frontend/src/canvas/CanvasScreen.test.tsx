@@ -232,15 +232,20 @@ describe('CanvasScreen', () => {
       cooldownEndsAt: null,
     };
 
-    async function open(config = TEST_CONFIG) {
-      fetchMock.mockImplementation(async (input) => {
+    type Post = (body: Record<string, unknown>) => Response | Promise<Response>;
+
+    async function open(config = TEST_CONFIG, who: Me = me, post?: Post) {
+      fetchMock.mockImplementation(async (input, init) => {
         const url = String(input);
+        if (url === '/api/pages/3/doodles' && init?.method === 'POST' && post) {
+          return post(JSON.parse(String(init.body)) as Record<string, unknown>);
+        }
         if (url === '/api/pages/current') return reply(page('3', config));
         if (url.endsWith('/minimap')) return reply(minimap);
         if (url.startsWith('/api/pages/3/doodles')) return reply({ pageId: '3', doodles: [] });
         return reply({}, 404);
       });
-      render(<CanvasScreen me={me} />);
+      render(<CanvasScreen me={who} />);
       await screen.findByRole('button', { name: 'down' });
       act(() => links.current!.connect());
       await act(async () => {
@@ -263,7 +268,6 @@ describe('CanvasScreen', () => {
 
       expect(drafts()[0]).toMatchObject({ pageId: '3', op: 'points', strokeIndex: 0, c: 0, points: [3800, 2100] });
       const draftId = drafts()[0]!.draftId;
-      expect(screen.getByRole('button', { name: '게시' })).toBeDisabled();
       // The cursor rests while a draft is open: the view gets no pointer handler for it.
       expect(screen.queryByRole('button', { name: 'move' })).not.toBeInTheDocument();
       expect(link.sent.some((m) => m.destination === '/app/cursor')).toBe(false);
@@ -271,6 +275,88 @@ describe('CanvasScreen', () => {
       act(() => screen.getByRole('button', { name: '취소' }).click());
       expect(drafts().at(-1)).toEqual({ pageId: '3', draftId, op: 'cancel' });
       expect(screen.queryByRole('button', { name: '취소' })).not.toBeInTheDocument();
+    });
+
+    const published = {
+      doodle: { id: '77', kind: 'DRAWING', bbox: { x: 3796, y: 2096, w: 18, h: 13 }, payload: { v: 1, strokes: [] } },
+      cooldownEndsAt: '2026-10-21T00:30:00Z',
+    };
+
+    it('posts the draft with ✓, shows it at once and starts the cooldown (AC-11, AC-12)', async () => {
+      let sentBody: Record<string, unknown> | undefined;
+      const { link, drafts } = await open(TEST_CONFIG, me, (body) => {
+        sentBody = body;
+        return reply(published, 201);
+      });
+      // The visible chunks are loaded once their subscriptions are confirmed (INV-09).
+      await act(async () => {
+        link.readyAll();
+        await new Promise((r) => setTimeout(r, 0));
+      });
+      draw();
+      const draftId = drafts()[0]!.draftId;
+
+      await act(async () => screen.getByRole('button', { name: '게시' }).click());
+
+      expect(sentBody).toEqual({
+        kind: 'DRAWING',
+        payload: { v: 1, strokes: [{ c: 0, w: TEST_CONFIG.strokeWidths[1], p: [3800, 2100, 3810, 2105] }] },
+      });
+      expect(screen.getByRole('list', { name: 'doodles' })).toHaveTextContent('77');
+      expect(drafts().at(-1)).toEqual({ pageId: '3', draftId, op: 'cancel' });
+      expect(screen.queryByRole('button', { name: '게시' })).not.toBeInTheDocument();
+
+      // The next draft waits for the cooldown, judged by the server clock of the page load.
+      draw();
+      expect(screen.getByRole('button', { name: '게시' })).toBeDisabled();
+      expect(screen.getByText('30분 뒤에 게시할 수 있어요')).toBeInTheDocument();
+    });
+
+    it('keeps the draft and explains when the post is refused (AC-13)', async () => {
+      const { drafts } = await open(TEST_CONFIG, me, () =>
+        reply({ error: { code: 'COOLDOWN', message: '다음 게시까지 12분 남았어요.', details: { retryAfterSec: 700 } } }, 429),
+      );
+      draw();
+
+      await act(async () => screen.getByRole('button', { name: '게시' }).click());
+
+      expect(screen.getByRole('status')).toHaveTextContent('다음 게시까지 12분 남았어요.');
+      expect(screen.getByRole('button', { name: '취소' })).toBeEnabled();
+      expect(drafts().some((d) => d.op === 'cancel')).toBe(false);
+      expect(screen.getByRole('button', { name: '게시' })).toBeDisabled();
+      expect(screen.getByText('12분 뒤에 게시할 수 있어요')).toBeInTheDocument();
+    });
+
+    it('disables ✓ and ✗ while the post is on its way', async () => {
+      let answer: (r: Response) => void = () => {};
+      await open(TEST_CONFIG, me, () => new Promise<Response>((resolve) => (answer = resolve)));
+      draw();
+
+      act(() => screen.getByRole('button', { name: '게시' }).click());
+
+      expect(screen.getByRole('button', { name: '게시' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: '취소' })).toBeDisabled();
+      await act(async () => answer(reply({ error: { code: 'INTERNAL', message: '일시적인 오류가 발생했어요.' } }, 500)));
+      expect(screen.getByRole('button', { name: '게시' })).toBeEnabled();
+      expect(screen.getByRole('status')).toHaveTextContent('일시적인 오류가 발생했어요.');
+    });
+
+    it('waits out the cooldown it learned from /api/me', async () => {
+      await open(TEST_CONFIG, { ...me, cooldownEndsAt: '2026-10-21T00:05:00Z' } as Me);
+      draw();
+      expect(screen.getByRole('button', { name: '게시' })).toBeDisabled();
+      expect(screen.getByText('5분 뒤에 게시할 수 있어요')).toBeInTheDocument();
+    });
+
+    it('loads the new page when the post finds the page ended (AC-13)', async () => {
+      await open(TEST_CONFIG, me, () => reply(pageEnded, 409));
+      draw();
+      const loads = () => fetchMock.mock.calls.filter((c) => String(c[0]) === '/api/pages/current').length;
+      const before = loads();
+
+      await act(async () => screen.getByRole('button', { name: '게시' }).click());
+
+      await waitFor(() => expect(loads()).toBe(before + 1));
     });
 
     it("hides the echo of its own draft but shows other people's (AC-15)", async () => {

@@ -106,7 +106,8 @@ frontend/src/
 │                  보이는 청크 동기화(chunkSync.ts: 구독 → 조회 → 병합, INV-09) + doodle 저장소(doodleStore.ts),
 │                  다른 사람 커서(cursors.ts, CursorLayer), 다른 사람 초안(remoteDrafts.ts) + 초안 레이어(DraftLayer), 배경 격자
 ├── tools/         내 초안 모델(draft.ts: 1px 점 버림, bbox 상한, 지우개 판정), 묶음 전송(draftSender.ts),
-│                  텍스트 크기 측정(textMeasure.ts), 도구·초안 훅(useDraft.ts: 무동작·연결 끊김 취소). 선택은 08
+│                  텍스트 크기 측정(textMeasure.ts), 도구·초안 훅(useDraft.ts: 무동작·연결 끊김 취소),
+│                  ✓ 게시 본문과 호출(publish.ts), 서버 시각 기준 쿨다운(cooldown.ts). 선택은 08
 ├── ui/            툴바(이동/펜/텍스트/지우개, 색, 굵기, 글자 크기), ✓/✗(DraftActions), 텍스트 입력 상자,
 │                  상단 상태바(점유율, 남은 시간), T−5분 카운트다운, 미니맵, 토스트
 ├── admin/         관리자 화면
