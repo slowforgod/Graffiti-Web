@@ -5,6 +5,7 @@ import { FakeLink } from '../realtime/fakeLink';
 import { chunkTopic, metaTopic } from '../realtime/link';
 import type { RemoteCursor } from './cursors';
 import type { Doodle } from './doodles';
+import type { RemoteDraft } from './remoteDrafts';
 import CanvasScreen from './CanvasScreen';
 import { TEST_CONFIG } from './testConfig';
 
@@ -27,12 +28,34 @@ vi.mock('./CanvasView', () => ({
     doodles,
     cursors,
     onPointerMove,
+    otherDrafts,
+    onDrawStart,
+    onDrawMove,
+    onDrawEnd,
   }: {
     doodles: Doodle[];
     cursors: RemoteCursor[];
     onPointerMove?: (p: { x: number; y: number }) => void;
+    otherDrafts: RemoteDraft[];
+    onDrawStart?: (p: { x: number; y: number }, scale: number) => void;
+    onDrawMove?: (p: { x: number; y: number }, scale: number) => void;
+    onDrawEnd?: () => void;
   }) => (
     <>
+      <ul aria-label="drafts">
+        {otherDrafts.map((d) => (
+          <li key={d.draftId}>{d.draftId}</li>
+        ))}
+      </ul>
+      <button type="button" onClick={() => onDrawStart?.({ x: 3800, y: 2100 }, 1)}>
+        down
+      </button>
+      <button type="button" onClick={() => onDrawMove?.({ x: 3810, y: 2105 }, 1)}>
+        drag
+      </button>
+      <button type="button" onClick={() => onDrawEnd?.()}>
+        up
+      </button>
       <ul aria-label="doodles">
         {doodles.map((d) => (
           <li key={d.id}>{d.id}</li>
@@ -52,7 +75,7 @@ vi.mock('./CanvasView', () => ({
   ),
 }));
 
-function page(id: string) {
+function page(id: string, config = TEST_CONFIG) {
   return {
     id,
     seq: Number(id),
@@ -61,7 +84,7 @@ function page(id: string) {
     countdownStartedAt: null,
     scheduledEndAt: '2026-10-28T00:00:00Z',
     serverTime: '2026-10-21T00:00:00Z',
-    config: TEST_CONFIG,
+    config,
   };
 }
 
@@ -195,6 +218,92 @@ describe('CanvasScreen', () => {
     expect(links.current!.sent).toEqual([{ destination: '/app/cursor', body: { pageId: '3', x: 3800, y: 2100 } }]);
     expect(chunk).toMatch(/^\/topic\/page\.3\.chunk\.\d+$/);
     expect(chunkTopic('3', 0)).toBe('/topic/page.3.chunk.0');
+  });
+
+  describe('drafts', () => {
+    const me: Me = {
+      authenticated: true,
+      id: '1',
+      nickname: '나',
+      cursorColor: '#000000',
+      role: 'USER',
+      consentRequired: false,
+      banned: false,
+      cooldownEndsAt: null,
+    };
+
+    async function open(config = TEST_CONFIG) {
+      fetchMock.mockImplementation(async (input) => {
+        const url = String(input);
+        if (url === '/api/pages/current') return reply(page('3', config));
+        if (url.endsWith('/minimap')) return reply(minimap);
+        if (url.startsWith('/api/pages/3/doodles')) return reply({ pageId: '3', doodles: [] });
+        return reply({}, 404);
+      });
+      render(<CanvasScreen me={me} />);
+      await screen.findByRole('button', { name: 'down' });
+      act(() => links.current!.connect());
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 150));
+      });
+      act(() => screen.getByRole('button', { name: '펜' }).click());
+      const link = links.current!;
+      return { link, drafts: () => link.sent.filter((m) => m.destination === '/app/draft').map((m) => m.body as Record<string, unknown>) };
+    }
+
+    function draw() {
+      act(() => screen.getByRole('button', { name: 'down' }).click());
+      act(() => screen.getByRole('button', { name: 'drag' }).click());
+      act(() => screen.getByRole('button', { name: 'up' }).click());
+    }
+
+    it('relays a pen stroke, rests the cursor and cancels with ✗ (AC-9, AC-11)', async () => {
+      const { link, drafts } = await open();
+      draw();
+
+      expect(drafts()[0]).toMatchObject({ pageId: '3', op: 'points', strokeIndex: 0, c: 0, points: [3800, 2100] });
+      const draftId = drafts()[0]!.draftId;
+      expect(screen.getByRole('button', { name: '게시' })).toBeDisabled();
+      // The cursor rests while a draft is open: the view gets no pointer handler for it.
+      expect(screen.queryByRole('button', { name: 'move' })).not.toBeInTheDocument();
+      expect(link.sent.some((m) => m.destination === '/app/cursor')).toBe(false);
+
+      act(() => screen.getByRole('button', { name: '취소' }).click());
+      expect(drafts().at(-1)).toEqual({ pageId: '3', draftId, op: 'cancel' });
+      expect(screen.queryByRole('button', { name: '취소' })).not.toBeInTheDocument();
+    });
+
+    it("hides the echo of its own draft but shows other people's (AC-15)", async () => {
+      const { link, drafts } = await open();
+      draw();
+      const chunk = link.active().find((s) => s.destination.includes('.chunk.'))!.destination;
+      const own = drafts()[0]!.draftId as string;
+      act(() => {
+        link.deliver(chunk, { type: 'draft:update', sid: 's-1', draftId: own, op: 'points', strokeIndex: 0, c: 0, w: 4, points: [1, 1] });
+        link.deliver(chunk, { type: 'draft:update', sid: 's-2', draftId: 'theirs', op: 'text', bbox: { x: 1, y: 1, w: 9, h: 9 } });
+      });
+      expect(screen.getByRole('list', { name: 'drafts' })).toHaveTextContent('theirs');
+      expect(screen.getByRole('list', { name: 'drafts' })).not.toHaveTextContent(own);
+    });
+
+    it('drops the draft when the connection drops (D-11)', async () => {
+      const { link } = await open();
+      draw();
+      act(() => link.disconnect());
+      expect(screen.queryByRole('button', { name: '취소' })).not.toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('연결이 끊겨 그리던 초안이 사라졌어요.');
+      expect(screen.getByRole('button', { name: '펜' })).toBeDisabled();
+    });
+
+    it('cancels a draft left alone for the idle timeout (D-11)', async () => {
+      const { drafts } = await open({ ...TEST_CONFIG, draftIdleTimeoutSec: 0.2 });
+      draw();
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 300));
+      });
+      expect(drafts().at(-1)).toMatchObject({ op: 'cancel' });
+      expect(screen.getByRole('status')).toHaveTextContent('10분 동안 움직임이 없어 초안을 지웠어요.');
+    });
   });
 
   it('explains when the page cannot be loaded', async () => {

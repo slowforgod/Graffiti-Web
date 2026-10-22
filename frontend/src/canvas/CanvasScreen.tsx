@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Me } from '../auth/me';
+import { LOGIN_URL } from '../auth/me';
 import type { RealtimeLink } from '../realtime/link';
 import type { Connection } from '../realtime/connection';
 import { createConnection } from '../realtime/connection';
@@ -7,13 +8,21 @@ import { MetaSync } from '../realtime/metaSync';
 import { throttle } from '../realtime/throttle';
 import type { CurrentPage } from '../shared/pageConfig';
 import { fetchCurrentPage } from '../shared/pageConfig';
+import { draftBounds } from '../tools/draft';
+import type { DraftNotice } from '../tools/useDraft';
+import { useDraft } from '../tools/useDraft';
+import DraftActions from '../ui/DraftActions';
 import Minimap from '../ui/Minimap';
+import TextDraftEditor from '../ui/TextDraftEditor';
+import type { DrawAccess } from '../ui/Toolbar';
+import Toolbar from '../ui/Toolbar';
 import { fetchMinimap } from '../ui/minimap';
 import CanvasView from './CanvasView';
 import { ChunkSync } from './chunkSync';
 import { visibleChunks } from './chunks';
 import type { RemoteCursor } from './cursors';
 import type { Doodle } from './doodles';
+import type { RemoteDraft } from './remoteDrafts';
 import { fetchChunkDoodles } from './doodles';
 import { useWindowSize } from './useWindowSize';
 import type { Point, Viewport } from './viewport';
@@ -21,6 +30,32 @@ import { centerOn, visibleWorldRect } from './viewport';
 
 // Waits for panning or zooming to settle before asking for new chunks.
 const CHUNK_DEBOUNCE_MS = 100;
+
+// How often other people's silent drafts are looked at for the idle timeout.
+const DRAFT_EXPIRY_CHECK_MS = 30_000;
+
+const NOTICES: Record<DraftNotice, string> = {
+  'too-big': '낙서 하나는 가로세로 1024px 안에 그려요.',
+  'text-full': '글자는 줄바꿈을 빼고 50자까지 쓸 수 있어요.',
+  idle: '10분 동안 움직임이 없어 초안을 지웠어요.',
+  disconnected: '연결이 끊겨 그리던 초안이 사라졌어요.',
+};
+
+function drawAccess(me: Me | undefined, online: boolean): DrawAccess {
+  if (!me) {
+    return 'loading';
+  }
+  if (!me.authenticated) {
+    return 'anonymous';
+  }
+  if (me.consentRequired) {
+    return 'consent';
+  }
+  if (me.banned) {
+    return 'banned';
+  }
+  return online ? 'ok' : 'offline';
+}
 
 interface Props {
   me?: Me;
@@ -84,7 +119,9 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
   const [doodles, setDoodles] = useState<Doodle[]>([]);
   const [cursors, setCursors] = useState<RemoteCursor[]>([]);
   const [cells, setCells] = useState<Uint8Array | null>(null);
+  const [otherDrafts, setOtherDrafts] = useState<RemoteDraft[]>([]);
   const sync = useRef<ChunkSync | null>(null);
+  const tools = useDraft({ pageId: page.id, config, link });
 
   useEffect(() => {
     const chunks = new ChunkSync({
@@ -94,6 +131,7 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
       fetchChunks: fetchChunkDoodles,
       onDoodles: setDoodles,
       onCursors: setCursors,
+      onDrafts: setOtherDrafts,
       onPageEnded,
     });
     const meta = new MetaSync({
@@ -106,12 +144,17 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
     });
     sync.current = chunks;
     meta.start();
+    const expiry = setInterval(
+      () => chunks.expireDrafts(config.draftIdleTimeoutSec * 1000),
+      Math.min(DRAFT_EXPIRY_CHECK_MS, config.draftIdleTimeoutSec * 1000),
+    );
     const stop = link.onConnect(() => {
       chunks.resync();
       meta.start();
     });
     return () => {
       stop();
+      clearInterval(expiry);
       chunks.dispose();
       meta.dispose();
       sync.current = null;
@@ -127,7 +170,13 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
   }, [viewport, size, config]);
 
   // Only people who may draw send their cursor (API.md §6); their own comes back and is hidden.
+  // While a draft is open the cursor rests: the draft shows where the author is and keeps the
+  // author under the SEND limit (D-12).
   const author = me?.authenticated && !me.consentRequired && !me.banned ? me : null;
+  const access = drawAccess(me, tools.online);
+  const own = tools.draft;
+  const bounds = own ? draftBounds(own) : null;
+  const tool = access === 'ok' ? tools.tool : 'move';
   const sendCursor = useMemo(
     () =>
       author &&
@@ -136,6 +185,8 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
   );
   useEffect(() => () => sendCursor?.cancel(), [sendCursor]);
   const others = author ? cursors.filter((c) => c.nickname !== author.nickname) : cursors;
+  // The author's own draft comes back from the chunk topics too.
+  const drafts = own ? otherDrafts.filter((d) => d.draftId !== own.id) : otherDrafts;
 
   return (
     <div className="canvas-screen">
@@ -146,8 +197,44 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
         doodles={doodles}
         cursors={others}
         onViewportChange={setViewport}
-        onPointerMove={sendCursor ? (p) => sendCursor.push(p) : undefined}
+        onPointerMove={sendCursor && !own ? (p) => sendCursor.push(p) : undefined}
+        tool={tool}
+        ownDraft={own}
+        otherDrafts={drafts}
+        onDrawStart={tools.pointerDown}
+        onDrawMove={tools.pointerMove}
+        onDrawEnd={tools.pointerUp}
       />
+      {own?.kind === 'TEXT' && (
+        <TextDraftEditor
+          draft={own}
+          color={config.palette[own.c] ?? config.palette[0]!}
+          viewport={viewport}
+          onChange={tools.editText}
+        />
+      )}
+      {own && bounds && (
+        <DraftActions bounds={bounds} viewport={viewport} screen={size} onCancel={tools.cancel} />
+      )}
+      <Toolbar
+        config={config}
+        access={access}
+        tool={tool}
+        onTool={tools.setTool}
+        onLogin={() => window.location.assign(LOGIN_URL)}
+        draftKind={own?.kind ?? null}
+        color={tools.color}
+        onColor={tools.setColor}
+        width={tools.width}
+        onWidth={tools.setWidth}
+        fontSize={tools.fontSize}
+        onFontSize={tools.setFontSize}
+      />
+      {tools.notice && (
+        <p role="status" className="draft-notice" onClick={tools.clearNotice}>
+          {NOTICES[tools.notice]}
+        </p>
+      )}
       <Minimap config={config} cells={cells} view={visibleWorldRect(viewport, size)} />
     </div>
   );

@@ -19,6 +19,7 @@ export interface ClientConfig {
   countdownWarningSec: number;
   draftIdleTimeoutSec: number;
   cursorIntervalMs: number;
+  draftIntervalMs: number;
   heartbeatMs: number;
 }
 

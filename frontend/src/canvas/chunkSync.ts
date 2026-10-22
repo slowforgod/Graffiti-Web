@@ -6,11 +6,14 @@ import type { RemoteCursor } from './cursors';
 import { CursorBoard } from './cursors';
 import type { Doodle } from './doodles';
 import { DoodleStore } from './doodleStore';
+import type { DraftEvent, RemoteDraft } from './remoteDrafts';
+import { RemoteDrafts } from './remoteDrafts';
 
 export type FetchChunks = (pageId: string, chunks: number[]) => Promise<Doodle[]>;
 
-// Chunk topic events of API.md §6 that 04 handles; others (drafts, 05) are ignored here.
+// Chunk topic events of API.md §6; unknown types are ignored.
 export type ChunkEvent =
+  | DraftEvent
   | { type: 'doodle:published'; doodle: Doodle }
   | { type: 'doodle:removed'; id: string }
   | { type: 'cursor'; sid: string; nickname: string; color: string; x: number; y: number }
@@ -24,7 +27,9 @@ interface Options {
   fetchChunks: FetchChunks;
   onDoodles: (doodles: Doodle[]) => void;
   onCursors: (cursors: RemoteCursor[]) => void;
+  onDrafts?: (drafts: RemoteDraft[]) => void;
   onPageEnded: () => void;
+  now?: () => number;
 }
 
 interface ChunkState {
@@ -39,6 +44,7 @@ interface ChunkState {
 export class ChunkSync {
   readonly store: DoodleStore;
   readonly cursors = new CursorBoard();
+  readonly drafts = new RemoteDrafts();
   private readonly options: Options;
   private visible = new Set<number>();
   private readonly states = new Map<number, ChunkState>();
@@ -60,6 +66,7 @@ export class ChunkSync {
       leaving.forEach((c) => this.forget(c));
       this.store.dropChunks(leaving);
       this.cursors.dropChunks(leaving);
+      this.drafts.dropChunks(leaving);
       this.emit();
     }
     const connected = this.options.link.connected();
@@ -83,8 +90,16 @@ export class ChunkSync {
     }
     this.states.clear();
     this.cursors.clear();
+    this.drafts.clear();
     this.setVisible([...this.visible]);
     this.emit();
+  }
+
+  // Drops other people's drafts not heard of for `maxAgeMs` (D-11: idle drafts are cancelled).
+  expireDrafts(maxAgeMs: number): void {
+    if (this.drafts.expire(this.now(), maxAgeMs)) {
+      this.emit();
+    }
   }
 
   dispose(): void {
@@ -162,8 +177,11 @@ export class ChunkSync {
     if (this.disposed || !state) {
       return;
     }
+    // Cursors and drafts are live only: the REST answer does not carry them, so they are never buffered.
     if (event.type === 'cursor' || event.type === 'cursor:leave') {
       this.apply(chunk, event);
+    } else if (event.type === 'draft:update' || event.type === 'draft:cancel') {
+      this.drafts.apply(chunk, event as DraftEvent, this.now());
     } else if (state.live) {
       this.apply(chunk, event);
     } else {
@@ -194,6 +212,11 @@ export class ChunkSync {
   private emit(): void {
     this.options.onDoodles(this.store.list());
     this.options.onCursors(this.cursors.list());
+    this.options.onDrafts?.(this.drafts.list());
+  }
+
+  private now(): number {
+    return (this.options.now ?? Date.now)();
   }
 }
 

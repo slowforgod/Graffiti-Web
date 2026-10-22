@@ -9,6 +9,7 @@ class FakeClient {
   heartbeatOutgoing = 0;
   onConnect: () => void = () => {};
   onStompError: (frame: IFrame) => void = () => {};
+  onWebSocketClose: () => void = () => {};
   receipts = new Map<string, () => void>();
   subscribed: { destination: string; headers: StompHeaders; callback: (m: IMessage) => void }[] = [];
   published: { destination: string; body: string }[] = [];
@@ -75,6 +76,19 @@ describe('connection', () => {
     client.onStompError({ headers: { message: 'PAGE_ENDED' } } as unknown as IFrame);
     expect(onConnect).toHaveBeenCalledTimes(1);
     expect(onPageEnded).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a drop of an open connection once', () => {
+    const { client, connection } = make();
+    const onDisconnect = vi.fn();
+    connection.onDisconnect(onDisconnect);
+
+    client.onWebSocketClose();
+    expect(onDisconnect).not.toHaveBeenCalled();
+    client.onConnect();
+    client.onWebSocketClose();
+    client.onWebSocketClose();
+    expect(onDisconnect).toHaveBeenCalledTimes(1);
   });
 
   it('uses the server heartbeat', () => {

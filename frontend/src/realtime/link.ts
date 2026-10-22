@@ -7,6 +7,8 @@ export interface RealtimeLink {
   send(destination: string, body: unknown): void;
   // Runs on every (re)connect; subscriptions of an earlier connection are gone by then.
   onConnect(listener: () => void): () => void;
+  // Runs when an open connection drops; the server cancels this connection's draft (D-11).
+  onDisconnect(listener: () => void): () => void;
   // Runs when the server refuses a frame because the page has ended.
   onPageEnded(listener: () => void): () => void;
 }

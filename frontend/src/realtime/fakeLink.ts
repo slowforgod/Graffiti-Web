@@ -13,6 +13,7 @@ export class FakeLink implements RealtimeLink {
   readonly subscriptions: FakeSubscription[] = [];
   readonly sent: { destination: string; body: unknown }[] = [];
   private readonly connectListeners = new Set<() => void>();
+  private readonly disconnectListeners = new Set<() => void>();
   private readonly pageEndedListeners = new Set<() => void>();
 
   connected(): boolean {
@@ -36,6 +37,11 @@ export class FakeLink implements RealtimeLink {
     return () => this.connectListeners.delete(listener);
   }
 
+  onDisconnect(listener: () => void): () => void {
+    this.disconnectListeners.add(listener);
+    return () => this.disconnectListeners.delete(listener);
+  }
+
   onPageEnded(listener: () => void): () => void {
     this.pageEndedListeners.add(listener);
     return () => this.pageEndedListeners.delete(listener);
@@ -45,6 +51,12 @@ export class FakeLink implements RealtimeLink {
     this.isConnected = true;
     this.subscriptions.forEach((s) => (s.active = false));
     this.connectListeners.forEach((l) => l());
+  }
+
+  disconnect(): void {
+    this.isConnected = false;
+    this.subscriptions.forEach((s) => (s.active = false));
+    this.disconnectListeners.forEach((l) => l());
   }
 
   endPage(): void {
