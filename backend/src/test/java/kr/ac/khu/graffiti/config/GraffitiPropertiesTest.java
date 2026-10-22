@@ -41,6 +41,7 @@ class GraffitiPropertiesTest {
             assertThat(p.page().countdownThreshold()).isEqualTo(0.70);
             assertThat(p.page().countdownDuration()).isEqualTo(Duration.ofHours(6));
             assertThat(p.page().maxLifetime()).isEqualTo(Duration.ofDays(7));
+            assertThat(p.page().countdownWarning()).isEqualTo(Duration.ofMinutes(5));
 
             assertThat(p.doodle().maxBbox()).isEqualTo(1024);
             assertThat(p.doodle().maxPayloadBytes()).isEqualTo(2_097_152);
@@ -48,6 +49,7 @@ class GraffitiPropertiesTest {
             assertThat(p.doodle().strokeWidths()).containsExactly(2, 4, 8, 16);
             assertThat(p.doodle().fontSizes())
                     .containsExactly(10, 11, 12, 13, 14, 15, 16, 20, 24, 32, 36, 40, 48, 64, 96);
+            assertThat(p.doodle().defaultFontSize()).isEqualTo(24);
             assertThat(p.doodle().textMaxLength()).isEqualTo(50);
             assertThat(p.doodle().draftIdleTimeout()).isEqualTo(Duration.ofMinutes(10));
 
@@ -122,6 +124,11 @@ class GraffitiPropertiesTest {
     @Test
     void rejectsNonPositiveSessionTimeout() {
         assertStartupFails("graffiti.auth.session-timeout=0s");
+    }
+
+    @Test
+    void rejectsDefaultFontSizeOutsideTheList() {
+        assertStartupFails("graffiti.doodle.default-font-size=25");
     }
 
     @Test

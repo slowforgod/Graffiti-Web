@@ -65,11 +65,12 @@ public record GraffitiProperties(
     public record Page(
             @Positive @DecimalMax("1.0") double countdownThreshold,
             @NotNull Duration countdownDuration,
-            @NotNull Duration maxLifetime) {
+            @NotNull Duration maxLifetime,
+            @NotNull Duration countdownWarning) {
 
-        @AssertTrue(message = "countdown-duration and max-lifetime must be positive")
+        @AssertTrue(message = "countdown-duration, max-lifetime and countdown-warning must be positive")
         public boolean isDurationsPositive() {
-            return isPositive(countdownDuration) && isPositive(maxLifetime);
+            return isPositive(countdownDuration) && isPositive(maxLifetime) && isPositive(countdownWarning);
         }
     }
 
@@ -79,8 +80,14 @@ public record GraffitiProperties(
             @NotEmpty List<@NotNull @Pattern(regexp = "#[0-9A-Fa-f]{6}") String> palette,
             @NotEmpty List<@NotNull @Positive Integer> strokeWidths,
             @NotEmpty List<@NotNull @Positive Integer> fontSizes,
+            @Positive int defaultFontSize,
             @Positive int textMaxLength,
             @NotNull Duration draftIdleTimeout) {
+
+        @AssertTrue(message = "default-font-size must be one of font-sizes")
+        public boolean isDefaultFontSizeListed() {
+            return fontSizes != null && fontSizes.contains(defaultFontSize);
+        }
 
         @AssertTrue(message = "draft-idle-timeout must be positive")
         public boolean isDraftIdleTimeoutPositive() {
