@@ -15,12 +15,21 @@ ChatKHU는 OpenAI, Anthropic, Google Gemini, xAI, Perplexity 등의 모델을 **
 
 ## 인증
 
-모든 엔드포인트에 API 키가 필요합니다. 두 헤더 중 하나를 씁니다.
+모든 엔드포인트에 API 키가 필요합니다. 두 헤더 방식을 모두 지원하며, 백엔드는 OpenAI 방식(`Authorization: Bearer`)을 씁니다.
 
+```http
+Authorization: Bearer <CHATKHU_API_KEY>    # OpenAI SDK 기본
+x-api-key: <CHATKHU_API_KEY>               # Anthropic SDK 기본
 ```
-Authorization: Bearer <CHATKHU_API_KEY>    # OpenAI 스타일
-x-api-key: <CHATKHU_API_KEY>               # Anthropic SDK 스타일
-```
+
+키는 ChatKHU 웹사이트 왼쪽 아래 **API Gateway** → **API 키 생성**에서 발급합니다. 발급한 키는 다시 조회할 수 없으므로 바로 안전한 곳에 보관합니다. 호출 크레딧은 **키를 만든 계정**에서 차감됩니다.
+
+## 보안
+
+- 키는 환경변수 `CHATKHU_API_KEY`에만 두고 소스 코드나 문서에 넣지 않습니다(SEC-06).
+- HTTPS 주소만 씁니다. HTTP는 지원되지 않습니다.
+- 키가 노출되면 바로 API Gateway 페이지에서 해지하고 새로 발급한 뒤, 로컬 `.env`, GitHub Secrets, 서버 `/opt/graffiti/.env`를 함께 바꿉니다. API로 해지하려면 `POST /v1/gateway/keys/revoke/`를 씁니다.
+- 키는 조직 단위로 범위가 정해져 다른 조직의 모델에는 접근할 수 없습니다.
 
 ## 전체 엔드포인트
 
@@ -67,6 +76,8 @@ x-api-key: <CHATKHU_API_KEY>               # Anthropic SDK 스타일
 | 요청 본문 크기 | 25MB | `413` |
 | TTS `input` 길이 | 4,000자 | `400` |
 
+크레딧은 월 단위로 배정되고 매월 갱신됩니다. 잔액과 갱신일은 `GET /v1/gateway/credits/`로 확인합니다.
+
 검사 요청이 `429`나 시간 초과로 실패하면 D-18대로 그 단계는 `UNCHECKED`로 처리합니다. 속도 제한은 회원(키) 단위이므로 게시가 몰리면 걸릴 수 있습니다. 07 명세에서 재시도 여부와 타임아웃을 정합니다.
 
 ## 예시 (OpenAI 호환)
@@ -82,7 +93,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-    model="claude-sonnet-5",
+    model="gpt-5.6-luna",
     messages=[{"role": "user", "content": "Hello!"}],
 )
 print(response.choices[0].message.content)
@@ -92,7 +103,27 @@ print(response.choices[0].message.content)
 
 ## 모델
 
-`GET /v1/gateway/models/`로 목록을 봅니다. 2026-10-23에 확인했을 때 129개였고 GPT, Claude, Gemini, Grok, Qwen, Solar 계열이 있었습니다. 검사에 쓸 모델은 07 명세에서 정합니다.
+이 프로젝트는 ChatKHU에서 **OpenAI 모델만** 씁니다. 쓸 모델은 07 명세에서 정합니다.
+
+### 모델 목록 조회
+
+```http
+GET https://factchat-cloud.mindlogic.ai/v1/gateway/models/?type=llm
+Authorization: Bearer <CHATKHU_API_KEY>
+```
+
+- `?type=llm`이면 채팅 모델만 옵니다. 생략하면 오디오, 이미지, 비디오 모델도 함께 옵니다.
+- 응답은 `{"object": "list", "data": [...]}`이고, 각 항목의 `id`를 요청의 `model`에 그대로 넣습니다. OpenAI 모델은 `owned_by`가 `openai`입니다.
+- 모델 하나는 `GET /v1/gateway/models/{model}/`로 조회합니다.
+- 조직에 활성화된 모델만 목록에 나오고, 구독 플랜에 따라 달라집니다.
+
+### 엔드포인트
+
+OpenAI 채팅 모델은 `POST /v1/gateway/chat/completions/`로 호출합니다. o-시리즈 추론 모델과 Codex는 `POST /v1/gateway/responses/`를 씁니다.
+
+### API로 호출할 수 없는 모델
+
+무료 모델(`gpt-5-nano` 등)과 앱 전용 기능(`mindlogic-super-agent`)은 게이트웨이 API로 호출하면 `403`이 옵니다. API에서는 크레딧을 쓰는 일반 모델(예: `gpt-5.6-luna`, `gpt-5.6-terra`)을 씁니다.
 
 ## 공식 제공업체 문서
 
@@ -102,5 +133,3 @@ print(response.choices[0].message.content)
 |---|---|
 | OpenAI Chat Completions | <https://platform.openai.com/docs/api-reference/chat> |
 | OpenAI Responses API | <https://platform.openai.com/docs/api-reference/responses> |
-| Anthropic Messages API | <https://docs.anthropic.com/en/api/messages> |
-| Google Gemini | <https://ai.google.dev/api/generate-content> |
