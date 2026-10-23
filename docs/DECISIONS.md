@@ -126,9 +126,9 @@
 - ~~D-18a: 텍스트는 사전 검사, 그림은 30초마다 사후 검사 후 숨김~~ — SUPERSEDED by D-18
 
 ### D-19 검사 제공자 — ACCEPTED
-- **텍스트**: ① 금칙어 1차 필터 → ② **KHUChat**(JSON 응답 `{"flagged","category","reason"}`) → ③ **OpenAI omni-moderation** 이중 검사. 하나라도 걸리면 거부
-  - KHUChat 응답 파싱 실패 → 그 단계만 통과로 보고 로그 기록
-- **그림**: 서버에서 Java2D로 PNG 렌더링 → **OpenAI omni-moderation**(이미지). KHUChat은 이미지 입력 미지원
+- **텍스트**: ① 금칙어 1차 필터 → ② **ChatKHU**(JSON 응답 `{"flagged","category","reason"}`) → ③ **OpenAI omni-moderation** 이중 검사. 하나라도 걸리면 거부
+  - ChatKHU 응답 파싱 실패 → 그 단계만 통과로 보고 로그 기록
+- **그림**: 서버에서 Java2D로 PNG 렌더링 → **OpenAI omni-moderation**(이미지). ChatKHU는 이미지 입력 미지원
 - 모든 제공자는 `ModerationProvider` 인터페이스 뒤에 둠
 - **한계 인지**: 손글씨 한국어 욕설은 놓칠 수 있음 → 관리자 삭제로 보완
 - **추가**: 그림에는 자체 ML 모델(이미지 분류 + OCR)이 더해짐 → D-34 ~ D-39
@@ -142,7 +142,7 @@
 
 ### D-35 자체 ML 검사 범위 — ACCEPTED
 - **그림 doodle의 시각적 내용**(선정, 폭력, 혐오 이미지): 자체 **이미지 분류 모델**. 입력은 `DoodleRenderer`가 만든 PNG
-- **그림 doodle 안의 손글씨**: ML 서버의 **OCR**로 글자를 추출 → 기존 텍스트 검사(금칙어, KHUChat, OpenAI)에 넘김
+- **그림 doodle 안의 손글씨**: ML 서버의 **OCR**로 글자를 추출 → 기존 텍스트 검사(금칙어, ChatKHU, OpenAI)에 넘김
 - **타이핑한 텍스트 doodle**: 자체 모델 없이 기존 3중 검사(D-19) 유지
 - **이유**: 텍스트는 문자열이 이미 있어 기존 검사가 효율적. 손글씨는 그림 doodle이라 문자열이 없으므로 OCR이 필요. 무료(D-04)이고 팀 ML 파트 범위
 - **한계와 대안**: 마우스로 쓴 한글 손글씨의 OCR 정확도는 낮을 수 있음 → 그림자 모드(D-34)에서 측정 후, 부족하면 비전 LLM 제공자로 교체(유료)
@@ -260,7 +260,7 @@
 - **내부 API**: Spring → ML 서버 `POST /v1/moderate` (Docker 내부망 전용)
 - **ENFORCE 모드에서 ML 장애나 시간 초과**: doodle 전체를 `UNCHECKED`로 만들지 않고 **ML 판정만 빠진 것**으로 처리 (다른 검사는 정상 수행됐으므로). 그림자 모드에서는 기록만
 - **쿨다운**: ML 거부도 다른 AI 거부와 같이 쿨다운 소모 (D-12)
-- **OCR 결과 처리**: 손글씨에서 읽은 글자는 텍스트 검사 경로(금칙어 → KHUChat → OpenAI)로 넘김. 그림자 모드에서는 이 텍스트 검사 결과도 기록만 함
+- **OCR 결과 처리**: 손글씨에서 읽은 글자는 텍스트 검사 경로(금칙어 → ChatKHU → OpenAI)로 넘김. 그림자 모드에서는 이 텍스트 검사 결과도 기록만 함
 - **로드맵**: `07b-ml-moderation`(ML 서버, 그림자 모드, 판정 기록) 추가. 미세조정과 ENFORCE 전환은 운영 데이터가 쌓인 뒤 별도 작업 (TODOS)
 
 ### D-41 머지 방식 — ACCEPTED

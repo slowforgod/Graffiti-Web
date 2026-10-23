@@ -268,7 +268,7 @@
 }
 ```
 - `label`은 ML 서버가 `models.lock`의 임계값으로 정합니다. Spring은 `scores`도 그대로 `ml_prediction`에 저장합니다.
-- `ocr.text`가 비어 있지 않으면 Spring이 텍스트 검사 경로(금칙어 → KHUChat → OpenAI)로 넘깁니다(D-35).
+- `ocr.text`가 비어 있지 않으면 Spring이 텍스트 검사 경로(금칙어 → ChatKHU → OpenAI)로 넘깁니다(D-35).
 - 오류: `400`(이미지 아님, 크기 초과), `503`(모델 미로드). Spring은 응답 시간 3초 초과, 4xx, 5xx를 모두 ML 판정 없음으로 처리합니다(INV-13, D-40).
 
 `GET /health` 응답

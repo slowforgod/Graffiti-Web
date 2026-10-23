@@ -23,7 +23,7 @@ description: graffiti 배포 전 보안 감사. docs/SECURITY.md의 SEC-01~17을
 ### 2. 공격 표면 목록
 - REST 엔드포인트 전체: `@RequestMapping`, `@GetMapping` 등을 찾아 경로, 메서드, 권한을 표로 만든다.
 - STOMP: `@MessageMapping`, 구독 가능한 목적지, `ChannelInterceptor`의 검사 항목.
-- 외부 호출: OAuth, KHUChat, OpenAI (타임아웃, 재시도, 응답 파싱).
+- 외부 호출: OAuth, ChatKHU, OpenAI (타임아웃, 재시도, 응답 파싱).
 - ML 서버: `ml/serving`의 엔드포인트, Docker 포트 공개 여부, 로그에 OCR 글자나 이미지가 남는지, 학습 데이터 추출 스크립트에 작성자 정보가 섞이는지 (SEC-17).
 - 설정: `SecurityFilterChain`, CORS와 Origin, 세션과 쿠키, actuator 노출, 로그 패턴.
 - 인프라 파일: `docker-compose.yml`(포트 공개), nginx 설정, GitHub Actions(시크릿 사용), `.gitignore`.

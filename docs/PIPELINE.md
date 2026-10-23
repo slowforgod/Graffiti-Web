@@ -72,7 +72,7 @@ DRAFT ──(G1 사람 승인)──▶ APPROVED ──(구현 시작)──▶ 
 | 04 | realtime | STOMP 설정, `ChannelInterceptor`(인증, 구독 검증, 속도 제한), 커서, 구독→조회→병합 | 03 | D-09, INV-09, SEC-07/08 |
 | 05 | draft | 툴바, 펜, 텍스트, 지우개(초안), ✓/✗ UI, 초안 중계, 10분 자동 취소 | 04 | D-07, D-10, D-11, D-33 |
 | 06 | publish | 게시 REST, `DoodleValidator`, 쿨다운, 점유율 갱신, 브로드캐스트 (모더레이션은 항상 통과하는 임시 구현) | 05 | D-12, D-27, D-28, INV-05/08 |
-| 07 | moderation | 금칙어, KHUChat, OpenAI, `DoodleRenderer`, REJECTED/UNCHECKED, 타임아웃 | 06 | D-18, D-19, SEC-05/15 |
+| 07 | moderation | 금칙어, ChatKHU, OpenAI, `DoodleRenderer`, REJECTED/UNCHECKED, 타임아웃 | 06 | D-18, D-19, SEC-05/15 |
 | 07b | ml-moderation | `ml/serving`(FastAPI, CLIP 제로샷 이미지 분류 + OCR), `MlModerationProvider`, 병렬 호출, OCR 글자 → 텍스트 검사, `ml_prediction` 기록, **SHADOW 모드**, 평가 스크립트 | 07 (ML 서버 자체는 00 이후 병행 가능) | D-34~D-40, INV-13, SEC-17 |
 | 08 | my-doodles | 내 doodle 삭제, 선택 삭제, PNG 저장 | 06 | D-13 |
 | 09 | page-turn-ux | 상단 상태바, T−5분 카운트다운과 경고, `page:turned` 처리, 초안 폐기 | 04, 06 | D-16 |

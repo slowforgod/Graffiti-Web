@@ -22,7 +22,7 @@
                        │   │     └─ PageState (메모리: cellCount[], 상태, 타이머)        │
                        │   ├─ ModerationService ── 큐 밖 스레드풀 (INV-02)              │
                        │   │     ├─ WordFilter (금칙어)                                │
-                       │   │     ├─ KhuChatProvider ───────────▶ KHUChat API (텍스트)    │
+                       │   │     ├─ ChatKhuProvider ───────────▶ ChatKHU API (텍스트)    │
                        │   │     ├─ OpenAiModerationProvider ──▶ OpenAI omni-moderation │
                        │   │     └─ MlModerationProvider ──┐  (그림, SHADOW/ENFORCE)    │
                        │   └─ DoodleRenderer (Java2D → PNG) │                           │
@@ -64,7 +64,7 @@ backend/src/main/java/kr/ac/khu/graffiti/
 ├── doodle/        게시(DoodleController: 본문 2MB 상한·엄격한 JSON, DoodleValidator 순수 검증·bbox·칸·청크,
 │                  PublishService: 예약 → 검사 → 게시 → 실패 시 되돌림, JdbcPostStore, PublishedDoodleFootprints),
 │                  청크 조회(ChunkList 순수 검증, ChunkDoodleQuery JDBC, ChunkDoodleController). 삭제는 08
-├── moderation/    ModerationProvider 인터페이스, 구현체 4개(WordFilter, KhuChat, OpenAi, Ml), DoodleRenderer,
+├── moderation/    ModerationProvider 인터페이스, 구현체 4개(WordFilter, ChatKhu, OpenAi, Ml), DoodleRenderer,
 │                  ModerationService(병렬 호출과 판정 합성), MlPredictionRecorder. 06에는 항상 UNCHECKED인 임시 ModerationService만
 ├── realtime/      STOMP 설정(WebSocketConfig, 하트비트), RealtimeInterceptor(구독 목적지 검증, SEND 권한·속도 제한),
 │                  SubscribeReceipts(구독 등록 후 RECEIPT, INV-09), StompErrorHandler(ERROR 프레임 = 에러 코드),
@@ -130,7 +130,7 @@ Client                         REST(Controller)          PageCommandProcessor(�
   │                               │                              │    쿨다운 남음? → 거절        │
   │                               │                              │    last_posted_at = now      │
   │                               │◀──────── reserved ───────────│                             │
-  │                               │──────────────── moderate(doodle) ──────────────────────────▶│ ④ 텍스트: 금칙어→KHUChat→OpenAI
+  │                               │──────────────── moderate(doodle) ──────────────────────────▶│ ④ 텍스트: 금칙어→ChatKHU→OpenAI
   │                               │                              │                             │    그림: Java2D PNG→ OpenAI ∥ ML(4.7)
   │                               │◀─────────────── PASSED / REJECTED / UNCHECKED ──────────────│   (타임아웃 → UNCHECKED)
   │                               │── PublishDoodle / RecordReject ▶│ ⑤ p가 아직 현재 페이지?     │
@@ -251,7 +251,7 @@ PageBootstrap (SmartLifecycle, 웹 서버보다 앞 단계)
                                    ├─ 이미지 분류 → label, scores        │
                                    └─ OCR → ocrText                      │
                                          └─▶ 텍스트 검사 경로             │
-                                             (금칙어 → KHUChat → OpenAI) ─┤
+                                             (금칙어 → ChatKHU → OpenAI) ─┤
                                                                           ▼
                               ModerationVerdictCombiner (순수 로직)
                               ├─ OpenAI 이미지 결과: 항상 반영
@@ -325,7 +325,7 @@ PageBootstrap (SmartLifecycle, 웹 서버보다 앞 단계)
 | `graffiti.auth.nickname-max-attempts` | 10 | D-22 |
 | `graffiti.web.allowed-origins` | 환경변수 `APP_ORIGIN` | SEC-03 |
 
-비밀값(`GOOGLE_CLIENT_ID/SECRET`, `OPENAI_API_KEY`, `KHUCHAT_API_KEY`, `DB_PASSWORD`)은 환경변수로만 받습니다(SEC-06).
+비밀값(`GOOGLE_CLIENT_ID/SECRET`, `OPENAI_API_KEY`, `CHATKHU_API_KEY`, `DB_PASSWORD`)은 환경변수로만 받습니다(SEC-06).
 
 ## 7. 배포 구성
 
