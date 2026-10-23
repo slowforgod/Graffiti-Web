@@ -327,12 +327,6 @@ PageBootstrap (SmartLifecycle, 웹 서버보다 앞 단계)
 
 비밀값(`GOOGLE_CLIENT_ID/SECRET`, `OPENAI_API_KEY`, `CHATKHU_API_KEY`, `DB_PASSWORD`)은 환경변수로만 받습니다(SEC-06).
 
-**ChatKHU 접속 정보** (D-19, 07에서 사용). ChatKHU는 여러 회사의 LLM을 키 하나로 쓰는 LLM 게이트웨이(mindlogic FactChat)입니다.
-- 형식: OpenAI 호환 Chat Completions. `POST https://factchat-cloud.mindlogic.ai/v1/gateway/chat/completions/`
-- 인증: `Authorization: Bearer <CHATKHU_API_KEY>`
-- 모델 목록: `GET /v1/gateway/models/`. 쓸 모델은 07 명세에서 정합니다
-- 제한: 회원당 60초에 120건(초과 시 `429`), 요청 본문 25MB
-
 ## 7. 배포 구성
 
 ```
