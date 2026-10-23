@@ -43,6 +43,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.messaging.MessageDeliveryException;
 import org.springframework.messaging.converter.CompositeMessageConverter;
 import org.springframework.messaging.converter.MappingJackson2MessageConverter;
 import org.springframework.messaging.converter.StringMessageConverter;
@@ -100,13 +101,22 @@ class RealtimeIT extends WebIntegrationTest {
     void tearDown() {
         clients.forEach(c -> {
             if (c.session.isConnected()) {
-                c.session.disconnect();
+                try {
+                    c.session.disconnect();
+                } catch (IllegalStateException | MessageDeliveryException e) {
+                    // The server closed it in the meantime (after an ERROR frame).
+                }
             }
         });
         receiptScheduler.shutdown();
     }
 
     // --- connection and subscription checks ---
+
+    @Test
+    void sessionsSendTheirBufferBeforeClosing() {
+        assertThat(context.getBean("subProtocolWebSocketHandler")).isInstanceOf(FlushBeforeClose.Handler.class);
+    }
 
     @Test
     void handshakeFromAnotherOriginIsRefused() {
@@ -137,7 +147,7 @@ class RealtimeIT extends WebIntegrationTest {
         for (Map.Entry<String, String> e : expected.entrySet()) {
             Client anonymous = connect(null, ORIGIN);
             anonymous.trySubscribe(e.getKey());
-            assertThat(anonymous.nextError()).as(e.getKey()).isEqualTo(e.getValue());
+            assertThat(anonymous.nextError(e.getKey())).as(e.getKey()).isEqualTo(e.getValue());
         }
     }
 
@@ -211,7 +221,11 @@ class RealtimeIT extends WebIntegrationTest {
     @Test
     void oversizedFramesCloseTheConnection() throws Exception {
         Client author = connect(cookie(author()), ORIGIN);
-        author.send("/app/cursor", Map.of("pageId", Long.toString(page.id()), "pad", "x".repeat(70_000)));
+        try {
+            author.send("/app/cursor", Map.of("pageId", Long.toString(page.id()), "pad", "x".repeat(70_000)));
+        } catch (MessageDeliveryException e) {
+            // The server may close the connection while the frame is still being written: that is the outcome.
+        }
 
         long deadline = System.currentTimeMillis() + WAIT_SECONDS * 1000;
         while (author.session.isConnected() && System.currentTimeMillis() < deadline) {
@@ -546,6 +560,7 @@ class RealtimeIT extends WebIntegrationTest {
             headers.add("Cookie", cookie);
         }
         BlockingQueue<String> errors = new LinkedBlockingQueue<>();
+        BlockingQueue<String> transportErrors = new LinkedBlockingQueue<>();
         StompSession session = stomp.connectAsync("ws://localhost:" + port + "/ws", headers,
                 new StompSessionHandlerAdapter() {
                     @Override
@@ -557,8 +572,13 @@ class RealtimeIT extends WebIntegrationTest {
                     public void handleFrame(StompHeaders frame, Object payload) {
                         errors.add(frame.getFirst("message"));
                     }
+
+                    @Override
+                    public void handleTransportError(StompSession session, Throwable exception) {
+                        transportErrors.add(exception.toString());
+                    }
                 }).get(WAIT_SECONDS, TimeUnit.SECONDS);
-        Client client = new Client(session, errors);
+        Client client = new Client(session, errors, transportErrors);
         clients.add(client);
         return client;
     }
@@ -607,7 +627,7 @@ class RealtimeIT extends WebIntegrationTest {
         }
     }
 
-    private record Client(StompSession session, BlockingQueue<String> errors) {
+    private record Client(StompSession session, BlockingQueue<String> errors, BlockingQueue<String> transportErrors) {
 
         // Waits for the server's RECEIPT, so the subscription is registered before the test goes on.
         Subscribed subscribe(String destination) throws InterruptedException {
@@ -649,8 +669,16 @@ class RealtimeIT extends WebIntegrationTest {
         }
 
         String nextError() throws InterruptedException {
+            return nextError("");
+        }
+
+        // When no ERROR comes, says whether the connection is still open (the frame was accepted) or was
+        // closed without one, so a rare failure in CI can be told apart.
+        String nextError(String context) throws InterruptedException {
             String code = errors.poll(WAIT_SECONDS, TimeUnit.SECONDS);
-            assertThat(code).as("ERROR frame within %ss", WAIT_SECONDS).isNotNull();
+            assertThat(code).as("ERROR frame within %ss %s(connected: %s, transport error: %s)", WAIT_SECONDS,
+                    context.isEmpty() ? "" : "for " + context + " ", session.isConnected(), transportErrors.peek())
+                    .isNotNull();
             return code;
         }
     }
