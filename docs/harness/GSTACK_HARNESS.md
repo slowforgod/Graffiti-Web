@@ -170,7 +170,7 @@ gstack은 **Claude Code에 "역할(role)"을 입히는 스킬 묶음**이다. �
 - **Pass 1 CRITICAL 항목** (graffiti와 직결)
   - **SQL·데이터 안전**: 문자열로 이어 붙인 SQL, TOCTOU(확인 후 쓰기 경쟁), 검증 우회 직접 쓰기, N+1
   - **경쟁 조건**: 유니크 인덱스 없는 find-or-create, **원자적이지 않은 상태 전이**(`WHERE old_status=? UPDATE` 패턴을 쓰지 않음), XSS
-  - **LLM 출력 신뢰 경계**: LLM이 만든 값을 형식 검증 없이 DB에 저장, 구조화 출력의 타입이나 형태를 검사하지 않음 ← **KHUChat JSON 응답 파싱에 해당**
+  - **LLM 출력 신뢰 경계**: LLM이 만든 값을 형식 검증 없이 DB에 저장, 구조화 출력의 타입이나 형태를 검사하지 않음 ← **ChatKHU JSON 응답 파싱에 해당**
   - **Enum 완전성**: 새 상태값(예: `UNCHECKED`)을 추가했는데 모든 소비자(switch, 필터, 화면)가 처리하는지
   - **Gate Integrity**: 테스트 삭제, skip, 기준 완화 등
 - **Fix-First 휴리스틱**

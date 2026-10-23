@@ -48,7 +48,7 @@
 - 문서: `API.md` §3/§6, `ARCHITECTURE.md` §3/§4.1, `DB.md` §4(예약 UPDATE)
 
 **제외 (NOT in scope)**
-- 실제 모더레이션(금칙어, KHUChat, OpenAI, 렌더링, `moderation_action` 기록) → 07
+- 실제 모더레이션(금칙어, ChatKHU, OpenAI, 렌더링, `moderation_action` 기록) → 07
 - 내 doodle 목록, 삭제, PNG 저장 → 08
 - 상단 상태바, 카운트다운 경고 → 09
 - 사용자별 REST 속도 제한기 → 만들지 않음. 쿨다운(관리자 외)과 nginx IP 제한으로 충분, 11에서 다시 봄
