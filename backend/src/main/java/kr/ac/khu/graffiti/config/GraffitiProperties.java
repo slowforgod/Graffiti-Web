@@ -160,8 +160,15 @@ public record GraffitiProperties(
         }
     }
 
+    /**
+     * {@code adminRequestsPerSecond} caps every {@code /api/admin/**} request of one admin, and
+     * {@code writeRequestsPerSecond} every other state-changing {@code /api/**} request of one signed-in user
+     * (SEC-08/09). nginx limits per IP in front of both.
+     */
     public record Web(
-            @NotEmpty List<@NotBlank String> allowedOrigins) {
+            @NotEmpty List<@NotBlank String> allowedOrigins,
+            @Positive int adminRequestsPerSecond,
+            @Positive int writeRequestsPerSecond) {
     }
 
     private static boolean isPositive(Duration duration) {

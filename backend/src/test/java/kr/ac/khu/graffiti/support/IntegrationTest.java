@@ -16,9 +16,12 @@ import org.testcontainers.containers.MySQLContainer;
  *
  * <p>The moderation checks are stubs until the criteria are settled, so the shipped default would hold every
  * doodle; tests publish unchecked ones like 06 did and stub {@code ModerationService} to test the other results.
+ * The REST request caps are lifted; {@code ApiGuardsIT} tests them.
  */
 @SpringBootTest
-@TestPropertySource(properties = "graffiti.moderation.unchecked=PUBLISH")
+// The test clock stands still, so a per-second request cap would count a whole test as one second.
+@TestPropertySource(properties = {"graffiti.moderation.unchecked=PUBLISH",
+        "graffiti.web.admin-requests-per-second=100000", "graffiti.web.write-requests-per-second=100000"})
 @Import(IntegrationTest.ClockConfig.class)
 public abstract class IntegrationTest {
 

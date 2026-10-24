@@ -331,6 +331,8 @@ PageBootstrap (SmartLifecycle, 웹 서버보다 앞 단계)
 | `graffiti.realtime.heartbeat` | 10s (STOMP 양방향 하트비트, `heartbeatMs`) | 04 |
 | `graffiti.query.max-chunks` / `max-batch-delete` | 60 / 50 | D-30 |
 | `graffiti.query.admin-page-size-max` | 100 (관리자 목록 한 번의 최대 개수) | 07 틀 |
+| `graffiti.web.admin-requests-per-second` | 20 (관리자 한 명의 `/api/admin/**` 요청, 초당) | SEC-08/09, 11 |
+| `graffiti.web.write-requests-per-second` | 10 (로그인 사용자 한 명의 그 밖의 `/api/**` POST·PUT·PATCH·DELETE, 초당) | SEC-08/09, 11 |
 | `graffiti.moderation.timeout` | 5s (검사기 하나마다) | D-18 |
 | `graffiti.moderation.unchecked` | 환경변수 `MODERATION_UNCHECKED`, 기본 `HOLD`. 실제 검사 없이 스텁만 지난 낙서를 보류(`HOLD`)할지 미검사로 게시(`PUBLISH`, 로컬 전용)할지 | 07 틀, D-42 |
 | `graffiti.moderation.text-checks` | [word-filter, chatkhu, openai-text] (순서대로, 없는 구현은 스텁) | D-19 |
@@ -377,6 +379,8 @@ EC2 (메모리 4GB급, D-36) 보안 그룹: 80/443, 22는 팀원과 배포용 (S
 | `/api/` IP당 속도 | 20r/s, burst 40 | SEC-09 |
 | `/oauth2/`, `/login/` IP당 속도 | 10r/m, burst 10 | SEC-09 |
 | `/ws` IP당 동시 연결 | 10 | SEC-08 |
+
+- nginx는 IP 단위로 막고, 앱은 그 뒤에서 **사용자 단위**로 한 번 더 막습니다(`auth/ApiGuards`, 11): 관리자 API는 경로 자체가 관리자 전용(핸들러가 `@CurrentUser(ADMIN)`을 빠뜨려도 403)이고 관리자마다 초당 20회, 그 밖의 상태 변경 요청은 사용자마다 초당 10회. 넘으면 `429 RATE_LIMITED`.
 | `client_max_body_size` | 3m (앱의 2MB 한도보다 크게 두어 앱이 413을 API 형식으로 응답) | D-30 |
 
 준비 절차(EC2, DNS, 서버 `.env`, GitHub 변수와 Secrets, 첫 인증서)는 `deploy/README.md`에 있습니다. 운영 공개, 백업과 복구 리허설(SEC-11)은 12b에서 정합니다.

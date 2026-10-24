@@ -30,7 +30,7 @@
 | `PAYLOAD_TOO_LARGE` | 413 | 2MB 초과 |
 | `MODERATION_REJECTED` | 422 | 검사 거부. `details.category`(있을 때), `details.cooldownEndsAt`(관리자는 없음) |
 | `COOLDOWN` | 429 | 게시 쿨다운. `details.retryAfterSec` |
-| `RATE_LIMITED` | 429 | 요청 속도 초과 |
+| `RATE_LIMITED` | 429 | 요청 속도 초과 (nginx의 IP당 한도, 앱의 사용자당 한도: 관리자 API 초당 20회, 그 밖의 변경 요청 초당 10회, 11) |
 | `INTERNAL` | 500 | 서버 오류 (내부 정보 노출 금지) |
 
 ---
@@ -150,6 +150,8 @@
 - 실패하면 `details.field`(`strokes`, `p`, `c`, `w`, `text`, `size`, `x`, `bbox`, `kind`, `v`, 알 수 없는 필드 이름, 형식 오류는 `body`)와 `details.reason`
 
 ## 4. 관리자 (`/api/admin/**`, 관리자 전용)
+
+- 경로 단위로 관리자만 통과합니다(역할은 요청마다 DB에서 읽음). 관리자마다 초당 `graffiti.web.admin-requests-per-second`(20)회까지, 넘으면 `429 RATE_LIMITED` (11)
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|

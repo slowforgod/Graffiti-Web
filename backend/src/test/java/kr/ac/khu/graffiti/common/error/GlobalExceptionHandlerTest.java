@@ -13,6 +13,10 @@ import jakarta.validation.constraints.NotBlank;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import kr.ac.khu.graffiti.auth.ApiGuards;
+import kr.ac.khu.graffiti.common.ClockConfig;
+import kr.ac.khu.graffiti.config.GraffitiProperties;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import kr.ac.khu.graffiti.user.UserAccountService;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -29,7 +33,9 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 // Security filters are covered by SecurityIT; this test is about the error body only.
 @WebMvcTest(controllers = GlobalExceptionHandlerTest.ThrowingController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import({GlobalExceptionHandler.class, GlobalExceptionHandlerTest.ThrowingController.class})
+// ApiGuards (11) is registered by AuthWebConfig, which @WebMvcTest picks up.
+@EnableConfigurationProperties(GraffitiProperties.class)
+@Import({GlobalExceptionHandler.class, GlobalExceptionHandlerTest.ThrowingController.class, ApiGuards.class, ClockConfig.class})
 class GlobalExceptionHandlerTest {
 
     @Autowired
