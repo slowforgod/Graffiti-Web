@@ -127,3 +127,5 @@ graffiti:
     nickname-max-attempts: 10
   web:
     allowed-origins: ${APP_ORIGIN:http://localhost:5173}
+    admin-requests-per-second: 20   # per admin, every /api/admin/** request (SEC-08/09, 11)
+    write-requests-per-second: 10   # per signed-in user, every other POST/PUT/PATCH/DELETE under /api/

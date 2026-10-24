@@ -78,6 +78,9 @@ class GraffitiPropertiesTest {
             assertThat(p.auth().allowedDomain()).isEqualTo("khu.ac.kr");
             assertThat(p.auth().sessionTimeout()).isEqualTo(Duration.ofDays(30));
             assertThat(p.auth().nicknameMaxAttempts()).isEqualTo(10);
+
+            assertThat(p.web().adminRequestsPerSecond()).isEqualTo(20);
+            assertThat(p.web().writeRequestsPerSecond()).isEqualTo(10);
         });
     }
 
