@@ -1,6 +1,5 @@
 package kr.ac.khu.graffiti.doodle;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
@@ -28,19 +27,8 @@ class PublishedDoodleFootprints implements PublishedFootprintSource {
 
     @Override
     public List<Footprint> load(long pageId, CellGeometry geometry) {
-        return jdbc.query(SQL, Map.of("pageId", pageId), (rs, n) -> "TEXT".equals(rs.getString("kind"))
-                ? Footprint.ofBox(rs.getInt("bbox_x"), rs.getInt("bbox_y"), rs.getInt("bbox_w"), rs.getInt("bbox_h"),
-                        geometry)
-                : Footprint.ofStrokes(strokes(rs.getString("payload")), geometry));
-    }
-
-    private List<Footprint.Stroke> strokes(String payload) {
-        try {
-            return json.readValue(payload, DoodleValidator.DrawingPayload.class).strokes().stream()
-                    .map(s -> new Footprint.Stroke(s.w(), s.p()))
-                    .toList();
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("stored drawing payload is not readable", e);
-        }
+        return jdbc.query(SQL, Map.of("pageId", pageId), (rs, n) -> StoredFootprint.of(rs.getString("kind"),
+                rs.getString("payload"), rs.getInt("bbox_x"), rs.getInt("bbox_y"), rs.getInt("bbox_w"),
+                rs.getInt("bbox_h"), geometry, json));
     }
 }

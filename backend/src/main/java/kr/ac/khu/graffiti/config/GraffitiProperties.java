@@ -32,6 +32,9 @@ public record GraffitiProperties(
 
     public enum MlMode { OFF, SHADOW, ENFORCE }
 
+    /** What happens to a doodle no real check looked at (a stub stood in): published as UNCHECKED, or held. */
+    public enum UncheckedPolicy { PUBLISH, HOLD }
+
     @AssertTrue(message = "post-cooldown must be positive")
     public boolean isPostCooldownPositive() {
         return isPositive(postCooldown);
@@ -111,11 +114,19 @@ public record GraffitiProperties(
 
     public record Query(
             @Positive int maxChunks,
-            @Positive int maxBatchDelete) {
+            @Positive int maxBatchDelete,
+            @Positive int adminPageSizeMax) {
     }
 
+    /**
+     * {@code textChecks} and {@code drawingChecks} name the checks per kind, in order (D-19); names without an
+     * implementation run as stubs that check nothing.
+     */
     public record Moderation(
             @NotNull Duration timeout,
+            @NotNull UncheckedPolicy unchecked,
+            @NotNull List<@NotBlank String> textChecks,
+            @NotNull List<@NotBlank String> drawingChecks,
             @NotNull @Valid Ml ml) {
 
         @AssertTrue(message = "moderation timeout must be positive")

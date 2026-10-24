@@ -64,8 +64,12 @@ class GraffitiPropertiesTest {
 
             assertThat(p.query().maxChunks()).isEqualTo(60);
             assertThat(p.query().maxBatchDelete()).isEqualTo(50);
+            assertThat(p.query().adminPageSizeMax()).isEqualTo(100);
 
             assertThat(p.moderation().timeout()).isEqualTo(Duration.ofSeconds(5));
+            assertThat(p.moderation().unchecked()).isEqualTo(GraffitiProperties.UncheckedPolicy.HOLD);
+            assertThat(p.moderation().textChecks()).containsExactly("word-filter", "chatkhu", "openai-text");
+            assertThat(p.moderation().drawingChecks()).containsExactly("openai-image");
             assertThat(p.moderation().ml().mode()).isEqualTo(GraffitiProperties.MlMode.SHADOW);
             assertThat(p.moderation().ml().baseUrl()).isEqualTo("http://ml:8000");
             assertThat(p.moderation().ml().timeout()).isEqualTo(Duration.ofSeconds(3));

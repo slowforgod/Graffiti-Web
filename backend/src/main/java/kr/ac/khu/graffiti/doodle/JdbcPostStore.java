@@ -33,8 +33,20 @@ class JdbcPostStore implements PostStore {
     private static final String INSERT_DOODLE = """
             INSERT INTO doodle (page_id, author_id, kind, status, moderation_state, moderation_detail,
                                 bbox_x, bbox_y, bbox_w, bbox_h, payload, payload_bytes, submitted_at, published_at)
-            VALUES (:pageId, :authorId, :kind, 'PUBLISHED', :moderationState, :moderationDetail,
+            VALUES (:pageId, :authorId, :kind, :status, :moderationState, :moderationDetail,
                     :x, :y, :w, :h, :payload, :payloadBytes, :submittedAt, :publishedAt)""";
+
+    private static final String PUBLISH_WITHHELD = """
+            UPDATE doodle SET status = 'PUBLISHED', published_at = :at
+            WHERE id = :id AND page_id = :pageId AND status = :from""";
+
+    private static final String REJECT_HELD = """
+            UPDATE doodle SET status = 'REJECTED' WHERE id = :id AND status = 'HELD'""";
+
+    private static final String INSERT_ACTION = """
+            INSERT INTO moderation_action (actor_type, actor_id, action, target_doodle_id, target_user_id, reason,
+                                           detail, created_at)
+            VALUES (:actorType, :actorId, :action, :doodleId, :userId, :reason, :detail, :at)""";
 
     private static final String INSERT_CHUNK = """
             INSERT INTO doodle_chunk (page_id, chunk_index, doodle_id) VALUES (:pageId, :chunk, :doodleId)""";
@@ -67,7 +79,45 @@ class JdbcPostStore implements PostStore {
 
     @Override
     public long insertPublished(NewDoodle d, Instant publishedAt) {
+        return insert(d, "PUBLISHED", publishedAt);
+    }
+
+    @Override
+    public long insertWithheld(NewDoodle d, String status) {
+        if (!"REJECTED".equals(status) && !"HELD".equals(status)) {
+            throw new IllegalArgumentException("not a withheld status: " + status);
+        }
+        return insert(d, status, null);
+    }
+
+    @Override
+    public boolean publishWithheld(long doodleId, long pageId, String from, Instant publishedAt) {
+        return jdbc.update(PUBLISH_WITHHELD, new MapSqlParameterSource("id", doodleId)
+                .addValue("pageId", pageId)
+                .addValue("from", from)
+                .addValue("at", utc(publishedAt))) == 1;
+    }
+
+    @Override
+    public boolean rejectHeld(long doodleId) {
+        return jdbc.update(REJECT_HELD, Map.of("id", doodleId)) == 1;
+    }
+
+    @Override
+    public void recordAction(Action a, Instant at) {
+        jdbc.update(INSERT_ACTION, new MapSqlParameterSource("actorType", a.actorType())
+                .addValue("actorId", a.actorId())
+                .addValue("action", a.action())
+                .addValue("doodleId", a.targetDoodleId())
+                .addValue("userId", a.targetUserId())
+                .addValue("reason", a.reason())
+                .addValue("detail", a.detail())
+                .addValue("at", utc(at)));
+    }
+
+    private long insert(NewDoodle d, String status, Instant publishedAt) {
         SqlParameterSource params = new MapSqlParameterSource()
+                .addValue("status", status)
                 .addValue("pageId", d.pageId())
                 .addValue("authorId", d.authorId())
                 .addValue("kind", d.kind())

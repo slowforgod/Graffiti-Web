@@ -93,6 +93,50 @@ class PageCommandHandler {
         return new PageCommand.Published(done.result(), done.at());
     }
 
+    long withhold(PageCommand.WithholdDoodle c) {
+        PostStore.NewDoodle doodle = c.doodle();
+        requireCurrent(doodle.pageId());
+        String action = switch (c.status()) {
+            case "REJECTED" -> "REJECT";
+            case "HELD" -> "HOLD";
+            default -> throw new IllegalArgumentException("not a withheld status: " + c.status());
+        };
+        Instant now = now();
+        return tx.execute(s -> {
+            long id = posts.insertWithheld(doodle, c.status());
+            posts.recordAction(new PostStore.Action("AI", null, action, id, doodle.authorId(), null,
+                    doodle.moderationDetail()), now);
+            return id;
+        });
+    }
+
+    PageCommand.Published publishWithheld(PageCommand.PublishWithheld c) {
+        PostStore.NewDoodle doodle = c.doodle();
+        PageState state = requireCurrent(doodle.pageId());
+        String action = "HELD".equals(c.from()) ? "APPROVE" : "RESTORE";
+        Committed<Long> done = commitFootprint(state, c.footprint(), +1, doodle, at -> {
+            if (!posts.publishWithheld(c.doodleId(), doodle.pageId(), c.from(), at)) {
+                throw new ApiException(ErrorCode.STATE_CONFLICT);
+            }
+            posts.recordAction(new PostStore.Action("ADMIN", c.adminId(), action, c.doodleId(), doodle.authorId(),
+                    null, null), at);
+            return c.doodleId();
+        });
+        return new PageCommand.Published(done.result(), done.at());
+    }
+
+    boolean rejectHeld(PageCommand.RejectHeld c) {
+        Instant now = now();
+        return Boolean.TRUE.equals(tx.execute(s -> {
+            if (!posts.rejectHeld(c.doodleId())) {
+                return false;
+            }
+            posts.recordAction(new PostStore.Action("ADMIN", c.adminId(), "REJECT", c.doodleId(), c.authorId(),
+                    null, null), now);
+            return true;
+        }));
+    }
+
     boolean release(PageCommand.ReleasePost c) {
         PageCommand.Reservation r = c.reservation();
         if (r.exempt()) {

@@ -25,9 +25,10 @@
 | `DOMAIN_NOT_ALLOWED` | 403 | 학교 계정이 아님 (로그인 리다이렉트 결과로 전달) |
 | `NOT_FOUND` | 404 | 대상 없음 |
 | `PAGE_ENDED` | 409 | 현재 페이지가 아님 (INV-04) |
+| `STATE_CONFLICT` | 409 | 대상의 상태가 이미 바뀜 (관리자가 이미 처리한 보류 doodle 등) |
 | `VALIDATION_FAILED` | 400 | 입력 검증 실패. `details.field`, `details.reason` |
 | `PAYLOAD_TOO_LARGE` | 413 | 2MB 초과 |
-| `MODERATION_REJECTED` | 422 | AI 검사 거부. `details.category` |
+| `MODERATION_REJECTED` | 422 | 검사 거부. `details.category`(있을 때), `details.cooldownEndsAt`(관리자는 없음) |
 | `COOLDOWN` | 429 | 게시 쿨다운. `details.retryAfterSec` |
 | `RATE_LIMITED` | 429 | 요청 속도 초과 |
 | `INTERNAL` | 500 | 서버 오류 (내부 정보 노출 금지) |
@@ -128,7 +129,8 @@
 ```
 응답
 - `201` `{ "doodle": { "id", "kind", "bbox", "payload" }, "cooldownEndsAt": "..." }`. `bbox`는 서버 값(그림은 캔버스로 자른 값), `payload`는 검증한 필드만 다시 만든 것. 관리자는 `cooldownEndsAt: null`
-- `422 MODERATION_REJECTED` (쿨다운 소모됨, `details.cooldownEndsAt` 포함)
+- `202` `{ "held": true, "cooldownEndsAt": "..." }`: 검사가 애매하거나 실패해서(또는 실제 검사가 없어서) 관리자 검토를 기다림. 캔버스에 나오지 않고 쿨다운은 소모됨(07 틀, D-42 PROPOSED). doodle 정보는 돌려주지 않음
+- `422 MODERATION_REJECTED` (쿨다운 소모됨, `details.category`, `details.cooldownEndsAt`). 이유 문장은 보내지 않음
 - `429 COOLDOWN` (`message` "다음 게시까지 N분 남았어요.", `details.retryAfterSec`) / `409 PAGE_ENDED` / `400 VALIDATION_FAILED` / `413 PAYLOAD_TOO_LARGE` / `403 BANNED`
 - 검증 실패, 크기 초과, 끝난 페이지는 쿨다운을 쓰지 않습니다. 검사 중 페이지가 넘어가거나 서버 오류가 나면 쿨다운을 되돌립니다(D-28)
 
@@ -142,15 +144,24 @@
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| GET | `/api/admin/doodles?moderation=REJECTED\|UNCHECKED&page=0&size=20` | 거부·미검사 내역 (작성자 이메일, 닉네임, 렌더링용 payload 포함) |
+| GET | `/api/admin/doodles?moderation=HELD\|REJECTED\|UNCHECKED&page=0&size=20` | 보류·거부·미검사 게시 내역 (작성자 이메일, 닉네임, 렌더링용 payload 포함). **07 틀에서 구현** |
 | GET | `/api/admin/doodles/{id}` | doodle 상세 (작성자 이메일 포함) |
-| POST | `/api/admin/doodles/{id}/restore` | REJECTED → PUBLISHED 또는 UNCHECKED 표시 해제 |
+| POST | `/api/admin/doodles/{id}/restore` | HELD 또는 REJECTED → PUBLISHED (현재 페이지만). **07 틀에서 구현**. UNCHECKED 표시 해제는 아직 없음 |
+| POST | `/api/admin/doodles/{id}/reject` | HELD → REJECTED (끝난 페이지도 가능). **07 틀에서 구현** |
 | DELETE | `/api/admin/doodles/{id}` | 아무 doodle 삭제 (종료된 페이지 포함) |
 | POST | `/api/admin/doodles/delete` | 일괄 삭제 `{ "ids": [...] }` |
 | GET | `/api/admin/users?sort=rejects&page=0&size=20` | AI 적발 횟수 순 사용자 |
 | POST | `/api/admin/users/{id}/ban` | `{ "reason": "...", "hideCurrentPageDoodles": true }` |
 | POST | `/api/admin/users/{id}/unban` | 차단 해제 |
-| GET | `/api/admin/actions?page=0&size=50` | 조치 기록 (SEC-14) |
+| GET | `/api/admin/actions?page=0&size=50` | 조치 기록, 최신순 (SEC-14). **07 틀에서 구현** |
+
+07 틀에서 구현한 관리자 API (나머지는 10에서)
+- 목록: `moderation` 기본 `HELD`. HELD는 오래된 순(검토 대기열), REJECTED·UNCHECKED는 최신순. `size`는 1~`graffiti.query.admin-page-size-max`(100), `page` ≥ 0, 아니면 400 `VALIDATION_FAILED`
+  - 응답 `{ "items": [{ "id", "pageId", "pageEnded", "kind", "bbox", "payload", "status", "moderationState", "moderationDetail", "submittedAt", "author": { "id", "nickname", "email" } }], "page", "size", "total" }`. `moderationDetail` 형식은 DB.md §3
+- `restore`: `200 { "doodle": { "id", "kind", "bbox", "payload" } }`. 게시와 같이 큐 안에서 점유율 반영, 청크마다 `doodle:published`, `moderation_action(ADMIN, APPROVE|RESTORE)`. 끝난 페이지면 `409 PAGE_ENDED`(보류 그대로), 이미 처리됐으면 `409 STATE_CONFLICT`, 없으면 `404`
+- `reject`: `200 { "id", "status": "REJECTED" }`, `moderation_action(ADMIN, REJECT)`. HELD가 아니면 `409 STATE_CONFLICT`
+- `actions`: `{ "items": [{ "id", "actorType", "actorId", "action", "targetDoodleId", "targetUserId", "reason", "detail", "createdAt" }], "page", "size", "total" }`
+- 관리자 화면은 `/admin`(nginx가 `index.html`로 응답). 미리보기는 캔버스(Konva)로만 그림(SEC-12)
 
 관리자는 메인 캔버스에서도 아무 doodle이나 선택해 `DELETE /api/admin/doodles/{id}`를 호출할 수 있습니다.
 

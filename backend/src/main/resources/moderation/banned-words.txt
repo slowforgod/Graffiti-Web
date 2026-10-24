@@ -1,0 +1,4 @@
+# 1차 금칙어 목록 (D-19 ①, docs/FILTER.md §3). 아직 기준이 확정되지 않아 비어 있다.
+# 한 줄에 단어 하나. 뒤에 공백과 카테고리를 붙일 수 있다(없으면 PROFANITY). 예: 한남충 HATE
+# 비교 전에 NFKC, 소문자, 공백·문장부호 제거를 한다(TextNormalizer). 목록이 비어 있으면 이 검사는 SKIPPED.
+# 고칠 때는 FILTER.md §3과 같은 PR에서, WordListTest에 막는 예와 통과 예를 하나씩 추가한다.

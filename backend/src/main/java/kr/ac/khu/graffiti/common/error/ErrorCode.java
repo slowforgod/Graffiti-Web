@@ -12,6 +12,7 @@ public enum ErrorCode {
     DOMAIN_NOT_ALLOWED(HttpStatus.FORBIDDEN, "경희대학교 계정으로만 로그인할 수 있어요."),
     NOT_FOUND(HttpStatus.NOT_FOUND, "찾을 수 없어요."),
     PAGE_ENDED(HttpStatus.CONFLICT, "이 페이지는 이미 넘어갔어요."),
+    STATE_CONFLICT(HttpStatus.CONFLICT, "이미 다른 처리가 끝났어요. 목록을 새로고침해 주세요."),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "입력값이 올바르지 않아요."),
     PAYLOAD_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "낙서가 너무 커요."),
     MODERATION_REJECTED(HttpStatus.UNPROCESSABLE_ENTITY, "부적절한 내용이 감지되어 게시할 수 없어요."),

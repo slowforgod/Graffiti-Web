@@ -19,6 +19,7 @@ class ErrorCodeTest {
             Map.entry("DOMAIN_NOT_ALLOWED", 403),
             Map.entry("NOT_FOUND", 404),
             Map.entry("PAGE_ENDED", 409),
+            Map.entry("STATE_CONFLICT", 409),
             Map.entry("VALIDATION_FAILED", 400),
             Map.entry("PAYLOAD_TOO_LARGE", 413),
             Map.entry("MODERATION_REJECTED", 422),

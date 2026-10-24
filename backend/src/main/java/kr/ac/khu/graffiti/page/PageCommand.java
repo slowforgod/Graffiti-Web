@@ -43,6 +43,41 @@ public sealed interface PageCommand<R> {
         }
     }
 
+    /**
+     * Stores a doodle moderation kept off the canvas: {@code status} REJECTED or HELD (D-42, PROPOSED), with a
+     * {@code moderation_action(AI, REJECT|HOLD)} row. No cells change; the post stays taken (D-12).
+     */
+    record WithholdDoodle(PostStore.NewDoodle doodle, String status) implements PageCommand<Long> {
+
+        @Override
+        public Long executeOn(PageCommandHandler handler) {
+            return handler.withhold(this);
+        }
+    }
+
+    /**
+     * An admin publishes a HELD or REJECTED ({@code from}) doodle of the current page: like {@link PublishDoodle}
+     * but updating the stored row, with {@code moderation_action(ADMIN, APPROVE|RESTORE)}. {@code doodle} is the
+     * stored row, for the broadcast.
+     */
+    record PublishWithheld(long doodleId, PostStore.NewDoodle doodle, String from, Footprint footprint, long adminId)
+            implements PageCommand<Published> {
+
+        @Override
+        public Published executeOn(PageCommandHandler handler) {
+            return handler.publishWithheld(this);
+        }
+    }
+
+    /** An admin rejects a HELD doodle, on any page; {@code moderation_action(ADMIN, REJECT)}. */
+    record RejectHeld(long doodleId, long authorId, long adminId) implements PageCommand<Boolean> {
+
+        @Override
+        public Boolean executeOn(PageCommandHandler handler) {
+            return handler.rejectHeld(this);
+        }
+    }
+
     /** Gives a reserved post back when it was not published for reasons not the author's (D-28). */
     record ReleasePost(Reservation reservation) implements PageCommand<Boolean> {
 
