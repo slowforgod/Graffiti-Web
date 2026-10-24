@@ -438,6 +438,107 @@ describe('CanvasScreen', () => {
     });
   });
 
+  describe('page turn (D-16)', () => {
+    const me: Me = {
+      authenticated: true,
+      id: '1',
+      nickname: '나',
+      cursorColor: '#000000',
+      role: 'USER',
+      consentRequired: false,
+      banned: false,
+      cooldownEndsAt: null,
+    };
+
+    function serve(pages: () => ReturnType<typeof page>) {
+      fetchMock.mockImplementation(async (input) => {
+        const url = String(input);
+        if (url === '/api/pages/current') return reply(pages());
+        if (url.endsWith('/minimap')) return reply(minimap);
+        if (url.includes('/doodles')) return reply({ pageId: pages().id, doodles: [] });
+        return reply({}, 404);
+      });
+    }
+
+    it('always shows the occupancy and the time left, and follows page:status', async () => {
+      serve(() => page('3'));
+      render(<CanvasScreen />);
+      const bar = await screen.findByRole('group', { name: '페이지 상태' });
+      expect(bar).toHaveTextContent('제3장');
+      expect(bar).toHaveTextContent('점유율 0.0%');
+      expect(bar).toHaveTextContent('남은 시간 7일');
+      expect(bar).toHaveTextContent('70%가 차면 6시간 뒤 넘어가요');
+
+      act(() => links.current!.connect());
+      act(() =>
+        links.current!.deliver(metaTopic('3'), {
+          type: 'page:status',
+          status: 'COUNTDOWN',
+          occupancyPermille: 701,
+          countdownStartedAt: '2026-10-21T00:00:00Z',
+          scheduledEndAt: '2026-10-21T06:00:00Z',
+        }),
+      );
+      expect(bar).toHaveTextContent('점유율 70.1%');
+      expect(bar).toHaveTextContent('6시간 뒤 넘어가요');
+      expect(bar).not.toHaveTextContent('70%가 차면');
+      expect(screen.queryByRole('timer')).not.toBeInTheDocument();
+    });
+
+    it('shows the big countdown and the draft warning from five minutes before the end', async () => {
+      serve(() => ({ ...page('3'), status: 'COUNTDOWN', scheduledEndAt: '2026-10-21T00:04:00Z' }));
+      render(<CanvasScreen />);
+      const timer = await screen.findByRole('timer', { name: '페이지 넘김까지 남은 시간' });
+      expect(timer).toHaveTextContent(/^[34]:\d\d/);
+      expect(timer).toHaveTextContent('페이지가 넘어가면 그리고 있는 초안도 사라져요');
+    });
+
+    it('says on the new page that the draft went with the old one', async () => {
+      let current = '3';
+      serve(() => page(current));
+      render(<CanvasScreen me={me} />);
+      await screen.findByRole('button', { name: 'down' });
+      act(() => links.current!.connect());
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 150));
+      });
+      act(() => screen.getByRole('button', { name: '펜' }).click());
+      act(() => screen.getByRole('button', { name: 'down' }).click());
+
+      current = '4';
+      act(() => links.current!.deliver(metaTopic('3'), { type: 'page:turned', newPageId: '4' }));
+
+      expect(await screen.findByText('페이지가 넘어가 그리던 초안이 사라졌어요.')).toBeInTheDocument();
+      expect(screen.getByRole('group', { name: '페이지 상태' })).toHaveTextContent('제4장');
+      expect(screen.queryByRole('button', { name: '취소' })).not.toBeInTheDocument();
+    });
+
+    it('asks for the current page when the end passed without page:turned', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+      try {
+        vi.setSystemTime(Date.parse('2026-10-21T00:00:00Z'));
+        let current = '3';
+        serve(() => (current === '3' ? { ...page('3'), scheduledEndAt: '2026-10-21T00:00:02Z' } : page('4')));
+        render(<CanvasScreen />);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(10);
+        });
+        expect(screen.getByRole('group', { name: '페이지 상태' })).toHaveTextContent('제3장');
+
+        current = '4';
+        for (let i = 0; i < 8; i++) {
+          await act(async () => {
+            await vi.advanceTimersByTimeAsync(1_000);
+          });
+        }
+        expect(screen.getByRole('group', { name: '페이지 상태' })).toHaveTextContent('제4장');
+        expect(screen.getByText('새 페이지로 넘어왔어요.')).toBeInTheDocument();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe('my doodles (D-13)', () => {
     const me: Me = {
       authenticated: true,

@@ -5,6 +5,7 @@ import { LOGIN_URL } from '../auth/me';
 import type { RealtimeLink } from '../realtime/link';
 import type { Connection } from '../realtime/connection';
 import { createConnection } from '../realtime/connection';
+import type { PageStatusEvent } from '../realtime/metaSync';
 import { MetaSync } from '../realtime/metaSync';
 import { throttle } from '../realtime/throttle';
 import type { CurrentPage } from '../shared/pageConfig';
@@ -19,6 +20,9 @@ import { useMyDoodles } from '../mine/useMyDoodles';
 import DraftActions from '../ui/DraftActions';
 import MyDoodlesPanel from '../ui/MyDoodlesPanel';
 import Minimap from '../ui/Minimap';
+import StatusBar from '../ui/StatusBar';
+import TurnWarning from '../ui/TurnWarning';
+import { nextTick, untilEnd } from '../ui/pageTime';
 import TextDraftEditor from '../ui/TextDraftEditor';
 import type { DrawAccess } from '../ui/Toolbar';
 import Toolbar from '../ui/Toolbar';
@@ -56,6 +60,14 @@ const PUBLISH_HELD = '검토 후 게시돼요.';
 // Longest wait between redraws of the cooldown note.
 const COOLDOWN_TICK_MS = 30_000;
 
+// After the scheduled end, how long to wait for page:turned before asking for the current page anyway
+// (a connection that missed the event).
+const TURN_GRACE_MS = 5_000;
+
+// Shown on the new page after a turn (D-16).
+const TURNED = '새 페이지로 넘어왔어요.';
+const TURNED_DRAFT_LOST = '페이지가 넘어가 그리던 초안이 사라졌어요.';
+
 function drawAccess(me: Me | undefined, online: boolean): DrawAccess {
   if (!me) {
     return 'loading';
@@ -83,6 +95,15 @@ export default function CanvasScreen({ me }: Props) {
   const [failed, setFailed] = useState(false);
   const [generation, setGeneration] = useState(0);
   const reload = useCallback(() => setGeneration((g) => g + 1), []);
+  const [turnNotice, setTurnNotice] = useState<string | null>(null);
+  // A page that ended under the screen: say so on the next one, and whether a draft went with it.
+  const turned = useCallback(
+    (hadDraft: boolean) => {
+      setTurnNotice(hadDraft ? TURNED_DRAFT_LOST : TURNED);
+      reload();
+    },
+    [reload],
+  );
   const [connection] = useState<Connection>(() => createConnection());
   const heartbeatMs = page?.config.heartbeatMs;
 
@@ -91,12 +112,12 @@ export default function CanvasScreen({ me }: Props) {
       return;
     }
     connection.activate(heartbeatMs);
-    const stop = connection.onPageEnded(reload);
+    const stop = connection.onPageEnded(() => turned(false));
     return () => {
       stop();
       connection.deactivate();
     };
-  }, [connection, heartbeatMs, reload]);
+  }, [connection, heartbeatMs, turned]);
 
   useEffect(() => {
     let active = true;
@@ -115,17 +136,21 @@ export default function CanvasScreen({ me }: Props) {
   if (!page) {
     return null;
   }
-  return <PageCanvas key={page.id} page={page} link={connection} me={me} onPageEnded={reload} />;
+  return (
+    <PageCanvas key={page.id} page={page} link={connection} me={me} onPageEnded={turned} turnNotice={turnNotice} />
+  );
 }
 
 interface PageCanvasProps {
   page: CurrentPage;
   link: RealtimeLink;
   me?: Me;
-  onPageEnded: () => void;
+  // `hadDraft`: the author was drawing when the page ended, and the draft is gone (D-16).
+  onPageEnded: (hadDraft: boolean) => void;
+  turnNotice: string | null;
 }
 
-function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
+function PageCanvas({ page, link, me, onPageEnded: pageEnded, turnNotice }: PageCanvasProps) {
   const { config } = page;
   const size = useWindowSize();
   const [viewport, setViewport] = useState<Viewport>(() =>
@@ -137,12 +162,31 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
   const [otherDrafts, setOtherDrafts] = useState<RemoteDraft[]>([]);
   const sync = useRef<ChunkSync | null>(null);
   const tools = useDraft({ pageId: page.id, config, link });
+  const hasDraft = useRef(false);
+  useEffect(() => {
+    hasDraft.current = tools.draft !== null;
+  }, [tools.draft]);
+  const onPageEnded = useCallback(() => pageEnded(hasDraft.current), [pageEnded]);
+  const [turnNote, setTurnNote] = useState(turnNotice);
+  // The status bar and the T−5 countdown (D-16) follow page:status; occupancy follows the minimap diffs.
+  const [status, setStatus] = useState<Pick<PageStatusEvent, 'status' | 'scheduledEndAt'>>(() => ({
+    status: page.status,
+    scheduledEndAt: page.scheduledEndAt,
+  }));
+  const [occupancy, setOccupancy] = useState(page.occupancyPermille);
   const [offset] = useState(() => clockOffset(page.serverTime));
   // The cooldown this screen learned from its own posts; until then the one from /api/me.
   const [postedCooldown, setPostedCooldown] = useState<string | null>();
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  // The same page loaded again (the end passed without page:turned) brings the server's latest times.
+  const [loaded, setLoaded] = useState(page);
+  if (loaded !== page) {
+    setLoaded(page);
+    setStatus({ status: page.status, scheduledEndAt: page.scheduledEndAt });
+    setOccupancy(page.occupancyPermille);
+  }
   const removeOwn = useCallback((ids: string[]) => sync.current?.removeOwn(ids), []);
   const mine = useMyDoodles({ pageId: page.id, seq: page.seq, config, onDeleted: removeOwn, onPageEnded });
 
@@ -161,7 +205,14 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
       pageId: page.id,
       link,
       fetchMinimap,
-      onMeta: (m) => setCells(m.cells),
+      onMeta: (m) => {
+        setCells(m.cells);
+        setOccupancy(m.occupancyPermille);
+      },
+      onStatus: (e) => {
+        setStatus({ status: e.status, scheduledEndAt: e.scheduledEndAt });
+        setOccupancy(e.occupancyPermille);
+      },
       onPageTurned: onPageEnded,
       onPageEnded,
     });
@@ -225,6 +276,19 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
   const cooldownEndsAt = postedCooldown !== undefined ? postedCooldown : (author?.cooldownEndsAt ?? null);
   const waitMs = cooldownLeft(cooldownEndsAt, offset, now);
 
+  const endMs = untilEnd(status.scheduledEndAt, offset, now);
+  const warningMs = config.countdownWarningSec * 1000;
+
+  // Keeps the status bar and the countdown current. Past the end, page:turned should come at once; if it
+  // does not (a missed event), the current page is asked for after a grace period.
+  useEffect(() => {
+    const timer =
+      endMs > 0
+        ? setTimeout(() => setNow(Date.now()), Math.min(endMs, nextTick(endMs, warningMs)))
+        : setTimeout(onPageEnded, TURN_GRACE_MS);
+    return () => clearTimeout(timer);
+  }, [endMs, warningMs, onPageEnded]);
+
   // Redraws the note as minutes pass and enables ✓ when the cooldown ends.
   useEffect(() => {
     if (waitMs <= 0) {
@@ -272,7 +336,7 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
 
   const canPost = own !== null && publishBody(own) !== null && waitMs <= 0;
   const publishNote = waitMs > 0 ? `${minutesLeft(waitMs)}분 뒤에 게시할 수 있어요` : undefined;
-  const notice = publishError ?? (tools.notice ? NOTICES[tools.notice] : null);
+  const notice = publishError ?? (tools.notice ? NOTICES[tools.notice] : null) ?? turnNote;
 
   const others = author ? cursors.filter((c) => c.nickname !== author.nickname) : cursors;
   // The author's own draft comes back from the chunk topics too.
@@ -341,6 +405,7 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
           className="draft-notice"
           onClick={() => {
             setPublishError(null);
+            setTurnNote(null);
             tools.clearNotice();
           }}
         >
@@ -348,6 +413,15 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
         </p>
       )}
       <Minimap config={config} cells={cells} view={visibleWorldRect(viewport, size)} />
+      <StatusBar
+        seq={page.seq}
+        status={status.status}
+        occupancyPermille={occupancy}
+        remainingMs={endMs}
+        thresholdPermille={config.countdownThresholdPermille}
+        countdownMs={config.countdownDurationSec * 1000}
+      />
+      {endMs > 0 && endMs <= warningMs && <TurnWarning remainingMs={endMs} />}
     </div>
   );
 }

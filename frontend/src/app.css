@@ -180,6 +180,63 @@ body {
   font-size: 14px;
 }
 
+/* Page status (09, D-16): always at the top; the T−5 countdown below the header on the left. */
+.status-bar {
+  position: fixed;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 12px;
+  max-width: calc(100vw - 24px);
+  padding: 4px 12px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.status-hint {
+  color: #5f6673;
+}
+
+.turn-warning {
+  position: fixed;
+  top: 52px;
+  left: 8px;
+  z-index: 11;
+  padding: 8px 14px;
+  background: rgba(183, 28, 28, 0.92);
+  color: #fff;
+  border-radius: 10px;
+  pointer-events: none;
+}
+
+.turn-warning strong {
+  display: block;
+  font-size: 40px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.turn-warning p {
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+
+@media (max-width: 720px) {
+  .status-bar {
+    top: 48px;
+  }
+
+  .turn-warning {
+    top: 92px;
+  }
+}
+
 /* "내 낙서" panel (08), above the minimap. */
 .mine-panel {
   position: fixed;
