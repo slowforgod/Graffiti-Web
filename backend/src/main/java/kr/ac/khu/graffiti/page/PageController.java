@@ -29,7 +29,7 @@ class PageController {
     CurrentPage current() {
         PageSnapshot page = pages.current();
         return new CurrentPage(Long.toString(page.id()), page.seq(), page.status(), page.occupancyPermille(),
-                page.countdownStartedAt(), page.scheduledEndAt(), clock.instant(), config(page));
+                page.createdAt(), page.countdownStartedAt(), page.scheduledEndAt(), clock.instant(), config(page));
     }
 
     @GetMapping("/api/pages/{pageId}/minimap")
@@ -51,7 +51,8 @@ class PageController {
                 page.rules().countdownThresholdPermille(), page.rules().countdownDuration().toSeconds());
     }
 
-    record CurrentPage(String id, int seq, PageStatus status, int occupancyPermille, Instant countdownStartedAt,
+    record CurrentPage(String id, int seq, PageStatus status, int occupancyPermille, Instant createdAt,
+            Instant countdownStartedAt,
             Instant scheduledEndAt, Instant serverTime, ClientConfig config) {
     }
 

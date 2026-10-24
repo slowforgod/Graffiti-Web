@@ -88,6 +88,7 @@ function page(id: string, config = TEST_CONFIG) {
     seq: Number(id),
     status: 'ACTIVE',
     occupancyPermille: 0,
+    createdAt: '2026-10-21T12:00:00Z',
     countdownStartedAt: null,
     scheduledEndAt: '2026-10-28T00:00:00Z',
     serverTime: '2026-10-21T00:00:00Z',
@@ -460,13 +461,14 @@ describe('CanvasScreen', () => {
       });
     }
 
-    it('always shows the occupancy and the time left, and follows page:status', async () => {
+    it('always shows the occupancy and the start date, the time left only in the countdown, and follows page:status', async () => {
       serve(() => page('3'));
       render(<CanvasScreen />);
       const bar = await screen.findByRole('group', { name: '페이지 상태' });
       expect(bar).toHaveTextContent('제3장');
       expect(bar).toHaveTextContent('점유율 0.0%');
-      expect(bar).toHaveTextContent('남은 시간 7일');
+      expect(bar).toHaveTextContent('26/10/21부터');
+      expect(bar).not.toHaveTextContent('남음');
       expect(bar).toHaveTextContent('70%가 차면 6시간 뒤 넘어가요');
 
       act(() => links.current!.connect());
@@ -480,7 +482,8 @@ describe('CanvasScreen', () => {
         }),
       );
       expect(bar).toHaveTextContent('점유율 70.1%');
-      expect(bar).toHaveTextContent('6시간 뒤 넘어가요');
+      expect(bar).toHaveTextContent('6시간 남음');
+      expect(bar).toHaveTextContent('26/10/21부터');
       expect(bar).not.toHaveTextContent('70%가 차면');
       expect(screen.queryByRole('timer')).not.toBeInTheDocument();
     });

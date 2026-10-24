@@ -75,6 +75,7 @@ class CanvasReadIT extends WebIntegrationTest {
                 .andExpect(jsonPath("$.seq").value(page.seq()))
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
                 .andExpect(jsonPath("$.occupancyPermille").value(0))
+                .andExpect(jsonPath("$.createdAt").value(page.createdAt().toString()))
                 .andExpect(jsonPath("$.countdownStartedAt").isEmpty())
                 .andExpect(jsonPath("$.scheduledEndAt").value(page.scheduledEndAt().toString()))
                 .andExpect(jsonPath("$.serverTime").value(clock.instant().toString()))
