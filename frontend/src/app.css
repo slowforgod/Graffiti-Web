@@ -180,6 +180,49 @@ body {
   font-size: 14px;
 }
 
+/* "내 낙서" panel (08), above the minimap. */
+.mine-panel {
+  position: fixed;
+  right: 12px;
+  bottom: 112px;
+  z-index: 12;
+  width: 260px;
+  max-width: calc(100vw - 24px);
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.97);
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+  font-size: 14px;
+}
+
+.mine-panel p {
+  margin: 6px 0;
+}
+
+.mine-header,
+.mine-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.mine-confirm {
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid #e53935;
+  border-radius: 8px;
+}
+
+.mine-confirm button + button {
+  margin-left: 6px;
+}
+
+.mine-notice {
+  color: #37474f;
+}
+
 /* Admin review (/admin). The body never scrolls, so the screen scrolls itself. */
 .admin-screen {
   position: fixed;

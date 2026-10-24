@@ -108,6 +108,12 @@ export class ChunkSync {
     this.emit();
   }
 
+  // The author's own deleted doodles, gone at once; the doodle:removed that follows finds nothing.
+  removeOwn(ids: string[]): void {
+    ids.forEach((id) => this.store.remove(id));
+    this.emit();
+  }
+
   dispose(): void {
     this.disposed = true;
     this.states.forEach((s) => s.unsubscribe());

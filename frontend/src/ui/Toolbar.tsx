@@ -18,6 +18,9 @@ interface Props {
   onWidth: (w: number) => void;
   fontSize: number;
   onFontSize: (size: number) => void;
+  // Opens the "내 낙서" panel (D-13); absent for people who cannot have doodles.
+  onMine?: () => void;
+  mineOpen?: boolean;
 }
 
 // D-07 palette order. A palette that grows beyond it falls back to numbered names.
@@ -115,6 +118,13 @@ export default function Toolbar(props: Props) {
             ))}
           </select>
         </label>
+      )}
+      {props.onMine && (
+        <div className="toolbar-group">
+          <button type="button" aria-pressed={props.mineOpen ?? false} disabled={draftKind !== null} onClick={props.onMine}>
+            내 낙서
+          </button>
+        </div>
       )}
       {hint && <span className="toolbar-hint">{hint}</span>}
     </div>

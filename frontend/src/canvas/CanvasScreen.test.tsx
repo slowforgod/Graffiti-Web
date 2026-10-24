@@ -32,6 +32,7 @@ vi.mock('./CanvasView', () => ({
     onDrawStart,
     onDrawMove,
     onDrawEnd,
+    selection,
   }: {
     doodles: Doodle[];
     cursors: RemoteCursor[];
@@ -40,8 +41,14 @@ vi.mock('./CanvasView', () => ({
     onDrawStart?: (p: { x: number; y: number }, scale: number) => void;
     onDrawMove?: (p: { x: number; y: number }, scale: number) => void;
     onDrawEnd?: () => void;
+    selection?: { items: { id: string }[]; selected: ReadonlySet<string>; onToggle: (id: string) => void } | null;
   }) => (
     <>
+      {selection?.items.map((i) => (
+        <button key={i.id} type="button" aria-pressed={selection.selected.has(i.id)} onClick={() => selection.onToggle(i.id)}>
+          {`pick ${i.id}`}
+        </button>
+      ))}
       <ul aria-label="drafts">
         {otherDrafts.map((d) => (
           <li key={d.draftId}>{d.draftId}</li>
@@ -428,6 +435,90 @@ describe('CanvasScreen', () => {
       });
       expect(drafts().at(-1)).toMatchObject({ op: 'cancel' });
       expect(screen.getByRole('status')).toHaveTextContent('10분 동안 움직임이 없어 초안을 지웠어요.');
+    });
+  });
+
+  describe('my doodles (D-13)', () => {
+    const me: Me = {
+      authenticated: true,
+      id: '1',
+      nickname: '나',
+      cursorColor: '#000000',
+      role: 'USER',
+      consentRequired: false,
+      banned: false,
+      cooldownEndsAt: null,
+    };
+    const eleven = { id: '11', kind: 'DRAWING', bbox: { x: 3800, y: 2100, w: 10, h: 10 }, payload: { v: 1, strokes: [] } };
+
+    function serve(onDelete: (url: string, init?: RequestInit) => Response) {
+      fetchMock.mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (url === '/api/pages/current') return reply(page('3'));
+        if (url.endsWith('/minimap')) return reply(minimap);
+        if (url === '/api/me/doodles?pageId=3') return reply({ pageId: '3', doodles: [{ id: '11', bbox: eleven.bbox }] });
+        if (url.startsWith('/api/doodles')) return onDelete(url, init);
+        if (url.startsWith('/api/pages/3/doodles')) return reply({ pageId: '3', doodles: [eleven] });
+        return reply({}, 404);
+      });
+    }
+
+    it('picks doodles on the canvas and deletes them after a confirmation', async () => {
+      const deletes: string[] = [];
+      serve((url, init) => {
+        deletes.push(`${init?.method} ${url}`);
+        return new Response(null, { status: 204 });
+      });
+      render(<CanvasScreen me={me} />);
+      expect(await screen.findByText('11')).toBeInTheDocument();
+
+      act(() => screen.getByRole('button', { name: '내 낙서' }).click());
+      expect(await screen.findByText(/내 낙서가 1개 있어요/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '펜' })).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.getByRole('button', { name: '고른 낙서 지우기' })).toBeDisabled();
+
+      act(() => screen.getByRole('button', { name: 'pick 11' }).click());
+      act(() => screen.getByRole('button', { name: '고른 낙서 지우기' }).click());
+      expect(screen.getByRole('alertdialog')).toHaveTextContent('고른 낙서 1개를 지울까요?');
+      expect(deletes).toEqual([]);
+      await act(async () => screen.getByRole('button', { name: '지우기' }).click());
+
+      expect(deletes).toEqual(['DELETE /api/doodles/11']);
+      expect(await screen.findByText('1개를 지웠어요.')).toBeInTheDocument();
+      expect(screen.getByRole('list', { name: 'doodles' })).not.toHaveTextContent('11');
+      expect(screen.getByText('이 페이지에 게시한 낙서가 없어요.')).toBeInTheDocument();
+    });
+
+    it('keeps the doodles and says why when the deletion is refused', async () => {
+      serve(() => reply({ error: { code: 'STATE_CONFLICT', message: '이미 처리된 요청이에요.' } }, 409));
+      render(<CanvasScreen me={me} />);
+      expect(await screen.findByText('11')).toBeInTheDocument();
+      act(() => screen.getByRole('button', { name: '내 낙서' }).click());
+      const all = await screen.findByRole('button', { name: '모두 고르기' });
+      act(() => all.click());
+      expect(await screen.findByRole('button', { name: 'pick 11' })).toHaveAttribute('aria-pressed', 'true');
+      act(() => screen.getByRole('button', { name: '고른 낙서 지우기' }).click());
+      await act(async () => screen.getByRole('button', { name: '지우기' }).click());
+
+      expect(await screen.findByText('이미 처리된 요청이에요.')).toBeInTheDocument();
+      expect(screen.getByRole('list', { name: 'doodles' })).toHaveTextContent('11');
+    });
+
+    it('lets a banned author look and save but not delete', async () => {
+      serve(() => reply({}, 404));
+      render(<CanvasScreen me={{ ...me, banned: true }} />);
+      expect(await screen.findByText('11')).toBeInTheDocument();
+      act(() => screen.getByRole('button', { name: '내 낙서' }).click());
+      expect(await screen.findByText(/내 낙서가 1개 있어요/)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '고른 낙서 지우기' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '모두 PNG로 저장' })).toBeEnabled();
+    });
+
+    it('is not offered to signed-out visitors', async () => {
+      serve(() => reply({}, 404));
+      render(<CanvasScreen me={{ authenticated: false }} />);
+      expect(await screen.findByText('11')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '내 낙서' })).not.toBeInTheDocument();
     });
   });
 
