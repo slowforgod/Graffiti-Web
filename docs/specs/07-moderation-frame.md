@@ -1,6 +1,6 @@
 # 07-moderation-frame: 검사기를 끼우는 틀, 보류(HELD), 관리자 검토
 
-- **상태**: IN_PROGRESS (PR 대기)
+- **상태**: MERGED (PR #40, 2026-10-24)
 - **승인자**: 현 (slowforgod) / 승인일: 2026-10-24 (스레드 "M4 안전 구현 (기준 확정 전)"의 요청: "필터링은 아니더라도 API랑 연결까지만". standing 지시 "승인 받지말고 다 해")
 - **브랜치**: `feat/07-moderation-frame`
 - **선행 명세**: 06
