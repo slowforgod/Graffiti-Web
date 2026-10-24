@@ -12,5 +12,6 @@ public record PageSnapshot(
         Instant countdownStartedAt,
         Instant scheduledEndAt,
         CellGeometry geometry,
-        int chunkSize) {
+        int chunkSize,
+        PageRules rules) {
 }

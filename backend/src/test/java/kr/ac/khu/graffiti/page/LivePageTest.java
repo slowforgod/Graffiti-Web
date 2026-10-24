@@ -6,6 +6,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Duration;
 import java.time.Instant;
 import kr.ac.khu.graffiti.page.event.PageStatusChanged;
 import kr.ac.khu.graffiti.page.event.PageTurned;
@@ -20,7 +21,8 @@ class LivePageTest {
 
     private static PageSnapshot page(long id) {
         Instant t = Instant.parse("2026-10-01T00:00:00Z");
-        return new PageSnapshot(id, (int) id, PageStatus.ACTIVE, 0, t, null, t.plusSeconds(60), GEOMETRY, 480);
+        return new PageSnapshot(id, (int) id, PageStatus.ACTIVE, 0, t, null, t.plusSeconds(60), GEOMETRY, 480,
+                new PageRules(700, Duration.ofHours(6), Duration.ofDays(7)));
     }
 
     @Test

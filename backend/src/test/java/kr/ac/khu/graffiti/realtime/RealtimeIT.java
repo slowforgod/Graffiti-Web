@@ -494,6 +494,29 @@ class RealtimeIT extends WebIntegrationTest {
                 "{\"type\":\"page:turned\",\"newPageId\":\"" + next.id() + "\"}");
     }
 
+    @Test
+    void aDraftOfTheTurnedPageIsRefusedAndTheNextPageWorksOnTheSameConnection() throws Exception {
+        Client author = connect(cookie(author()), ORIGIN);
+        BlockingQueue<JsonNode> errors = author.subscribe("/user/queue/errors").events;
+        String id = UUID.randomUUID().toString();
+        author.send("/app/draft", points(id, 0, 0, 2, 10, 10));
+        String oldPage = pageId();
+
+        turnPage();
+        Client watcher = connect(null, ORIGIN);
+        BlockingQueue<JsonNode> chunk0 = watcher.subscribe(chunk(0)).events;
+        Map<String, Object> late = new HashMap<>(points(id, 0, 0, 2, 12, 12));
+        late.put("pageId", oldPage);
+        author.send("/app/draft", late);
+
+        // D-16: no resend to the new page; the client drops the draft and starts over.
+        assertThat(next(errors).get("code").asText()).isEqualTo("PAGE_ENDED");
+        assertThat(chunk0.poll(500, TimeUnit.MILLISECONDS)).isNull();
+        author.send("/app/draft", points(UUID.randomUUID().toString(), 0, 0, 2, 10, 10));
+        assertThat(next(chunk0).get("type").asText()).isEqualTo("draft:update");
+        assertThat(author.errors).isEmpty();
+    }
+
     // --- helpers ---
 
     private static WebSocketContainer largeFrames() {
