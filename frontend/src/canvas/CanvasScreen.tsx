@@ -11,7 +11,7 @@ import type { CurrentPage } from '../shared/pageConfig';
 import { fetchCurrentPage } from '../shared/pageConfig';
 import { clockOffset, cooldownLeft, endsAfter, minutesLeft } from '../tools/cooldown';
 import { draftBounds } from '../tools/draft';
-import { publishBody, publishDoodle } from '../tools/publish';
+import { isHeld, publishBody, publishDoodle } from '../tools/publish';
 import { sizeGuide } from '../tools/sizeGuide';
 import type { DraftNotice } from '../tools/useDraft';
 import { useDraft } from '../tools/useDraft';
@@ -47,6 +47,9 @@ const NOTICES: Record<DraftNotice, string> = {
 
 // Shown when a post fails for a reason the server did not word itself (a dropped connection).
 const PUBLISH_FAILED = '게시하지 못했어요. 잠시 후 다시 시도해 주세요.';
+
+// A held post was taken: it goes on the canvas once an admin approves it.
+const PUBLISH_HELD = '검토 후 게시돼요.';
 
 // Longest wait between redraws of the cooldown note.
 const COOLDOWN_TICK_MS = 30_000;
@@ -232,9 +235,13 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
     setPublishing(true);
     setPublishError(null);
     try {
-      const published = await publishDoodle(page.id, body);
-      sync.current?.addPublished(published.doodle);
-      setPostedCooldown(published.cooldownEndsAt);
+      const result = await publishDoodle(page.id, body);
+      if (isHeld(result)) {
+        setPublishError(PUBLISH_HELD);
+      } else {
+        sync.current?.addPublished(result.doodle);
+      }
+      setPostedCooldown(result.cooldownEndsAt);
       // Tells the viewers to drop the half-transparent draft (ARCHITECTURE.md §4.3).
       tools.cancel();
     } catch (e) {
@@ -244,6 +251,10 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
       }
       if (e instanceof ApiError && e.code === 'COOLDOWN' && typeof e.details.retryAfterSec === 'number') {
         setPostedCooldown(endsAfter(e.details.retryAfterSec, offset));
+      }
+      // A rejection keeps the draft so it can be changed, but the post is used up (D-12).
+      if (e instanceof ApiError && e.code === 'MODERATION_REJECTED' && typeof e.details.cooldownEndsAt === 'string') {
+        setPostedCooldown(e.details.cooldownEndsAt);
       }
       setPublishError(e instanceof ApiError && e.message ? e.message : PUBLISH_FAILED);
     } finally {

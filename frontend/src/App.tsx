@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+import AdminScreen from './admin/AdminScreen';
+import { ADMIN_PATH } from './admin/adminApi';
 import AuthBar from './auth/AuthBar';
 import CanvasScreen from './canvas/CanvasScreen';
 import ConsentScreen from './auth/ConsentScreen';
@@ -59,6 +61,14 @@ export default function App() {
   const agree = useCallback(async () => {
     setMe(await consent());
   }, []);
+
+  if (window.location.pathname === ADMIN_PATH) {
+    return (
+      <main>
+        <AdminScreen me={me} />
+      </main>
+    );
+  }
 
   return (
     <main>

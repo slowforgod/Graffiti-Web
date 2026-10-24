@@ -1,3 +1,4 @@
+import { ADMIN_PATH } from '../admin/adminApi';
 import type { Me } from './me';
 import { LOGIN_URL } from './me';
 
@@ -21,6 +22,11 @@ export default function AuthBar({ me, onLogout }: Props) {
   return (
     <nav aria-label="계정">
       <span style={{ color: me.cursorColor }}>●</span> <span>{me.nickname}</span>{' '}
+      {me.role === 'ADMIN' && (
+        <>
+          <a href={ADMIN_PATH}>관리자 검토</a>{' '}
+        </>
+      )}
       <button type="button" onClick={onLogout}>
         로그아웃
       </button>

@@ -327,6 +327,45 @@ describe('CanvasScreen', () => {
       expect(screen.getByText('12분 뒤에 게시할 수 있어요')).toBeInTheDocument();
     });
 
+    it('clears the draft and says it waits for review when the post is held', async () => {
+      const { drafts } = await open(TEST_CONFIG, me, () =>
+        reply({ held: true, cooldownEndsAt: '2026-10-21T00:30:00Z' }, 202),
+      );
+      draw();
+      const draftId = drafts()[0]!.draftId;
+
+      await act(async () => screen.getByRole('button', { name: '게시' }).click());
+
+      expect(screen.getByRole('status')).toHaveTextContent('검토 후 게시돼요.');
+      expect(drafts().at(-1)).toEqual({ pageId: '3', draftId, op: 'cancel' });
+      expect(screen.getByRole('list', { name: 'doodles' })).toBeEmptyDOMElement();
+      draw();
+      expect(screen.getByText('30분 뒤에 게시할 수 있어요')).toBeInTheDocument();
+    });
+
+    it('keeps the draft but uses up the post when moderation rejects it', async () => {
+      const { drafts } = await open(TEST_CONFIG, me, () =>
+        reply(
+          {
+            error: {
+              code: 'MODERATION_REJECTED',
+              message: '부적절한 내용이 감지되어 게시할 수 없어요.',
+              details: { category: 'PROFANITY', cooldownEndsAt: '2026-10-21T00:30:00Z' },
+            },
+          },
+          422,
+        ),
+      );
+      draw();
+
+      await act(async () => screen.getByRole('button', { name: '게시' }).click());
+
+      expect(screen.getByRole('status')).toHaveTextContent('부적절한 내용이 감지되어 게시할 수 없어요.');
+      expect(drafts().some((d) => d.op === 'cancel')).toBe(false);
+      expect(screen.getByRole('button', { name: '게시' })).toBeDisabled();
+      expect(screen.getByText('30분 뒤에 게시할 수 있어요')).toBeInTheDocument();
+    });
+
     it('disables ✓ and ✗ while the post is on its way', async () => {
       let answer: (r: Response) => void = () => {};
       await open(TEST_CONFIG, me, () => new Promise<Response>((resolve) => (answer = resolve)));

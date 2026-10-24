@@ -179,3 +179,66 @@ body {
   border-radius: 8px;
   font-size: 14px;
 }
+
+/* Admin review (/admin). The body never scrolls, so the screen scrolls itself. */
+.admin-screen {
+  position: fixed;
+  inset: 0;
+  overflow: auto;
+  padding: 16px;
+  background: #fff;
+}
+
+.admin-header {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.admin-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.admin-tabs button[aria-pressed='true'] {
+  font-weight: bold;
+}
+
+.admin-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.admin-item {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid #d9dde3;
+  border-radius: 8px;
+}
+
+.admin-item dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  flex: 1;
+}
+
+.admin-item dt {
+  color: #666;
+}
+
+.admin-item dd {
+  margin: 0;
+}
+
+.admin-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

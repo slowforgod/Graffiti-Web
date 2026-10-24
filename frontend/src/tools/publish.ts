@@ -18,6 +18,16 @@ export interface Published {
   cooldownEndsAt: string | null;
 }
 
+// 202: stored, but an admin looks at it before it goes on the canvas (D-42, PROPOSED).
+export interface Held {
+  held: true;
+  cooldownEndsAt: string | null;
+}
+
+export function isHeld(result: Published | Held): result is Held {
+  return 'held' in result && result.held;
+}
+
 // Null for a draft with nothing to post yet; the server refuses blank texts too.
 export function publishBody(draft: Draft): PublishBody | null {
   if (isEmpty(draft) || (draft.kind === 'TEXT' && draft.text.trim() === '')) {
@@ -30,8 +40,8 @@ export function publishBody(draft: Draft): PublishBody | null {
   return { kind: 'DRAWING', payload: { v: 1, strokes: liveStrokes(draft).map(({ c, w, p }) => ({ c, w, p: [...p] })) } };
 }
 
-export function publishDoodle(pageId: string, body: PublishBody): Promise<Published> {
-  return apiFetch<Published>(`/api/pages/${encodeURIComponent(pageId)}/doodles`, {
+export function publishDoodle(pageId: string, body: PublishBody): Promise<Published | Held> {
+  return apiFetch<Published | Held>(`/api/pages/${encodeURIComponent(pageId)}/doodles`, {
     method: 'POST',
     body: JSON.stringify(body),
   });
