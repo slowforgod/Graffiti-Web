@@ -5,14 +5,16 @@ import { decodeBitmap } from '../ui/minimapApi';
 import type { RealtimeLink } from './link';
 import { metaTopic } from './link';
 
+export interface PageStatusEvent {
+  type: 'page:status';
+  status: PageStatus;
+  occupancyPermille: number;
+  countdownStartedAt: string | null;
+  scheduledEndAt: string;
+}
+
 export type MetaEvent =
-  | {
-      type: 'page:status';
-      status: PageStatus;
-      occupancyPermille: number;
-      countdownStartedAt: string | null;
-      scheduledEndAt: string;
-    }
+  | PageStatusEvent
   | { type: 'minimap:diff'; set: number[]; clear: number[]; occupancyPermille: number }
   | { type: 'page:turned'; newPageId: string }
   | { type: string };
@@ -27,6 +29,8 @@ interface Options {
   link: RealtimeLink;
   fetchMinimap: (pageId: string) => Promise<MinimapBody>;
   onMeta: (meta: PageMeta) => void;
+  // page:status, as it arrives (D-16: the status bar and the countdown follow it).
+  onStatus?: (status: PageStatusEvent) => void;
   onPageTurned: () => void;
   onPageEnded: () => void;
 }
@@ -98,6 +102,9 @@ export class MetaSync {
     if (isType(event, 'page:turned')) {
       this.options.onPageTurned();
       return;
+    }
+    if (isType(event, 'page:status')) {
+      this.options.onStatus?.(event);
     }
     if (!this.live) {
       this.buffer.push(event);

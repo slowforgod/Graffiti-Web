@@ -21,4 +21,6 @@ export const TEST_CONFIG: ClientConfig = {
   cursorIntervalMs: 100,
   draftIntervalMs: 100,
   heartbeatMs: 10000,
+  countdownThresholdPermille: 700,
+  countdownDurationSec: 21600,
 };

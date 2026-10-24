@@ -118,7 +118,8 @@ frontend/src/
 │                  브라우저 안에서 그리는 PNG(png.ts: 내 doodle만, 흰 배경, canvas.toBlob, D-13)
 ├── ui/            툴바(이동/펜/텍스트/지우개, 색, 굵기, 글자 크기, 내 낙서), ✓/✗(DraftActions), 텍스트 입력 상자,
 │                  내 낙서 패널(MyDoodlesPanel: 캔버스에서 고르기, 지우기 확인, PNG 저장),
-│                  상단 상태바(점유율, 남은 시간), T−5분 카운트다운, 미니맵, 토스트
+│                  상단 상태바(StatusBar: 제N장, 점유율, 남은 시간), T−5분 카운트다운(TurnWarning), 남은 시간 계산
+│                  (pageTime.ts), 미니맵, 토스트
 ├── admin/         관리자 화면
 └── shared/        설정 상수(서버의 /api/pages/current 응답으로 받음), 타입
 ```
@@ -204,10 +205,12 @@ PageTimer (scheduled_end_at 도달) ──▶ 큐: EndPage(pageId)   (현재 페
   ③ PageState 교체 (cellCount 새 배열)
   ④ 커밋 후 이벤트 PageTurned(old, new), PageStatusChanged(new) → broadcast /topic/page.{old}.meta  page:turned {newPageId}
 클라이언트: 초안 폐기 → 옛 페이지 구독 해제 → /api/pages/current → 새 페이지 로딩(4.2)
+           → 새 페이지에 "페이지가 넘어가 그리던 초안이 사라졌어요."(초안이 있었을 때) 또는 "새 페이지로 넘어왔어요."
+           (page:turned를 놓쳐도 종료 시각 + 5초에 /api/pages/current를 다시 불러 같은 결과)
 ```
 
 - 상태 전이는 `UPDATE ... WHERE id=? AND status=?`처럼 **이전 상태를 조건으로** 실행합니다. 영향받은 행이 0이면 예외를 던집니다.
-- T−5분 카운트다운은 클라이언트가 `scheduledEndAt`과 서버 시각 차이(`serverTime`)로 계산합니다. 서버 푸시는 필요 없습니다.
+- T−5분 카운트다운은 클라이언트가 `scheduledEndAt`과 서버 시각 차이(`serverTime`)로 계산합니다. 서버 푸시는 필요 없습니다. 상태바(`ui/StatusBar.tsx`)와 카운트다운(`ui/TurnWarning.tsx`)은 `page:status`로 상태와 종료 시각을, `minimap:diff`로 점유율을 갱신하고, 시계는 경고 1분 전부터 1초마다, 그 전에는 30초마다 다시 봅니다(`ui/pageTime.ts`, 09).
 
 ### 4.4a 로그인 (D-21, SEC-04, SEC-13)
 

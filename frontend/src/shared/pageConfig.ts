@@ -21,6 +21,9 @@ export interface ClientConfig {
   cursorIntervalMs: number;
   draftIntervalMs: number;
   heartbeatMs: number;
+  // The page's turn rules (D-15), from its row: the countdown starts at this occupancy and lasts this long.
+  countdownThresholdPermille: number;
+  countdownDurationSec: number;
 }
 
 export type PageStatus = 'ACTIVE' | 'COUNTDOWN' | 'ENDED';
