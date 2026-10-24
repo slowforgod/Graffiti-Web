@@ -133,7 +133,7 @@ class AdminReviewIT extends WebIntegrationTest {
                 .andExpect(status().isForbidden()).andExpect(jsonPath("$.error.code").value("CSRF_INVALID"));
         mvc.perform(get("/api/admin/actions").with(authentication(session(author)))).andExpect(status().isForbidden());
 
-        assertThat(status(id)).isEqualTo("HELD");
+        assertThat(statusOf(id)).isEqualTo("HELD");
     }
 
     @Test
@@ -144,7 +144,7 @@ class AdminReviewIT extends WebIntegrationTest {
                 .with(authentication(session(admin)))).andExpect(status().isOk()));
 
         assertThat(body.at("/doodle/id").asText()).isEqualTo(Long.toString(id));
-        assertThat(status(id)).isEqualTo("PUBLISHED");
+        assertThat(statusOf(id)).isEqualTo("PUBLISHED");
         assertThat(jdbc.queryForObject("SELECT published_at IS NOT NULL FROM doodle WHERE id = ?", Boolean.class, id))
                 .isTrue();
         assertThat(published.received).singleElement().satisfies(e -> {
@@ -165,7 +165,7 @@ class AdminReviewIT extends WebIntegrationTest {
         mvc.perform(withCsrf(post("/api/admin/doodles/{id}/restore", id)).with(authentication(session(admin))))
                 .andExpect(status().isOk());
 
-        assertThat(status(id)).isEqualTo("PUBLISHED");
+        assertThat(statusOf(id)).isEqualTo("PUBLISHED");
         assertThat(lastAction(id)).containsEntry("action", "RESTORE");
     }
 
@@ -177,7 +177,7 @@ class AdminReviewIT extends WebIntegrationTest {
         mvc.perform(withCsrf(post("/api/admin/doodles/{id}/restore", id)).with(authentication(session(admin))))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.error.code").value("PAGE_ENDED"));
 
-        assertThat(status(id)).isEqualTo("HELD");
+        assertThat(statusOf(id)).isEqualTo("HELD");
         assertThat(published.received).isEmpty();
         JsonNode body = read(mvc.perform(get("/api/admin/doodles").param("size", "100")
                 .with(authentication(session(admin)))));
@@ -191,7 +191,7 @@ class AdminReviewIT extends WebIntegrationTest {
         mvc.perform(withCsrf(post("/api/admin/doodles/{id}/reject", id)).with(authentication(session(admin))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REJECTED"));
 
-        assertThat(status(id)).isEqualTo("REJECTED");
+        assertThat(statusOf(id)).isEqualTo("REJECTED");
         assertThat(lastAction(id)).containsEntry("actor_type", "ADMIN").containsEntry("action", "REJECT");
         mvc.perform(withCsrf(post("/api/admin/doodles/{id}/reject", id)).with(authentication(session(admin))))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.error.code").value("STATE_CONFLICT"));
@@ -245,7 +245,7 @@ class AdminReviewIT extends WebIntegrationTest {
         return jdbc.queryForObject("SELECT MAX(id) FROM doodle WHERE author_id = ?", Long.class, author.getId());
     }
 
-    private String status(long id) {
+    private String statusOf(long id) {
         return jdbc.queryForObject("SELECT status FROM doodle WHERE id = ?", String.class, id);
     }
 
