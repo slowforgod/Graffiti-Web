@@ -151,7 +151,9 @@ class AdminReviewIT extends WebIntegrationTest {
             assertThat(e.doodleId()).isEqualTo(id);
             assertThat(e.chunks()).containsExactly(0, 1);
         });
-        assertThat(processor.submit(new PageCommand.GetPageSnapshot()).join().occupancyPermille()).isPositive();
+        // One small doodle is under 1 permille, so look at the cells themselves.
+        byte[] cells = processor.submit(new PageCommand.GetMinimap(page.id())).join().bitmap();
+        assertThat(cells).as("occupied cells").isNotEqualTo(new byte[cells.length]);
         assertThat(lastAction(id)).containsEntry("actor_type", "ADMIN").containsEntry("action", "APPROVE")
                 .containsEntry("actor_id", admin.getId());
         mvc.perform(get("/api/pages/{p}/doodles", page.id()).param("chunks", "0"))
