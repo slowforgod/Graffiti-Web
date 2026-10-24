@@ -9,7 +9,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
-/** docs/API.md §2, public. Canvas, chunk and cell sizes come from the page row snapshot (D-06). */
+/**
+ * docs/API.md §2, public. Canvas, chunk and cell sizes and the turn rules come from the page row snapshot (D-06).
+ */
 @RestController
 class PageController {
 
@@ -45,7 +47,8 @@ class PageController {
                 doodle.textMaxLength(), doodle.maxBbox(), props.query().maxChunks(),
                 props.postCooldown().toSeconds(), props.page().countdownWarning().toSeconds(),
                 doodle.draftIdleTimeout().toSeconds(), props.realtime().cursorInterval().toMillis(),
-                props.realtime().draftInterval().toMillis(), props.realtime().heartbeat().toMillis());
+                props.realtime().draftInterval().toMillis(), props.realtime().heartbeat().toMillis(),
+                page.rules().countdownThresholdPermille(), page.rules().countdownDuration().toSeconds());
     }
 
     record CurrentPage(String id, int seq, PageStatus status, int occupancyPermille, Instant countdownStartedAt,
@@ -55,7 +58,8 @@ class PageController {
     record ClientConfig(int width, int height, int chunkSize, int cellSize, double zoomMin, double zoomMax,
             List<String> palette, List<Integer> strokeWidths, List<Integer> fontSizes, int defaultFontSize,
             int textMaxLength, int maxBbox, int maxChunks, long postCooldownSec, long countdownWarningSec,
-            long draftIdleTimeoutSec, long cursorIntervalMs, long draftIntervalMs, long heartbeatMs) {
+            long draftIdleTimeoutSec, long cursorIntervalMs, long draftIntervalMs, long heartbeatMs,
+            int countdownThresholdPermille, long countdownDurationSec) {
     }
 
     record MinimapResponse(int cols, int rows, String bitmap, int occupancyPermille) {

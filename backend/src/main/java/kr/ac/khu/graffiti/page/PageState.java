@@ -30,6 +30,6 @@ record PageState(
 
     PageSnapshot snapshot() {
         return new PageSnapshot(id, seq, status, grid.occupancyPermille(), createdAt, countdownStartedAt,
-                scheduledEndAt, grid.geometry(), chunkSize);
+                scheduledEndAt, grid.geometry(), chunkSize, rules);
     }
 }

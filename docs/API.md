@@ -85,11 +85,13 @@
     "fontSizes": [10,11,12,13,14,15,16,20,24,32,36,40,48,64,96], "defaultFontSize": 24,
     "textMaxLength": 50, "maxBbox": 1024, "maxChunks": 60,
     "postCooldownSec": 1800, "countdownWarningSec": 300, "draftIdleTimeoutSec": 600,
-    "cursorIntervalMs": 100, "draftIntervalMs": 100, "heartbeatMs": 10000
+    "cursorIntervalMs": 100, "draftIntervalMs": 100, "heartbeatMs": 10000,
+    "countdownThresholdPermille": 700, "countdownDurationSec": 21600
   }
 }
 ```
-- `width`, `height`, `chunkSize`, `cellSize`는 **현재 페이지 행의 스냅샷 값**입니다(D-06). 나머지는 서버 설정값입니다(INV-10).
+- `width`, `height`, `chunkSize`, `cellSize`, `countdownThresholdPermille`, `countdownDurationSec`는 **현재 페이지 행의 스냅샷 값**입니다(D-06, 09에서 넘김 규칙 추가: 상태바 안내용). 나머지는 서버 설정값입니다(INV-10).
+- 클라이언트는 `serverTime`으로 시계 차이를 재고 `scheduledEndAt`까지 남은 시간을 상단 상태바에 늘 보여 줍니다. 남은 시간이 `countdownWarningSec` 이하면 큰 카운트다운과 초안 경고를 띄웁니다(D-16, 09). 종료 시각이 지나고 5초 안에 `page:turned`가 오지 않으면 `/api/pages/current`를 다시 부릅니다.
 - 세 엔드포인트(`/current`, `/minimap`, `/doodles`) 모두 비로그인으로 호출할 수 있습니다.
 
 `GET /api/pages/{pageId}/minimap`
