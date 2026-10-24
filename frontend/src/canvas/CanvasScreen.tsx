@@ -15,7 +15,9 @@ import { isHeld, publishBody, publishDoodle } from '../tools/publish';
 import { sizeGuide } from '../tools/sizeGuide';
 import type { DraftNotice } from '../tools/useDraft';
 import { useDraft } from '../tools/useDraft';
+import { useMyDoodles } from '../mine/useMyDoodles';
 import DraftActions from '../ui/DraftActions';
+import MyDoodlesPanel from '../ui/MyDoodlesPanel';
 import Minimap from '../ui/Minimap';
 import TextDraftEditor from '../ui/TextDraftEditor';
 import type { DrawAccess } from '../ui/Toolbar';
@@ -141,6 +143,8 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const removeOwn = useCallback((ids: string[]) => sync.current?.removeOwn(ids), []);
+  const mine = useMyDoodles({ pageId: page.id, seq: page.seq, config, onDeleted: removeOwn, onPageEnded });
 
   useEffect(() => {
     const chunks = new ChunkSync({
@@ -195,7 +199,10 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
   const access = drawAccess(me, tools.online);
   const own = tools.draft;
   const bounds = own ? draftBounds(own) : null;
-  const tool = access === 'ok' ? tools.tool : 'move';
+  // The panel needs the canvas to pick doodles, so drawing rests while it is open.
+  const tool = access === 'ok' && !mine.open ? tools.tool : 'move';
+  // Anyone signed in and consented has doodles to look at; banned authors may not delete them (API.md §3).
+  const hasMine = me?.authenticated === true && !me.consentRequired;
   // With the pen, a dashed square shows how big one drawing may be. It is kept here once the drawing
   // has strokes so it does not move with the view.
   const drawingBounds = own?.kind === 'DRAWING' ? bounds : null;
@@ -288,6 +295,9 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
         onDrawStart={tools.pointerDown}
         onDrawMove={tools.pointerMove}
         onDrawEnd={tools.pointerUp}
+        selection={
+          mine.open && mine.items ? { items: mine.items, selected: mine.selected, onToggle: mine.toggle } : null
+        }
       />
       {own?.kind === 'TEXT' && (
         <TextDraftEditor
@@ -321,7 +331,10 @@ function PageCanvas({ page, link, me, onPageEnded }: PageCanvasProps) {
         onWidth={tools.setWidth}
         fontSize={tools.fontSize}
         onFontSize={tools.setFontSize}
+        onMine={hasMine ? () => (mine.open ? mine.close() : void mine.show()) : undefined}
+        mineOpen={mine.open}
       />
+      {mine.open && <MyDoodlesPanel mine={mine} canDelete={author !== null} />}
       {notice && (
         <p
           role="status"

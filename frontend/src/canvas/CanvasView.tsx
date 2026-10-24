@@ -32,7 +32,17 @@ interface Props {
   onDrawStart?: (world: Point, scale: number) => void;
   onDrawMove?: (world: Point, scale: number) => void;
   onDrawEnd?: () => void;
+  // The author's doodles, outlined and picked by clicking, while the "내 낙서" panel is open (D-13).
+  selection?: Selection | null;
 }
+
+export interface Selection {
+  items: { id: string; bbox: Box }[];
+  selected: ReadonlySet<string>;
+  onToggle: (id: string) => void;
+}
+
+const PICK_COLOR = '#1E88E5';
 
 // One wheel notch zooms by this factor.
 const WHEEL_ZOOM_STEP = 1.1;
@@ -58,6 +68,7 @@ export default function CanvasView({
   onDrawStart,
   onDrawMove,
   onDrawEnd,
+  selection = null,
 }: Props) {
   const pinch = useRef<Pinch | null>(null);
   const drawing = useRef<number | null>(null);
@@ -203,6 +214,28 @@ export default function CanvasView({
         <DraftLayer own={ownDraft} others={otherDrafts} palette={config.palette} scale={viewport.scale} />
         <CursorLayer cursors={cursors} scale={viewport.scale} />
       </Layer>
+      {selection && (
+        <Layer>
+          {selection.items.map(({ id, bbox }) => {
+            const picked = selection.selected.has(id);
+            return (
+              <Rect
+                key={id}
+                x={bbox.x}
+                y={bbox.y}
+                width={bbox.w}
+                height={bbox.h}
+                stroke={PICK_COLOR}
+                strokeWidth={(picked ? 3 : 1.5) / viewport.scale}
+                dash={picked ? undefined : [6 / viewport.scale, 4 / viewport.scale]}
+                fill={picked ? 'rgba(30, 136, 229, 0.18)' : 'rgba(30, 136, 229, 0.04)'}
+                onClick={() => selection.onToggle(id)}
+                onTap={() => selection.onToggle(id)}
+              />
+            );
+          })}
+        </Layer>
+      )}
     </Stage>
   );
 }
