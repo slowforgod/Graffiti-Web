@@ -56,5 +56,11 @@ public interface PostStore {
     /** HELD to REJECTED; false when the row is not HELD any more. */
     boolean rejectHeld(long doodleId);
 
+    /**
+     * PUBLISHED to DELETED for the author's own doodle on {@code pageId} (D-13, INV-07: the row stays), with
+     * {@code removed_at} and {@code removed_by}; false when the row is not in that state.
+     */
+    boolean deleteOwn(long doodleId, long pageId, long authorId, Instant at);
+
     void recordAction(Action action, Instant at);
 }

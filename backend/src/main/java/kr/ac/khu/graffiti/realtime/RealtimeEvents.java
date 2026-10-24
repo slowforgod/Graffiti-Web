@@ -62,6 +62,13 @@ public final class RealtimeEvents {
         }
     }
 
+    public record DoodleRemovedEvent(String type, String id) {
+
+        public DoodleRemovedEvent(String id) {
+            this("doodle:removed", id);
+        }
+    }
+
     public record PublishedDoodle(String id, String kind, Box bbox, @JsonRawValue String payload) {
     }
 

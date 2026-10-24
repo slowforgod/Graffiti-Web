@@ -43,6 +43,10 @@ class JdbcPostStore implements PostStore {
     private static final String REJECT_HELD = """
             UPDATE doodle SET status = 'REJECTED' WHERE id = :id AND status = 'HELD'""";
 
+    private static final String DELETE_OWN = """
+            UPDATE doodle SET status = 'DELETED', removed_at = :at, removed_by = :authorId
+            WHERE id = :id AND page_id = :pageId AND author_id = :authorId AND status = 'PUBLISHED'""";
+
     private static final String INSERT_ACTION = """
             INSERT INTO moderation_action (actor_type, actor_id, action, target_doodle_id, target_user_id, reason,
                                            detail, created_at)
@@ -101,6 +105,14 @@ class JdbcPostStore implements PostStore {
     @Override
     public boolean rejectHeld(long doodleId) {
         return jdbc.update(REJECT_HELD, Map.of("id", doodleId)) == 1;
+    }
+
+    @Override
+    public boolean deleteOwn(long doodleId, long pageId, long authorId, Instant at) {
+        return jdbc.update(DELETE_OWN, new MapSqlParameterSource("id", doodleId)
+                .addValue("pageId", pageId)
+                .addValue("authorId", authorId)
+                .addValue("at", utc(at))) == 1;
     }
 
     @Override

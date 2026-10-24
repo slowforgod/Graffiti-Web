@@ -1,6 +1,7 @@
 package kr.ac.khu.graffiti.realtime;
 
 import kr.ac.khu.graffiti.page.event.DoodlePublished;
+import kr.ac.khu.graffiti.page.event.DoodleRemoved;
 import kr.ac.khu.graffiti.page.event.OccupancyChanged;
 import kr.ac.khu.graffiti.page.event.PageStatusChanged;
 import kr.ac.khu.graffiti.page.event.PageTurned;
@@ -36,6 +37,12 @@ class PageEventRelay {
         RealtimeEvents.DoodlePublishedEvent event = new RealtimeEvents.DoodlePublishedEvent(
                 new RealtimeEvents.PublishedDoodle(Long.toString(e.doodleId()), e.kind(),
                         new RealtimeEvents.Box(e.x(), e.y(), e.w(), e.h()), e.payload()));
+        e.chunks().forEach(chunk -> broadcaster.toChunk(e.pageId(), chunk, event));
+    }
+
+    @EventListener
+    void onRemoved(DoodleRemoved e) {
+        RealtimeEvents.DoodleRemovedEvent event = new RealtimeEvents.DoodleRemovedEvent(Long.toString(e.doodleId()));
         e.chunks().forEach(chunk -> broadcaster.toChunk(e.pageId(), chunk, event));
     }
 

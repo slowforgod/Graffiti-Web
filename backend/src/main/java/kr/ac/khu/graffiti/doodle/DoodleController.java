@@ -40,7 +40,7 @@ class DoodleController {
 
     // Strict on purpose (SEC-02): unknown or repeated fields, numbers for text, text or fractions for
     // numbers are all refused rather than guessed.
-    private static final ObjectMapper STRICT = JsonMapper.builder()
+    static final ObjectMapper STRICT = JsonMapper.builder()
             .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
             .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
