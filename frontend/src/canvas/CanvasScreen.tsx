@@ -417,6 +417,7 @@ function PageCanvas({ page, link, me, onPageEnded: pageEnded, turnNotice }: Page
         seq={page.seq}
         status={status.status}
         occupancyPermille={occupancy}
+        createdAt={page.createdAt}
         remainingMs={endMs}
         thresholdPermille={config.countdownThresholdPermille}
         countdownMs={config.countdownDurationSec * 1000}

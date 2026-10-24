@@ -33,6 +33,8 @@ export interface CurrentPage {
   seq: number;
   status: PageStatus;
   occupancyPermille: number;
+  // When the page started; the status bar shows it as "YY/MM/DD부터" (09 D2).
+  createdAt: string;
   countdownStartedAt: string | null;
   scheduledEndAt: string;
   serverTime: string;

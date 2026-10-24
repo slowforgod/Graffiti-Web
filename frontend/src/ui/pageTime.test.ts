@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clockText, nextTick, occupancyText, remainingText, untilEnd } from './pageTime';
+import { clockText, nextTick, occupancyText, remainingText, startDateText, untilEnd } from './pageTime';
 
 describe('pageTime', () => {
   it('measures the time left on the server clock', () => {
@@ -39,5 +39,17 @@ describe('pageTime', () => {
     expect(nextTick(10 * 60_000, 5 * 60_000)).toBe(30_000);
     expect(nextTick(6 * 60_000, 5 * 60_000)).toBe(1000);
     expect(nextTick(1000, 5 * 60_000)).toBe(1000);
+  });
+});
+
+describe('startDateText', () => {
+  it('shows the start date as YY/MM/DD in local time', () => {
+    const local = new Date(2026, 9, 4, 13, 5).toISOString();
+    expect(startDateText(local)).toBe('26/10/04');
+    expect(startDateText(new Date(2030, 0, 31, 0, 0).toISOString())).toBe('30/01/31');
+  });
+
+  it('shows nothing for a missing date', () => {
+    expect(startDateText('')).toBe('');
   });
 });

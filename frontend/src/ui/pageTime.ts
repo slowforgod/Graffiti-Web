@@ -12,7 +12,7 @@ export function untilEnd(scheduledEndAt: string, offsetMs: number, now: number =
   return Number.isNaN(end) ? 0 : Math.max(0, end - (now + offsetMs));
 }
 
-// The always-on status bar: whole days and hours, hours and minutes, or minutes, rounded up so a page
+// The status bar during the countdown and the turn hint: whole days and hours, hours and minutes, or minutes, rounded up so a page
 // never reads "0분" before it ends.
 export function remainingText(ms: number): string {
   const minutes = Math.max(1, Math.ceil(ms / MINUTE));
@@ -28,6 +28,16 @@ export function remainingText(ms: number): string {
     return rest === 0 ? `${hours}시간` : `${hours}시간 ${rest}분`;
   }
   return `${minutes}분`;
+}
+
+// The page's start date as the status bar shows it: "26/10/24", in the viewer's local time.
+export function startDateText(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    return '';
+  }
+  const two = (n: number) => String(n).padStart(2, '0');
+  return `${two(d.getFullYear() % 100)}/${two(d.getMonth() + 1)}/${two(d.getDate())}`;
 }
 
 // The big T−5 countdown: "4:59", rounded up to whole seconds.
