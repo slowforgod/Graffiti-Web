@@ -93,7 +93,7 @@
 | 단위 | 그림 범위, 그리기 호출 | `mine/png.test.ts` |
 | 컴포넌트 | 패널, 고르기, 확인, 거절, 차단, 비로그인 | `CanvasScreen.test.tsx` |
 
-## 9. 결정 필요 (보류, 추천안으로 구현)
+## 9. 결정 (2026-10-24 현 확정: 전부 추천안)
 | # | 무엇을 | 추천안 (구현됨) | 바꾸면 영향 |
 |---|---|---|---|
 | 1 | 목록 응답 모양 | id + bbox (payload 없음, PNG는 청크 조회로 읽음). 한 페이지에 최대 336개(7일 ÷ 30분)라 가볍게 | payload까지 주면 `MyDoodleQuery`, `MyDoodleController`, `mine/myDoodles.ts`(`loadDoodles` 없앰), API.md §3 |
