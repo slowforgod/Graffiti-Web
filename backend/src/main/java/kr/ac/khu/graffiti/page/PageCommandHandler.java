@@ -4,12 +4,15 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import kr.ac.khu.graffiti.common.error.ApiException;
 import kr.ac.khu.graffiti.common.error.ErrorCode;
 import kr.ac.khu.graffiti.config.GraffitiProperties;
 import kr.ac.khu.graffiti.page.event.DoodlePublished;
+import kr.ac.khu.graffiti.page.event.DoodleRemoved;
 import kr.ac.khu.graffiti.page.event.OccupancyChanged;
 import kr.ac.khu.graffiti.page.event.PageStatusChanged;
 import kr.ac.khu.graffiti.page.event.PageTurned;
@@ -135,6 +138,31 @@ class PageCommandHandler {
                     null, null), now);
             return true;
         }));
+    }
+
+    List<Long> removeDoodles(PageCommand.RemoveDoodles c) {
+        PageState state = requireCurrent(c.pageId());
+        OccupancyGrid grid = state.grid().copy();
+        List<Integer> clear = new ArrayList<>();
+        Instant now = now();
+        tx.execute(s -> {
+            for (PageCommand.Removal r : c.removals()) {
+                if (!posts.deleteOwn(r.doodleId(), c.pageId(), c.authorId(), now)) {
+                    throw new ApiException(ErrorCode.STATE_CONFLICT);
+                }
+                // Only rows that were still PUBLISHED reach here, so their cells are in the grid.
+                clear.addAll(grid.apply(r.footprint(), -1).clear());
+            }
+            return null;
+        });
+        // A countdown never stops once started (INV-03), so removing cells only changes the grid.
+        current = state.withGrid(grid);
+        c.removals().forEach(r -> events.publishEvent(new DoodleRemoved(c.pageId(), r.doodleId(), r.chunks())));
+        if (!clear.isEmpty()) {
+            events.publishEvent(new OccupancyChanged(c.pageId(), List.of(), List.copyOf(clear),
+                    grid.occupancyPermille()));
+        }
+        return c.removals().stream().map(PageCommand.Removal::doodleId).toList();
     }
 
     boolean release(PageCommand.ReleasePost c) {

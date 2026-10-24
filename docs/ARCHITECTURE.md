@@ -61,10 +61,13 @@ backend/src/main/java/kr/ac/khu/graffiti/
 │   ├── PageBootstrap        재시작 복구 (웹 서버 시작 전, PublishedFootprintSource로 점유율 재계산)
 │   ├── PostStore            큐 안에서 쓰는 게시 저장 포트 (쿨다운 예약·되돌림, doodle INSERT, 보류·거부 저장과 게시,
 │   │                        moderation_action 기록). doodle 패키지가 구현
-│   └── event/               PageStatusChanged, OccupancyChanged, PageTurned, DoodlePublished (커밋 후 발행 → STOMP로 중계)
+│   └── event/               PageStatusChanged, OccupancyChanged, PageTurned, DoodlePublished, DoodleRemoved
+│                            (커밋 후 발행 → STOMP로 중계)
 ├── doodle/        게시(DoodleController: 본문 2MB 상한·엄격한 JSON, DoodleValidator 순수 검증·bbox·칸·청크,
 │                  PublishService: 예약 → 검사 → 게시 → 실패 시 되돌림, JdbcPostStore, PublishedDoodleFootprints),
-│                  청크 조회(ChunkList 순수 검증, ChunkDoodleQuery JDBC, ChunkDoodleController). 삭제는 08
+│                  청크 조회(ChunkList 순수 검증, ChunkDoodleQuery JDBC, ChunkDoodleController),
+│                  내 doodle(MyDoodleController: 목록·삭제·일괄 삭제, MyDoodleService: 행 읽기와 칸 계산은 큐 밖,
+│                  RemoveDoodles 큐 명령으로 전부 아니면 전무, MyDoodleQuery)
 ├── moderation/    ModerationCheck 인터페이스(검사기 하나), ModerationChecks(설정 이름 → 구현, 없으면 StubCheck),
 │                  ModerationService(순서대로 호출·타임아웃·ML 그림자), VerdictCombiner(순수, 판정 합성),
 │                  WordFilterCheck + WordList + TextNormalizer(resources/moderation/*.txt). 07 틀: ChatKhu, OpenAi,
@@ -110,8 +113,11 @@ frontend/src/
 │                  다른 사람 커서(cursors.ts, CursorLayer), 다른 사람 초안(remoteDrafts.ts) + 초안 레이어(DraftLayer), 배경 격자
 ├── tools/         내 초안 모델(draft.ts: 1px 점 버림, bbox 상한, 지우개 판정), 묶음 전송(draftSender.ts),
 │                  텍스트 크기 측정(textMeasure.ts), 도구·초안 훅(useDraft.ts: 무동작·연결 끊김 취소),
-│                  ✓ 게시 본문과 호출(publish.ts), 서버 시각 기준 쿨다운(cooldown.ts). 선택은 08
-├── ui/            툴바(이동/펜/텍스트/지우개, 색, 굵기, 글자 크기), ✓/✗(DraftActions), 텍스트 입력 상자,
+│                  ✓ 게시 본문과 호출(publish.ts), 서버 시각 기준 쿨다운(cooldown.ts)
+├── mine/          내 낙서(08): 목록·삭제 호출(myDoodles.ts), 선택·삭제 확인·PNG 저장 훅(useMyDoodles.ts),
+│                  브라우저 안에서 그리는 PNG(png.ts: 내 doodle만, 흰 배경, canvas.toBlob, D-13)
+├── ui/            툴바(이동/펜/텍스트/지우개, 색, 굵기, 글자 크기, 내 낙서), ✓/✗(DraftActions), 텍스트 입력 상자,
+│                  내 낙서 패널(MyDoodlesPanel: 캔버스에서 고르기, 지우기 확인, PNG 저장),
 │                  상단 상태바(점유율, 남은 시간), T−5분 카운트다운, 미니맵, 토스트
 ├── admin/         관리자 화면
 └── shared/        설정 상수(서버의 /api/pages/current 응답으로 받음), 타입
@@ -246,6 +252,8 @@ PageBootstrap (SmartLifecycle, 웹 서버보다 앞 단계)
 | 거부/미검사 복구 | 관리자 | REJECTED → PUBLISHED (UNCHECKED는 이미 PUBLISHED, 표시만 해제) | +칸 (현재 페이지일 때만) | doodle:published |
 
 모두 큐를 거치고(INV-01), 행은 지우지 않습니다(INV-07).
+
+- 내 doodle 삭제(08, `RemoveDoodles`): 행 읽기, 작성자·페이지·상태 확인, 칸 계산(`StoredFootprint`)은 큐 밖에서 하고, 큐 안에서는 한 트랜잭션으로 doodle마다 `UPDATE ... WHERE author_id = 나 AND status = 'PUBLISHED'`를 실행합니다. 하나라도 0행이면 `STATE_CONFLICT`로 전부 롤백하고 메모리도 그대로 둡니다. 커밋 뒤 메모리 칸을 바꾸고 doodle마다 `DoodleRemoved`(→ 저장된 `doodle_chunk`마다 `doodle:removed`), 비워진 칸이 있으면 `OccupancyChanged`(→ `minimap:diff`). 점유율이 내려가도 카운트다운은 멈추지 않습니다(INV-03). 끝난 페이지의 doodle은 지울 수 없습니다(`PAGE_ENDED`).
 
 ### 4.7 그림 검사와 자체 ML 모델 (D-34 ~ D-40)
 

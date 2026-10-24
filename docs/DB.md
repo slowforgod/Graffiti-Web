@@ -231,6 +231,14 @@ WHERE id = :id AND page_id = :currentPage AND status = :from;   -- :from = 'HELD
 -- 관리자가 보류를 거부
 UPDATE doodle SET status = 'REJECTED' WHERE id = :id AND status = 'HELD';
 
+-- 내 doodle 목록 (08): 게시된 것만
+SELECT id, bbox_x, bbox_y, bbox_w, bbox_h FROM doodle
+WHERE author_id = :me AND page_id = :pageId AND status = 'PUBLISHED' ORDER BY id;
+
+-- 내 doodle 삭제 (08, 큐 안, 한 트랜잭션에서 doodle마다): 0행이면 STATE_CONFLICT로 전부 롤백
+UPDATE doodle SET status = 'DELETED', removed_at = :now, removed_by = :me
+WHERE id = :id AND page_id = :currentPage AND author_id = :me AND status = 'PUBLISHED';
+
 -- 상태 전이 (INV-03): 영향받은 행이 0이면 예외
 UPDATE page SET status = 'COUNTDOWN', countdown_started_at = ?, scheduled_end_at = ?
 WHERE id = ? AND status = 'ACTIVE';

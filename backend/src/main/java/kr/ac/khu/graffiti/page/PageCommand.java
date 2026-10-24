@@ -1,6 +1,7 @@
 package kr.ac.khu.graffiti.page;
 
 import java.time.Instant;
+import java.util.List;
 
 /**
  * Work for the page command queue (INV-01). Each command names the page it targets; a command for a
@@ -75,6 +76,30 @@ public sealed interface PageCommand<R> {
         @Override
         public Boolean executeOn(PageCommandHandler handler) {
             return handler.rejectHeld(this);
+        }
+    }
+
+    /**
+     * The author deletes their own published doodles of the current page (D-13), all or none: each row must still
+     * be PUBLISHED and theirs, else {@code STATE_CONFLICT}. Removes their cells; the post is not given back (INV-08).
+     */
+    record RemoveDoodles(long pageId, long authorId, List<Removal> removals) implements PageCommand<List<Long>> {
+
+        public RemoveDoodles {
+            removals = List.copyOf(removals);
+        }
+
+        @Override
+        public List<Long> executeOn(PageCommandHandler handler) {
+            return handler.removeDoodles(this);
+        }
+    }
+
+    /** One doodle to take off the canvas: its cells, and the chunk topics that showed it. */
+    record Removal(long doodleId, Footprint footprint, List<Integer> chunks) {
+
+        public Removal {
+            chunks = List.copyOf(chunks);
         }
     }
 

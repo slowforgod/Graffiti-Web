@@ -118,9 +118,9 @@
 | 메서드 | 경로 | 권한 | 설명 |
 |---|---|---|---|
 | POST | `/api/pages/{pageId}/doodles` | 작성자 | 게시(✓). 검증 → 쿨다운 → 모더레이션 → 게시 (ARCHITECTURE 4.1) |
-| GET | `/api/me/doodles?pageId=` | 로그인 | 내 doodle ID 목록 (선택 삭제, PNG 저장용) |
-| DELETE | `/api/doodles/{doodleId}` | 작성자 | 내 doodle 삭제 |
-| POST | `/api/doodles/delete` | 작성자 | 내 doodle 일괄 삭제 `{ "ids": ["1","2"] }` (최대 50개, 하나라도 남의 것이면 전체 거절) |
+| GET | `/api/me/doodles?pageId=` | 로그인 | 내 doodle ID와 bbox 목록 (선택 삭제, PNG 저장용, 08) |
+| DELETE | `/api/doodles/{doodleId}` | 작성자 | 내 doodle 삭제 (08) |
+| POST | `/api/doodles/delete` | 작성자 | 내 doodle 일괄 삭제 `{ "ids": ["1","2"] }` (최대 50개, 하나라도 남의 것이면 전체 거절, 08) |
 
 `POST /api/pages/{pageId}/doodles` 요청
 ```json
@@ -133,6 +133,13 @@
 - `422 MODERATION_REJECTED` (쿨다운 소모됨, `details.category`, `details.cooldownEndsAt`). 이유 문장은 보내지 않음
 - `429 COOLDOWN` (`message` "다음 게시까지 N분 남았어요.", `details.retryAfterSec`) / `409 PAGE_ENDED` / `400 VALIDATION_FAILED` / `413 PAYLOAD_TOO_LARGE` / `403 BANNED`
 - 검증 실패, 크기 초과, 끝난 페이지는 쿨다운을 쓰지 않습니다. 검사 중 페이지가 넘어가거나 서버 오류가 나면 쿨다운을 되돌립니다(D-28)
+
+내 doodle (08, D-13)
+- `GET /api/me/doodles?pageId=12` → `200 { "pageId": "12", "doodles": [{ "id": "9001", "bbox": { "x", "y", "w", "h" } }] }`. 그 페이지에 **게시된(PUBLISHED)** 내 doodle만, id 오름차순. payload는 주지 않음(필요하면 bbox가 걸친 청크를 `GET /api/pages/{p}/doodles`로 읽음). 보류·거부된 것은 없음. 현재 페이지가 아니면 `409 PAGE_ENDED`, `pageId`가 없거나 양의 10진 정수가 아니면 `400 VALIDATION_FAILED`(`field: "pageId"`)
+- `DELETE /api/doodles/{id}` → `204`. 큐 안에서(INV-01) `PUBLISHED → DELETED`(`removed_at`, `removed_by` = 작성자, 행은 남음, INV-07), 칸 −1, bbox가 걸친 청크마다 `doodle:removed`, 비워진 칸은 `minimap:diff`. 쿨다운은 돌려주지 않음(INV-08)
+- `POST /api/doodles/delete` `{ "ids": ["1", "2"] }` → `204`. 전부 아니면 전무: 한 트랜잭션에서 하나라도 못 지우면 아무것도 지우지 않음. `ids`는 문자열 10진 정수 1~`max-batch-delete`(50)개(중복은 한 번만, 개수는 보낸 그대로 셈). 알 수 없는 필드, 숫자 id, 형식 오류는 `400`(`details.field` = `ids`, 필드 이름 또는 `body`, `reason` = `required`/`too_many`/`not_a_number`/`unknown`/`malformed`)
+- 거절(삭제 둘 다, 앞의 것부터 확인): 없는 id `404 NOT_FOUND` → 남의 doodle `403 FORBIDDEN` → 끝난 페이지의 doodle `409 PAGE_ENDED` → 게시 상태가 아님(이미 지움, 보류·거부) `409 STATE_CONFLICT`. CSRF 없음 `403 CSRF_INVALID`, 차단됨 `403 BANNED`
+- "내 낙서 PNG로 저장"은 서버 API 없이 브라우저에서 만듭니다(D-13)
 
 검증 규칙(`DoodleValidator`, SEC-02)
 - `v`는 1. 그림: 획 1개 이상, 각 획 점 1개 이상(짝수 개 정수), 좌표는 캔버스 범위 안, `c`는 팔레트 인덱스, `w`는 허용 굵기, 서버가 계산한 bbox(점 최소·최대를 굵기 절반만큼 넓혀 `floor`/`ceil`) ≤ 1024². 그림에 `bbox`를 보내면 거절
