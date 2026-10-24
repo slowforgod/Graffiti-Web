@@ -9,6 +9,7 @@ import java.util.concurrent.CompletionException;
 import kr.ac.khu.graffiti.config.GraffitiProperties;
 import kr.ac.khu.graffiti.doodle.DoodleValidator.Validated;
 import kr.ac.khu.graffiti.moderation.ModerationService;
+import kr.ac.khu.graffiti.moderation.ModerationState;
 import kr.ac.khu.graffiti.page.PageCommand;
 import kr.ac.khu.graffiti.page.PageCommandProcessor;
 import kr.ac.khu.graffiti.page.PostStore;
@@ -18,16 +19,24 @@ import org.springframework.stereotype.Service;
 
 /**
  * Publishes a checked doodle (ARCHITECTURE.md §4.1): take the post in the queue, moderate outside it,
- * publish in the queue. A post that was taken but not published is given back unless moderation
- * rejected it (D-12, D-28).
+ * then in the queue publish it, or store it REJECTED or HELD. A post that was taken but not stored is given
+ * back (D-28); a rejected or held one keeps it (D-12).
  */
 @Service
 public class PublishService {
 
     private static final Logger log = LoggerFactory.getLogger(PublishService.class);
 
-    /** The published doodle; {@code cooldownEndsAt} is null for admins (D-12). */
-    public record Result(long id, Validated doodle, String payload, Instant cooldownEndsAt) {
+    /**
+     * What happened to the post. {@code state} is PASSED or UNCHECKED when published, REJECTED or HELD
+     * otherwise; {@code category} is set on a rejection. {@code cooldownEndsAt} is null for admins (D-12).
+     */
+    public record Result(long id, Validated doodle, String payload, ModerationState state, String category,
+            Instant cooldownEndsAt) {
+
+        public boolean published() {
+            return state.publishable();
+        }
     }
 
     private final PageCommandProcessor processor;
@@ -48,16 +57,14 @@ public class PublishService {
         PageCommand.Reservation reservation = await(new PageCommand.ReservePost(pageId, authorId));
         try {
             ModerationService.Verdict verdict = moderation.moderate(doodle.kind(), doodle.payload());
-            if (!verdict.state().publishable()) {
-                // Rejections, which keep the cooldown taken, arrive with 07-moderation.
-                throw new IllegalStateException("moderation rejected a doodle before 07");
-            }
             DoodleValidator.Box b = doodle.bbox();
             PostStore.NewDoodle row = new PostStore.NewDoodle(pageId, authorId, doodle.kind(),
                     verdict.state().name(), verdict.detail(), b.x(), b.y(), b.w(), b.h(), payload,
                     payload.getBytes(StandardCharsets.UTF_8).length, reservation.reservedAt(), doodle.chunks());
-            PageCommand.Published published = await(new PageCommand.PublishDoodle(row, doodle.footprint()));
-            return new Result(published.doodleId(), doodle, payload,
+            long id = verdict.state().publishable()
+                    ? await(new PageCommand.PublishDoodle(row, doodle.footprint())).doodleId()
+                    : await(new PageCommand.WithholdDoodle(row, verdict.state().name()));
+            return new Result(id, doodle, payload, verdict.state(), verdict.category(),
                     reservation.exempt() ? null : reservation.reservedAt().plus(cooldown));
         } catch (RuntimeException e) {
             giveBack(reservation);

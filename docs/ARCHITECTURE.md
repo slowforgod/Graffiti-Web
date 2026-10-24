@@ -59,18 +59,21 @@ backend/src/main/java/kr/ac/khu/graffiti/
 │   ├── PageLifecycle        상태 전이, 종료 시각 계산 (순수 로직)
 │   ├── PageTimer            종료 예약 (PageStatusChanged마다 재예약)
 │   ├── PageBootstrap        재시작 복구 (웹 서버 시작 전, PublishedFootprintSource로 점유율 재계산)
-│   ├── PostStore            큐 안에서 쓰는 게시 저장 포트 (쿨다운 예약·되돌림, doodle INSERT). doodle 패키지가 구현
+│   ├── PostStore            큐 안에서 쓰는 게시 저장 포트 (쿨다운 예약·되돌림, doodle INSERT, 보류·거부 저장과 게시,
+│   │                        moderation_action 기록). doodle 패키지가 구현
 │   └── event/               PageStatusChanged, OccupancyChanged, PageTurned, DoodlePublished (커밋 후 발행 → STOMP로 중계)
 ├── doodle/        게시(DoodleController: 본문 2MB 상한·엄격한 JSON, DoodleValidator 순수 검증·bbox·칸·청크,
 │                  PublishService: 예약 → 검사 → 게시 → 실패 시 되돌림, JdbcPostStore, PublishedDoodleFootprints),
 │                  청크 조회(ChunkList 순수 검증, ChunkDoodleQuery JDBC, ChunkDoodleController). 삭제는 08
-├── moderation/    ModerationProvider 인터페이스, 구현체 4개(WordFilter, ChatKhu, OpenAi, Ml), DoodleRenderer,
-│                  ModerationService(병렬 호출과 판정 합성), MlPredictionRecorder. 06에는 항상 UNCHECKED인 임시 ModerationService만
+├── moderation/    ModerationCheck 인터페이스(검사기 하나), ModerationChecks(설정 이름 → 구현, 없으면 StubCheck),
+│                  ModerationService(순서대로 호출·타임아웃·ML 그림자), VerdictCombiner(순수, 판정 합성),
+│                  WordFilterCheck + WordList + TextNormalizer(resources/moderation/*.txt). 07 틀: ChatKhu, OpenAi,
+│                  DoodleRenderer, Ml 구현과 MlPredictionRecorder는 아직 없음(스텁)
 ├── realtime/      STOMP 설정(WebSocketConfig, 하트비트), RealtimeInterceptor(구독 목적지 검증, SEND 권한·속도 제한),
 │                  SubscribeReceipts(구독 등록 후 RECEIPT, INV-09), StompErrorHandler(ERROR 프레임 = 에러 코드),
 │                  Broadcaster + PageEventRelay(page/event → 메타 토픽, DoodlePublished → 청크 토픽), CursorController(/app/cursor 중계),
 │                  DraftController + DraftRules(/app/draft 검증·중계, 연결 종료 시 취소), RealtimeErrorAdvice
-├── admin/         관리자 API, moderation_action 기록
+├── admin/         관리자 API: 검토 목록(AdminDoodleQuery), 보류·거부 게시와 거부(AdminReviewService → 큐), 조치 기록 조회
 └── common/        에러 응답 형식(ApiError), 예외 → 에러 코드 매핑, 시계(Clock) 주입
 ```
 
@@ -148,8 +151,10 @@ Client                         REST(Controller)          PageCommandProcessor(�
 - ③ 예약(06): `ReservePost`가 DB에서 차단·역할·`last_posted_at`을 읽고, 쿨다운이 지났으면 `UPDATE users SET last_posted_at = now WHERE id = ? AND banned_at IS NULL AND last_posted_at <=> 읽은 값`. 관리자는 아무것도 쓰지 않음. 예약 시각 = `submitted_at`
 - 되돌림(D-28): ④에서 예외가 나거나 ⑤가 `PAGE_ENDED`·DB 오류로 실패하면 `ReleasePost`가 `last_posted_at`을 예약 전 값으로(그사이 바뀌지 않았을 때만). AI 거부(07)는 되돌리지 않음
 - ⑤ 게시(06): doodle과 `doodle_chunk`(bbox가 걸치는 청크) INSERT와 카운트다운 UPDATE가 한 트랜잭션. 커밋 뒤 `DoodlePublished` → 청크마다 `doodle:published`, 이어서 `minimap:diff`, `page:status`
-- 06의 ④는 임시 구현으로 항상 `UNCHECKED`. 06만 배포하지 않음(PIPELINE)
-- 거부되면 `RecordReject`가 `status=REJECTED`로 저장하고 `moderation_action(AI, REJECT)`를 기록합니다. 쿨다운은 그대로 소모됩니다(D-12).
+- ④ 검사(07 틀, `specs/07-moderation-frame.md`): `ModerationService`가 설정한 검사기(`graffiti.moderation.text-checks`, `drawing-checks`)를 순서대로 부르고(각각 타임아웃, BLOCK이면 멈춤) `VerdictCombiner`가 합칩니다. BLOCK → `REJECTED`, REVIEW·ERROR → `HELD`, 모두 PASS → `PASSED`, 스텁(아직 없는 검사기)이 끼어 있으면 `UNCHECKED`이고 `graffiti.moderation.unchecked`(기본 `HOLD`)가 보류할지 게시할지 정합니다. ML은 `ml.mode`대로 따로 돌고 SHADOW면 기록만(INV-13)
+- **실제 검사기는 아직 없습니다**(금칙어는 목록 파일이 비어 있어 SKIPPED, ChatKHU·OpenAI·ML은 스텁). 기본 설정이면 모든 낙서가 보류되므로, `unchecked: PUBLISH`로 바꿔 공개 배포하면 06과 같은 미검사 상태가 됩니다(PIPELINE)
+- 거부·보류되면 `WithholdDoodle`이 `status=REJECTED|HELD`로 저장하고(`doodle_chunk` 포함, 점유율·브로드캐스트 없음) `moderation_action(AI, REJECT|HOLD)`를 같은 트랜잭션에서 기록합니다. 쿨다운은 그대로 소모됩니다(D-12). 그사이 페이지가 넘어갔으면 `PAGE_ENDED` + 되돌림
+- 관리자가 보류·거부를 게시하면(`PublishWithheld`, 현재 페이지만) ⑤와 같이 점유율·`doodle:published`가 나가고 `moderation_action(ADMIN, APPROVE|RESTORE)`가 남습니다
 - DB 쓰기는 큐 작업 안에서 트랜잭션 하나로 묶고, 커밋이 성공한 **뒤에** 메모리 상태 갱신과 브로드캐스트를 합니다. DB가 실패하면 메모리는 그대로입니다.
 
 ### 4.2 화면 이동과 초기 로딩 (INV-09)
@@ -276,7 +281,7 @@ PageBootstrap (SmartLifecycle, 웹 서버보다 앞 단계)
 | **INV-02** | 큐 안에서 느린 작업(AI 호출, 이미지 렌더링, 외부 HTTP, 대량 조회)을 하지 않는다. 큐 작업 하나는 수 ms 안에 끝나야 한다 | D-03 |
 | **INV-03** | 페이지 상태는 `ACTIVE → COUNTDOWN → ENDED` 한 방향. 카운트다운은 취소되지 않는다. 종료 시각 = `min(created_at + 7일, countdown_started_at + 6시간)`. 전이는 이전 상태를 조건으로 하는 UPDATE로 | D-15 |
 | **INV-04** | 모든 쓰기 요청과 STOMP 전송은 `pageId`를 포함하고, 현재 페이지가 아니면 `PAGE_ENDED`로 거절한다 | D-16 |
-| **INV-05** | doodle은 모더레이션 결과가 `PASSED` 또는 `UNCHECKED`일 때만 게시된다. 검사를 건너뛰는 경로는 없다 | D-18 |
+| **INV-05** | doodle은 모더레이션 결과가 `PASSED` 또는 `UNCHECKED`일 때만 게시된다. 검사를 건너뛰는 경로는 없다. `HELD`·`REJECTED`는 관리자가 게시할 때만 캔버스에 나온다(`moderation_action` 기록) | D-18, D-23 |
 | **INV-06** | 초안은 DB나 디스크에 저장하지 않는다. 메모리에서도 중계만 하고 보관하지 않는다 | D-11 |
 | **INV-07** | doodle과 page 행은 삭제하지 않는다(상태만 바꿈). 종료된 페이지 데이터도 보관한다 | D-17 |
 | **INV-08** | 쿨다운은 큐 안에서 `last_posted_at`으로 확인하고 기록한다. AI 거부여도 소모, 삭제해도 반환 없음, 모더레이션 중 페이지 종료 시에만 되돌림. 관리자 면제 | D-12, D-28 |
@@ -314,7 +319,11 @@ PageBootstrap (SmartLifecycle, 웹 서버보다 앞 단계)
 | `graffiti.realtime.draft-interval` | 100ms (클라이언트 초안 전송 간격, `draftIntervalMs`. 초당 20회 한도 안) | 05, D-12 |
 | `graffiti.realtime.heartbeat` | 10s (STOMP 양방향 하트비트, `heartbeatMs`) | 04 |
 | `graffiti.query.max-chunks` / `max-batch-delete` | 60 / 50 | D-30 |
-| `graffiti.moderation.timeout` | 5s | D-18 |
+| `graffiti.query.admin-page-size-max` | 100 (관리자 목록 한 번의 최대 개수) | 07 틀 |
+| `graffiti.moderation.timeout` | 5s (검사기 하나마다) | D-18 |
+| `graffiti.moderation.unchecked` | 환경변수 `MODERATION_UNCHECKED`, 기본 `HOLD`. 실제 검사 없이 스텁만 지난 낙서를 보류(`HOLD`)할지 미검사로 게시(`PUBLISH`, 로컬 전용)할지 | 07 틀, D-42 |
+| `graffiti.moderation.text-checks` | [word-filter, chatkhu, openai-text] (순서대로, 없는 구현은 스텁) | D-19 |
+| `graffiti.moderation.drawing-checks` | [openai-image] | D-19 |
 | `graffiti.moderation.ml.mode` | SHADOW | D-34, D-39 |
 | `graffiti.moderation.ml.base-url` | http://ml:8000 (내부망) | D-36 |
 | `graffiti.moderation.ml.timeout` | 3s | D-36 |

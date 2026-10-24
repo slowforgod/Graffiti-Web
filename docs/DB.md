@@ -87,9 +87,9 @@ CREATE TABLE doodle (
   page_id           BIGINT      NOT NULL,
   author_id         BIGINT      NOT NULL,
   kind              ENUM('DRAWING','TEXT') NOT NULL,
-  status            ENUM('PUBLISHED','REJECTED','HIDDEN','DELETED') NOT NULL,
-  moderation_state  ENUM('PASSED','REJECTED','UNCHECKED') NOT NULL,
-  moderation_detail JSON        NULL,                        -- 제공자별 결과, 카테고리, 점수
+  status            ENUM('PUBLISHED','REJECTED','HELD','HIDDEN','DELETED') NOT NULL,   -- HELD: 관리자 검토 대기 (V5)
+  moderation_state  ENUM('PASSED','REJECTED','HELD','UNCHECKED') NOT NULL,           -- AI 판정. 관리자가 게시해도 그대로
+  moderation_detail JSON        NULL,                        -- 검사별 결과 (아래 3절). 원문 글자 없음 (SEC-05)
   bbox_x            INT         NOT NULL,                    -- 월드 좌표, 서버가 계산/검증
   bbox_y            INT         NOT NULL,
   bbox_w            INT         NOT NULL,                    -- ≤ 1024 (D-11)
@@ -110,6 +110,7 @@ CREATE TABLE doodle (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- doodle의 bbox가 걸치는 청크마다 1행 (최대 4×4=16행, 보통 1~4행) (D-24)
+-- REJECTED·HELD로 저장된 doodle도 행을 만든다(관리자가 게시할 때 그대로 씀). 청크 조회는 PUBLISHED만
 CREATE TABLE doodle_chunk (
   page_id      BIGINT   NOT NULL,
   chunk_index  SMALLINT NOT NULL,                            -- cy * 16 + cx, 0~143
@@ -123,7 +124,8 @@ CREATE TABLE moderation_action (
   id               BIGINT      NOT NULL AUTO_INCREMENT,
   actor_type       ENUM('AI','ADMIN','SYSTEM') NOT NULL,
   actor_id         BIGINT      NULL,                         -- 관리자 user id
-  action           ENUM('REJECT','MARK_UNCHECKED','DELETE','HIDE','RESTORE','BAN','UNBAN') NOT NULL,
+  action           ENUM('REJECT','HOLD','APPROVE','MARK_UNCHECKED','DELETE','HIDE','RESTORE','BAN','UNBAN') NOT NULL,
+                   -- HOLD: AI가 보류, APPROVE: 관리자가 보류를 게시, RESTORE: 관리자가 거부를 게시 (V5)
   target_doodle_id BIGINT      NULL,
   target_user_id   BIGINT      NULL,
   reason           VARCHAR(500) NULL,
@@ -131,6 +133,7 @@ CREATE TABLE moderation_action (
   created_at       DATETIME(3) NOT NULL,
   PRIMARY KEY (id),
   KEY idx_ma_target_user (target_user_id, action),
+  KEY idx_ma_target_doodle (target_doodle_id),
   KEY idx_ma_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -159,7 +162,7 @@ CREATE TABLE ml_prediction (
 -- 로그인 후 세션 속성은 SecurityContext(SessionUser: userId만)이고 이메일, 토큰은 없음(SEC-13).
 ```
 
-- `doodle_chunk`는 **게시될 때** 넣습니다. REJECTED doodle은 넣지 않고, 복구할 때 넣습니다. HIDDEN이나 DELETED가 돼도 행은 남기며, 조회할 때 `doodle.status='PUBLISHED'`로 거릅니다.
+- `doodle_chunk`는 doodle을 **저장할 때** 함께 넣습니다(PUBLISHED, REJECTED, HELD 모두). 관리자가 보류·거부를 게시하면 이 행을 그대로 써서 청크에 알립니다. HIDDEN이나 DELETED가 돼도 행은 남기며, 조회할 때 `doodle.status='PUBLISHED'`로 거릅니다.
 - 행은 삭제하지 않습니다(INV-07).
 
 ## 3. payload JSON 형식
@@ -188,6 +191,20 @@ CREATE TABLE ml_prediction (
 - 서버는 그림의 bbox를 **점에서 직접 계산**합니다(굵기의 절반만큼 확장). 클라이언트가 보낸 bbox는 쓰지 않아요.
 - 텍스트 bbox는 클라이언트 값을 상한 검증해서 씁니다(D-31).
 
+`moderation_detail` (07 틀. 검사기 이름과 결과 코드만 담고, 원문 글자·AI 응답 원문은 넣지 않음, SEC-05)
+
+```jsonc
+{
+  "checks": [                                   // 설정 순서대로, BLOCK에서 멈춤
+    { "check": "word-filter", "outcome": "PASS" },
+    { "check": "chatkhu", "outcome": "ERROR", "note": "TIMEOUT" },     // note: TIMEOUT, EXCEPTION, BAD_RESULT
+    { "check": "openai-text", "outcome": "SKIPPED" }                  // SKIPPED = 아직 구현 안 된 검사(스텁)
+  ],
+  "ml": { "check": "ml", "outcome": "BLOCK", "category": "SEXUAL", "mode": "SHADOW" },  // ml.mode가 OFF면 없음
+  "heldAsUnchecked": true                       // 실제 검사가 없어 unchecked=HOLD 설정으로 보류된 경우만
+}
+```
+
 ## 4. 주요 쿼리
 
 ```sql
@@ -206,6 +223,13 @@ WHERE id = :id AND banned_at IS NULL AND last_posted_at <=> :readValue;
 
 -- 게시 되돌림 (D-28): 예약한 값이 그대로일 때만 이전 값으로
 UPDATE users SET last_posted_at = :previous WHERE id = :id AND last_posted_at = :reservedAt;
+
+-- 관리자가 보류·거부를 게시 (07 틀, 큐 안): 그 상태 그대로이고 현재 페이지일 때만. 0행이면 STATE_CONFLICT
+UPDATE doodle SET status = 'PUBLISHED', published_at = :now
+WHERE id = :id AND page_id = :currentPage AND status = :from;   -- :from = 'HELD' 또는 'REJECTED'
+
+-- 관리자가 보류를 거부
+UPDATE doodle SET status = 'REJECTED' WHERE id = :id AND status = 'HELD';
 
 -- 상태 전이 (INV-03): 영향받은 행이 0이면 예외
 UPDATE page SET status = 'COUNTDOWN', countdown_started_at = ?, scheduled_end_at = ?

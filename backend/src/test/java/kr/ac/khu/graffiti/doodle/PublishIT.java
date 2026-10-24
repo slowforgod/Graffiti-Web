@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -28,6 +29,7 @@ import java.util.stream.IntStream;
 import kr.ac.khu.graffiti.auth.SessionUser;
 import kr.ac.khu.graffiti.config.GraffitiProperties;
 import kr.ac.khu.graffiti.moderation.ModerationService;
+import kr.ac.khu.graffiti.moderation.ModerationState;
 import kr.ac.khu.graffiti.page.FreshPage;
 import kr.ac.khu.graffiti.page.PageCommand;
 import kr.ac.khu.graffiti.page.PageCommandProcessor;
@@ -213,6 +215,83 @@ class PublishIT extends WebIntegrationTest {
         publish(author, DRAWING).andExpect(status().isInternalServerError());
 
         assertThat(lastPostedAt(author)).isNull();
+    }
+
+    @Test
+    void aHeldDoodleIsStoredOffTheCanvasAndKeepsTheCooldown() throws Exception {
+        Instant pressed = clock.instant();
+        doReturn(new ModerationService.Verdict(ModerationState.HELD, "{\"checks\": []}", null))
+                .when(moderation).moderate(anyString(), any());
+
+        JsonNode body = read(publish(author, DRAWING).andExpect(status().isAccepted()));
+
+        assertThat(fieldNames(body)).containsExactlyInAnyOrder("held", "cooldownEndsAt");
+        assertThat(body.get("held").asBoolean()).isTrue();
+        assertThat(body.get("cooldownEndsAt").asText()).isEqualTo(pressed.plus(props.postCooldown()).toString());
+        assertThat(lastPostedAt(author)).isEqualTo(pressed);
+
+        Map<String, Object> row = jdbc.queryForMap("SELECT * FROM doodle WHERE author_id = ?", author.getId());
+        assertThat(row).containsEntry("status", "HELD").containsEntry("moderation_state", "HELD");
+        assertThat(row.get("published_at")).isNull();
+        long id = ((Number) row.get("id")).longValue();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM doodle_chunk WHERE doodle_id = ?", Integer.class, id))
+                .isPositive();
+        assertThat(jdbc.queryForMap("SELECT actor_type, action, target_user_id FROM moderation_action "
+                + "WHERE target_doodle_id = ?", id)).containsEntry("actor_type", "AI").containsEntry("action", "HOLD")
+                .containsEntry("target_user_id", author.getId());
+
+        assertThat(events.of(Object.class)).isEmpty();
+        assertThat(processor.submit(new PageCommand.GetPageSnapshot()).join().occupancyPermille()).isZero();
+        mvc.perform(get("/api/pages/{p}/doodles", page.id()).param("chunks", "0"))
+                .andExpect(jsonPath("$.doodles").isEmpty());
+    }
+
+    @Test
+    void aRejectedDoodleIsRefusedWithItsCategoryAndKeepsTheCooldown() throws Exception {
+        Instant pressed = clock.instant();
+        doReturn(new ModerationService.Verdict(ModerationState.REJECTED, "{\"checks\": []}", "PROFANITY"))
+                .when(moderation).moderate(anyString(), any());
+
+        publish(author, TEXT).andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error.code").value("MODERATION_REJECTED"))
+                .andExpect(jsonPath("$.error.details.category").value("PROFANITY"))
+                .andExpect(jsonPath("$.error.details.cooldownEndsAt")
+                        .value(pressed.plus(props.postCooldown()).toString()));
+
+        assertThat(lastPostedAt(author)).isEqualTo(pressed);
+        Map<String, Object> row = jdbc.queryForMap("SELECT * FROM doodle WHERE author_id = ?", author.getId());
+        assertThat(row).containsEntry("status", "REJECTED").containsEntry("moderation_state", "REJECTED");
+        assertThat(jdbc.queryForObject("SELECT action FROM moderation_action WHERE target_doodle_id = ?",
+                String.class, row.get("id"))).isEqualTo("REJECT");
+        assertThat(events.of(Object.class)).isEmpty();
+    }
+
+    @Test
+    void aPageThatTurnsBeforeAHoldIsStoredGivesThePostBack() throws Exception {
+        doAnswer(inv -> {
+            clock.set(page.scheduledEndAt().plusSeconds(1));
+            processor.submit(new PageCommand.EndPage(page.id())).join();
+            return new ModerationService.Verdict(ModerationState.HELD, null, null);
+        }).when(moderation).moderate(anyString(), any());
+
+        publish(author, TEXT).andExpect(status().isConflict()).andExpect(jsonPath("$.error.code").value("PAGE_ENDED"));
+
+        assertThat(lastPostedAt(author)).isNull();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM doodle WHERE author_id = ?", Integer.class,
+                author.getId())).isZero();
+    }
+
+    @Test
+    void aFailedHoldInsertGivesThePostBack() throws Exception {
+        doReturn(new ModerationService.Verdict(ModerationState.HELD, null, null))
+                .when(moderation).moderate(anyString(), any());
+        doThrow(new DataAccessResourceFailureException("db down")).when(posts).recordAction(any(), any());
+
+        publish(author, DRAWING).andExpect(status().isInternalServerError());
+
+        assertThat(lastPostedAt(author)).isNull();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM doodle WHERE author_id = ?", Integer.class,
+                author.getId())).isZero();
     }
 
     @Test

@@ -15,6 +15,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import kr.ac.khu.graffiti.auth.Access;
 import kr.ac.khu.graffiti.auth.AuthUser;
@@ -24,12 +25,13 @@ import kr.ac.khu.graffiti.common.error.ErrorCode;
 import kr.ac.khu.graffiti.config.GraffitiProperties;
 import kr.ac.khu.graffiti.doodle.DoodleValidator.InvalidDoodleException;
 import kr.ac.khu.graffiti.doodle.DoodleValidator.Validated;
+import kr.ac.khu.graffiti.moderation.ModerationState;
 import kr.ac.khu.graffiti.page.PageReader;
 import kr.ac.khu.graffiti.page.PageSnapshot;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /** {@code POST /api/pages/{pageId}/doodles} (API.md §3): ✓ publishes a draft. */
@@ -57,6 +59,10 @@ class DoodleController {
     record Response(ChunkDoodleController.Doodle doodle, Instant cooldownEndsAt) {
     }
 
+    /** {@code 202}: stored, but waiting for an admin (D-42, PROPOSED). Nothing about the doodle goes back. */
+    record HeldResponse(boolean held, Instant cooldownEndsAt) {
+    }
+
     private final PageReader pages;
     private final PublishService publisher;
     private final GraffitiProperties props;
@@ -68,17 +74,30 @@ class DoodleController {
     }
 
     @PostMapping("/api/pages/{pageId}/doodles")
-    @ResponseStatus(HttpStatus.CREATED)
-    Response publish(@PathVariable long pageId, @CurrentUser(Access.AUTHOR) AuthUser user,
+    ResponseEntity<?> publish(@PathVariable long pageId, @CurrentUser(Access.AUTHOR) AuthUser user,
             HttpServletRequest request) throws IOException {
         byte[] body = readBody(request);
         PageSnapshot page = pages.requireCurrent(pageId);
         Validated doodle = validate(body, limits(page));
         PublishService.Result result = publisher.publish(pageId, user.id(), doodle);
+        if (result.state() == ModerationState.REJECTED) {
+            // Absent rather than null: an admin has no cooldown, and a check may block without a category.
+            Map<String, Object> details = new LinkedHashMap<>();
+            if (result.category() != null) {
+                details.put("category", result.category());
+            }
+            if (result.cooldownEndsAt() != null) {
+                details.put("cooldownEndsAt", result.cooldownEndsAt().toString());
+            }
+            throw new ApiException(ErrorCode.MODERATION_REJECTED, details);
+        }
+        if (!result.published()) {
+            return ResponseEntity.status(HttpStatus.ACCEPTED).body(new HeldResponse(true, result.cooldownEndsAt()));
+        }
         DoodleValidator.Box b = doodle.bbox();
-        return new Response(new ChunkDoodleController.Doodle(Long.toString(result.id()), doodle.kind(),
-                new ChunkDoodleController.Bbox(b.x(), b.y(), b.w(), b.h()), result.payload()),
-                result.cooldownEndsAt());
+        return ResponseEntity.status(HttpStatus.CREATED).body(new Response(new ChunkDoodleController.Doodle(
+                Long.toString(result.id()), doodle.kind(), new ChunkDoodleController.Bbox(b.x(), b.y(), b.w(), b.h()),
+                result.payload()), result.cooldownEndsAt()));
     }
 
     // Reads at most max-payload-bytes; one byte more means the body is too large (SEC-08, D-11).

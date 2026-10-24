@@ -7,13 +7,18 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.MySQLContainer;
 
 /**
  * Base for integration tests: one MySQL 8.4 container for the whole run and a movable clock.
  * Subclasses share one Spring context when they add no other configuration.
+ *
+ * <p>The moderation checks are stubs until the criteria are settled, so the shipped default would hold every
+ * doodle; tests publish unchecked ones like 06 did and stub {@code ModerationService} to test the other results.
  */
 @SpringBootTest
+@TestPropertySource(properties = "graffiti.moderation.unchecked=PUBLISH")
 @Import(IntegrationTest.ClockConfig.class)
 public abstract class IntegrationTest {
 
