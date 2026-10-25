@@ -377,8 +377,8 @@ EC2 (메모리 4GB급, D-36) 보안 그룹: 80/443, 22는 팀원과 배포용 (S
 | nginx 설정 (`deploy/nginx/`) | 값 | 근거 |
 |---|---|---|
 | `/api/` IP당 속도 | 20r/s, burst 40 | SEC-09 |
-| `/oauth2/`, `/login/` IP당 속도 | 10r/m, burst 10 | SEC-09 |
-| `/ws` IP당 동시 연결 | 10 | SEC-08 |
+| `/oauth2/`, `/login/` IP당 속도 | 60r/m, burst 60 (학교 NAT 뒤 한 강의실이 동시에 로그인해도 통과) | SEC-09 |
+| `/ws` IP당 동시 연결 | 100 (학교 NAT 뒤 여러 학생이 한 IP를 공유) | SEC-08 |
 
 - nginx는 IP 단위로 막고, 앱은 그 뒤에서 **사용자 단위**로 한 번 더 막습니다(`auth/ApiGuards`, 11): 관리자 API는 경로 자체가 관리자 전용(핸들러가 `@CurrentUser(ADMIN)`을 빠뜨려도 403)이고 관리자마다 초당 20회, 그 밖의 상태 변경 요청은 사용자마다 초당 10회. 넘으면 `429 RATE_LIMITED`.
 | `client_max_body_size` | 3m (앱의 2MB 한도보다 크게 두어 앱이 413을 API 형식으로 응답) | D-30 |
