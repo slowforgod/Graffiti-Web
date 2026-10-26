@@ -3,7 +3,7 @@ import type { Point } from '../canvas/viewport';
 import type { RealtimeLink } from '../realtime/link';
 import type { ClientConfig } from '../shared/pageConfig';
 import type { Draft, DrawingDraft, TextDraft } from './draft';
-import { eraseAt, extendStroke, inCanvas, newDrawing, startStroke, textLength } from './draft';
+import { eraseAt, extendStroke, inCanvas, liveStrokes, moveDraft, newDrawing, startStroke, textLength } from './draft';
 import { DraftSender } from './draftSender';
 import { measureText } from './textMeasure';
 
@@ -57,6 +57,8 @@ export function useDraft({ pageId, config, link, newId = () => crypto.randomUUID
   const sender = useRef<DraftSender | null>(null);
   const stroke = useRef<number | null>(null);
   const idle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The draft was dragged by its move handle since the drag began.
+  const moved = useRef(false);
 
   const redraw = useCallback(() => setVersion((v) => v + 1), []);
 
@@ -185,6 +187,33 @@ export function useDraft({ pageId, config, link, newId = () => crypto.randomUUID
     }
   };
 
+  // Drags the draft by a world delta with its move handle. The viewers see the new place when the drag ends.
+  const moveBy = (dx: number, dy: number) => {
+    const d = draft.current;
+    if (d && moveDraft(d, dx, dy, config)) {
+      moved.current = true;
+      touched();
+    }
+  };
+
+  // A text only needs its new box. A moved drawing goes out again as a new draft: the viewers drop the old
+  // one and get every stroke at its new place (API.md §6 has no move message).
+  const moveEnd = () => {
+    const d = draft.current;
+    if (!d || !moved.current) {
+      return;
+    }
+    moved.current = false;
+    if (d.kind === 'TEXT') {
+      sender.current?.text({ x: d.x, y: d.y, w: d.w, h: d.h });
+      return;
+    }
+    sender.current?.cancel();
+    const again = begin<DrawingDraft>({ id: newId(), kind: 'DRAWING', strokes: liveStrokes(d) });
+    again.strokes.forEach((_, i) => sender.current?.points(i));
+    touched();
+  };
+
   // Applies a new text (or size or colour) to the text draft when it stays within the limits (D-07, D-11).
   const editText = (next: { text?: string; size?: number; c?: number }): boolean => {
     const d = draft.current;
@@ -236,6 +265,8 @@ export function useDraft({ pageId, config, link, newId = () => crypto.randomUUID
     pointerDown,
     pointerMove,
     pointerUp,
+    moveBy,
+    moveEnd,
     editText: (text: string) => editText({ text }),
     cancel: () => drop('cancel'),
   };

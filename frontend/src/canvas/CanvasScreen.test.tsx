@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Me } from '../auth/me';
 import { FakeLink } from '../realtime/fakeLink';
@@ -283,6 +283,26 @@ describe('CanvasScreen', () => {
       act(() => screen.getByRole('button', { name: '취소' }).click());
       expect(drafts().at(-1)).toEqual({ pageId: '3', draftId, op: 'cancel' });
       expect(screen.queryByRole('button', { name: '취소' })).not.toBeInTheDocument();
+    });
+
+    it('moves the draft with the handle and relays it again at the new place', async () => {
+      const { drafts } = await open();
+      draw();
+      const first = drafts()[0]!.draftId;
+      const handle = screen.getByRole('button', { name: '낙서 옮기기' });
+      // jsdom has no PointerEvent; a MouseEvent carries the coordinates the handle reads.
+      vi.stubGlobal('PointerEvent', MouseEvent);
+
+      fireEvent.pointerDown(handle, { clientX: 100, clientY: 100, pointerId: 1 });
+      fireEvent.pointerMove(handle, { clientX: 120, clientY: 90, pointerId: 1 });
+      fireEvent.pointerUp(handle, { clientX: 120, clientY: 90, pointerId: 1 });
+
+      const sent = drafts();
+      expect(sent).toContainEqual({ pageId: '3', draftId: first, op: 'cancel' });
+      const again = sent.at(-1)!;
+      expect(again.draftId).not.toBe(first);
+      expect(again).toMatchObject({ op: 'points', strokeIndex: 0 });
+      expect((again.points as number[]).slice(0, 2)).toEqual([3820, 2090]);
     });
 
     const published = {
@@ -615,7 +635,10 @@ describe('CanvasScreen', () => {
       act(() => screen.getByRole('button', { name: '내 낙서' }).click());
       expect(await screen.findByText(/내 낙서가 1개 있어요/)).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: '고른 낙서 지우기' })).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: '모두 PNG로 저장' })).toBeEnabled();
+      // Saving waits for a pick like deleting does.
+      expect(screen.getByRole('button', { name: '고른 낙서 PNG로 저장' })).toBeDisabled();
+      act(() => screen.getByRole('button', { name: 'pick 11' }).click());
+      expect(screen.getByRole('button', { name: '고른 낙서 PNG로 저장' })).toBeEnabled();
     });
 
     it('is not offered to signed-out visitors', async () => {

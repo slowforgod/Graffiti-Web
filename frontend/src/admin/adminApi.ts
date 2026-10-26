@@ -49,6 +49,22 @@ export function rejectDoodle(id: string): Promise<{ id: string; status: string }
   return apiFetch(`/api/admin/doodles/${encodeURIComponent(id)}/reject`, { method: 'POST' });
 }
 
+// The admin action log (SEC-14), newest first.
+export interface AdminAction {
+  id: string;
+  actorType: string;
+  actorId: string | null;
+  action: string;
+  targetDoodleId: string | null;
+  targetUserId: string | null;
+  reason: string | null;
+  createdAt: string;
+}
+
+export function fetchActions(page = 0, size = 50): Promise<{ items: AdminAction[]; total: number }> {
+  return apiFetch(`/api/admin/actions?page=${page}&size=${size}`);
+}
+
 // One line for the card, e.g. "word-filter 통과 · chatkhu 미구현".
 const OUTCOME: Record<CheckEntry['outcome'], string> = {
   PASS: '통과',
