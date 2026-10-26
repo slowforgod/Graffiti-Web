@@ -51,6 +51,7 @@ class MeController {
     ResponseEntity<Void> logout(@CurrentUser(Access.SIGNED_IN) AuthUser user, HttpServletRequest request,
             HttpServletResponse response) {
         logout.logout(request, response, SecurityContextHolder.getContext().getAuthentication());
+        LogoutMark.set(response);
         return ResponseEntity.noContent().build();
     }
 

@@ -49,6 +49,8 @@ class LoginHandlersTest {
                 .containsExactly("ROLE_USER");
         assertThat(stored.getAuthentication().toString()).doesNotContain("a@khu.ac.kr", "token-value");
         assertThat(response.getRedirectedUrl()).isEqualTo("/");
+        // A login after a logout ends the account chooser until the next logout.
+        assertThat(response.getHeader("Set-Cookie")).startsWith(LogoutMark.COOKIE + "=;").contains("Max-Age=0");
     }
 
     @Test
