@@ -23,7 +23,7 @@ export default function ConsentScreen({ onAgree, onCancel }: Props) {
   };
 
   return (
-    <section role="dialog" aria-modal="true" aria-labelledby="consent-title">
+    <section className="consent-screen" role="dialog" aria-modal="true" aria-labelledby="consent-title">
       <h2 id="consent-title">개인정보 수집·이용 동의</h2>
       <dl>
         <dt>수집 항목</dt>

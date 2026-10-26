@@ -99,6 +99,44 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* The consent dialog (01) over everything, with the canvas dimmed behind it: until it is answered
+   the drawing tools stay off, so it must never be hidden under the fixed canvas. */
+.consent-screen {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 40;
+  box-sizing: border-box;
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 20px 22px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.45);
+}
+
+.consent-screen h2 {
+  margin-top: 0;
+  font-size: 18px;
+}
+
+.consent-screen dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  font-size: 14px;
+}
+
+.consent-screen dt {
+  color: #666;
+}
+
+.consent-screen dd {
+  margin: 0;
+}
+
 .canvas-screen {
   position: fixed;
   inset: 0;
