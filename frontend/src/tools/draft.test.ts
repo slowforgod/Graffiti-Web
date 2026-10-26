@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { draftBounds, eraseAt, extendStroke, isEmpty, liveStrokes, newDrawing, startStroke, strokeBounds, textLength } from './draft';
+import {
+  draftBounds,
+  eraseAt,
+  extendStroke,
+  isEmpty,
+  liveStrokes,
+  moveDraft,
+  newDrawing,
+  startStroke,
+  strokeBounds,
+  textLength,
+} from './draft';
 import { measureText } from './textMeasure';
 
 const LIMITS = { width: 7680, height: 4320, maxBbox: 1024 };
@@ -61,5 +72,30 @@ describe('text drafts', () => {
     expect(measureText('abcd', 10, (line) => line.length * 5.2)).toEqual({ w: 21, h: 10 });
     expect(measureText('ab', 10, () => 99)).toEqual({ w: 20, h: 10 });
     expect(measureText('', 24, () => 0)).toEqual({ w: 1, h: 24 });
+  });
+});
+
+describe('moving a draft', () => {
+  it('shifts every stroke by whole pixels', () => {
+    const d = newDrawing('a');
+    const i = startStroke(d, { x: 100, y: 100 }, 0, 4, LIMITS)!;
+    extendStroke(d, i, { x: 110, y: 105 }, LIMITS);
+    expect(moveDraft(d, 20.4, -9.6, LIMITS)).toBe(true);
+    expect(d.strokes[i]!.p).toEqual([120, 90, 130, 95]);
+  });
+
+  it('stops at the canvas edge', () => {
+    const d = newDrawing('a');
+    startStroke(d, { x: 10, y: 10 }, 0, 4, LIMITS);
+    // The bbox starts at 8 (half the width), so it can go 8px left and no further.
+    expect(moveDraft(d, -50, 0, LIMITS)).toBe(true);
+    expect(draftBounds(d)!.x).toBe(0);
+    expect(moveDraft(d, -5, 0, LIMITS)).toBe(false);
+  });
+
+  it('moves a text by its corner', () => {
+    const t = { id: 't', kind: 'TEXT' as const, text: 'hi', c: 0, size: 24, x: 7600, y: 50, w: 60, h: 30 };
+    moveDraft(t, 100, 10, LIMITS);
+    expect(t).toMatchObject({ x: 7620, y: 60 });
   });
 });

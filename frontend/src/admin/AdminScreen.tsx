@@ -2,18 +2,23 @@ import { useEffect, useState } from 'react';
 import { ApiError } from '../api/client';
 import type { Me } from '../auth/me';
 import { fetchCurrentPage } from '../shared/pageConfig';
-import type { ReviewDoodle, ReviewFilter } from './adminApi';
-import { describeChecks, fetchReview, rejectDoodle, restoreDoodle } from './adminApi';
+import type { AdminAction, ReviewDoodle, ReviewFilter } from './adminApi';
+import { describeChecks, fetchActions, fetchReview, rejectDoodle, restoreDoodle } from './adminApi';
 import DoodlePreview from './DoodlePreview';
 
 interface Props {
   me: Me | undefined;
+  // Shown in the settings drawer over the canvas: a close button instead of the link back.
+  onClose?: () => void;
 }
 
-const TABS: { filter: ReviewFilter; label: string }[] = [
+type View = ReviewFilter | 'ACTIONS';
+
+const TABS: { filter: View; label: string }[] = [
   { filter: 'HELD', label: '보류' },
   { filter: 'REJECTED', label: '거부' },
   { filter: 'UNCHECKED', label: '미검사 게시' },
+  { filter: 'ACTIONS', label: '조치 기록' },
 ];
 
 const PREVIEW_PX = 160;
@@ -31,10 +36,12 @@ function message(e: unknown): string {
   return '처리하지 못했어요.';
 }
 
-// /admin: the review queue of D-23 (held, rejected, published unchecked doodles).
-export default function AdminScreen({ me }: Props) {
-  const [filter, setFilter] = useState<ReviewFilter>('HELD');
+// The admin tools: the review queue of D-23 (held, rejected, published unchecked doodles) and the action
+// log. Opened from the settings button on the canvas, or at /admin.
+export default function AdminScreen({ me, onClose }: Props) {
+  const [filter, setFilter] = useState<View>('HELD');
   const [items, setItems] = useState<ReviewDoodle[]>([]);
+  const [actions, setActions] = useState<AdminAction[]>([]);
   const [total, setTotal] = useState(0);
   const [palette, setPalette] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -49,17 +56,23 @@ export default function AdminScreen({ me }: Props) {
       return;
     }
     let active = true;
-    fetchReview(filter, 0, PAGE_SIZE).then(
+    const load =
+      filter === 'ACTIONS'
+        ? fetchActions(0, PAGE_SIZE).then((page) => ({ ...page, items: [], actions: page.items }))
+        : fetchReview(filter, 0, PAGE_SIZE).then((page) => ({ ...page, actions: [] }));
+    load.then(
       (page) => {
         if (active) {
           setError(null);
           setItems(page.items);
+          setActions(page.actions);
           setTotal(page.total);
         }
       },
       (e: unknown) => {
         if (active) {
           setItems([]);
+          setActions([]);
           setTotal(0);
           setError(message(e));
         }
@@ -121,8 +134,14 @@ export default function AdminScreen({ me }: Props) {
   return (
     <section className="admin-screen">
       <header className="admin-header">
-        <h1>관리자 검토</h1>
-        <a href="/">캔버스로</a>
+        <h1>관리자</h1>
+        {onClose ? (
+          <button type="button" onClick={onClose}>
+            닫기
+          </button>
+        ) : (
+          <a href="/">캔버스로</a>
+        )}
       </header>
       <nav className="admin-tabs" aria-label="검토 목록">
         {TABS.map((t) => (
@@ -136,6 +155,19 @@ export default function AdminScreen({ me }: Props) {
       </nav>
       {error && <p role="alert">{error}</p>}
       <p className="admin-count">{total}개</p>
+      {filter === 'ACTIONS' && (
+        <ul className="admin-log" aria-label="조치 기록">
+          {actions.map((a) => (
+            <li key={a.id}>
+              <time>{new Date(a.createdAt).toLocaleString('ko-KR')}</time> <strong>{a.action}</strong> ({a.actorType}
+              {a.actorId ? ` #${a.actorId}` : ''})
+              {a.targetDoodleId && ` · 낙서 ${a.targetDoodleId}`}
+              {a.targetUserId && ` · 사용자 ${a.targetUserId}`}
+              {a.reason && ` · ${a.reason}`}
+            </li>
+          ))}
+        </ul>
+      )}
       <ul className="admin-list" aria-label="낙서 목록">
         {items.map((item) => (
           <li key={item.id} className="admin-item">

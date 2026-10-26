@@ -40,6 +40,32 @@ describe('App', () => {
     await screen.findByRole('link', { name: '경희대 계정으로 로그인' });
   });
 
+  it('shows the settings button to admins only and opens the admin tools from it', async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === '/api/me') return reply({ ...signedIn, role: 'ADMIN', consentRequired: false });
+      if (url.startsWith('/api/admin/doodles')) return reply({ items: [], page: 0, size: 20, total: 0 });
+      return reply({ error: { code: 'NOT_FOUND', message: '' } }, 404);
+    });
+    render(<App />);
+
+    const settings = await screen.findByRole('button', { name: '관리자 설정' });
+    expect(screen.queryByRole('link', { name: '관리자 검토' })).not.toBeInTheDocument();
+    await userEvent.click(settings);
+    const drawer = screen.getByRole('dialog', { name: '관리자 설정' });
+    expect(drawer).toHaveTextContent('보류');
+    expect(drawer).toHaveTextContent('조치 기록');
+    await userEvent.click(screen.getByRole('button', { name: '닫기' }));
+    expect(screen.queryByRole('dialog', { name: '관리자 설정' })).not.toBeInTheDocument();
+  });
+
+  it('hides the settings button from other users', async () => {
+    fetchMock.mockResolvedValue(reply({ ...signedIn, consentRequired: false }));
+    render(<App />);
+    await screen.findByText('익명의 펭귄 #3842');
+    expect(screen.queryByRole('button', { name: '관리자 설정' })).not.toBeInTheDocument();
+  });
+
   it('offers Google login when signed out', async () => {
     fetchMock.mockResolvedValue(reply({ authenticated: false }));
     render(<App />);

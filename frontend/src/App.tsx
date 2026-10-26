@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import AdminMenu from './admin/AdminMenu';
 import AdminScreen from './admin/AdminScreen';
 import { ADMIN_PATH } from './admin/adminApi';
 import AuthBar from './auth/AuthBar';
@@ -76,6 +77,7 @@ export default function App() {
       <header className="app-header">
         <h1>경희 낙서장</h1>
         <AuthBar me={me} onLogout={() => void signOut()} />
+        <AdminMenu me={me} />
       </header>
       <LoginErrorBanner code={loginError} onClose={() => setLoginError(null)} />
       {me?.authenticated && me.consentRequired && (

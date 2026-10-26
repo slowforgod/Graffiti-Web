@@ -18,6 +18,7 @@ import type { DraftNotice } from '../tools/useDraft';
 import { useDraft } from '../tools/useDraft';
 import { useMyDoodles } from '../mine/useMyDoodles';
 import DraftActions from '../ui/DraftActions';
+import DraftMoveHandle from '../ui/DraftMoveHandle';
 import MyDoodlesPanel from '../ui/MyDoodlesPanel';
 import Minimap from '../ui/Minimap';
 import StatusBar from '../ui/StatusBar';
@@ -36,10 +37,13 @@ import type { RemoteDraft } from './remoteDrafts';
 import { fetchChunkDoodles } from './doodles';
 import { useWindowSize } from './useWindowSize';
 import type { Point, Rect, Viewport } from './viewport';
-import { centerOn, visibleWorldRect } from './viewport';
+import { centerOn, clampScale, visibleWorldRect, zoomAt } from './viewport';
 
 // Waits for panning or zooming to settle before asking for new chunks.
 const CHUNK_DEBOUNCE_MS = 100;
+
+// The zoom buttons step by 30 percentage points (100% → 130% → 160%…), about the screen centre.
+const ZOOM_STEP = 0.3;
 
 // How often other people's silent drafts are looked at for the idle timeout.
 const DRAFT_EXPIRY_CHECK_MS = 30_000;
@@ -178,6 +182,8 @@ function PageCanvas({ page, link, me, onPageEnded: pageEnded, turnNotice }: Page
   // The cooldown this screen learned from its own posts; until then the one from /api/me.
   const [postedCooldown, setPostedCooldown] = useState<string | null>();
   const [publishing, setPublishing] = useState(false);
+  // A pen stroke is under way: the buttons over the canvas let the pointer through until it ends.
+  const [stroking, setStroking] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   // The same page loaded again (the end passed without page:turned) brings the server's latest times.
@@ -263,6 +269,8 @@ function PageCanvas({ page, link, me, onPageEnded: pageEnded, turnNotice }: Page
       ? sizeGuide(heldGuide, drawingBounds, visibleWorldRect(viewport, size), config)
       : null;
   const nextHeld = drawingBounds ? guide : null;
+  // A drawing's buttons sit on the dashed square, which the strokes cannot leave, so they never block a stroke.
+  const controlsBox = drawingBounds ? guide : null;
   if (!sameRect(nextHeld, heldGuide)) {
     setHeldGuide(nextHeld);
   }
@@ -334,6 +342,12 @@ function PageCanvas({ page, link, me, onPageEnded: pageEnded, turnNotice }: Page
     }
   };
 
+  const zoomTo = (scale: number) =>
+    setViewport((vp) => zoomAt(vp, { x: size.width / 2, y: size.height / 2 }, scale, size, config));
+  // Rounded to the step so a wheel zoom in between lands back on 10% marks.
+  const zoomIn = clampScale(Math.round((viewport.scale + ZOOM_STEP) * 10) / 10, config);
+  const zoomOut = clampScale(Math.round((viewport.scale - ZOOM_STEP) * 10) / 10, config);
+
   const canPost = own !== null && publishBody(own) !== null && waitMs <= 0;
   const publishNote = waitMs > 0 ? `${minutesLeft(waitMs)}분 뒤에 게시할 수 있어요` : undefined;
   const notice = publishError ?? (tools.notice ? NOTICES[tools.notice] : null) ?? turnNote;
@@ -356,9 +370,15 @@ function PageCanvas({ page, link, me, onPageEnded: pageEnded, turnNotice }: Page
         ownDraft={own}
         sizeGuide={guide}
         otherDrafts={drafts}
-        onDrawStart={tools.pointerDown}
+        onDrawStart={(p, scale) => {
+          setStroking(true);
+          tools.pointerDown(p, scale);
+        }}
         onDrawMove={tools.pointerMove}
-        onDrawEnd={tools.pointerUp}
+        onDrawEnd={() => {
+          setStroking(false);
+          tools.pointerUp();
+        }}
         selection={
           mine.open && mine.items ? { items: mine.items, selected: mine.selected, onToggle: mine.toggle } : null
         }
@@ -372,8 +392,20 @@ function PageCanvas({ page, link, me, onPageEnded: pageEnded, turnNotice }: Page
         />
       )}
       {own && bounds && (
+        <DraftMoveHandle
+          bounds={controlsBox ?? bounds}
+          passThrough={stroking}
+          viewport={viewport}
+          screen={size}
+          disabled={publishing}
+          onMove={tools.moveBy}
+          onMoveEnd={tools.moveEnd}
+        />
+      )}
+      {own && bounds && (
         <DraftActions
-          bounds={bounds}
+          bounds={controlsBox ?? bounds}
+          passThrough={stroking}
           viewport={viewport}
           screen={size}
           onPublish={canPost ? () => void publish() : undefined}
@@ -397,6 +429,11 @@ function PageCanvas({ page, link, me, onPageEnded: pageEnded, turnNotice }: Page
         onFontSize={tools.setFontSize}
         onMine={hasMine ? () => (mine.open ? mine.close() : void mine.show()) : undefined}
         mineOpen={mine.open}
+        zoom={{
+          percent: Math.round(viewport.scale * 100),
+          onIn: zoomIn > viewport.scale ? () => zoomTo(zoomIn) : undefined,
+          onOut: zoomOut < viewport.scale ? () => zoomTo(zoomOut) : undefined,
+        }}
       />
       {mine.open && <MyDoodlesPanel mine={mine} canDelete={author !== null} />}
       {notice && (

@@ -1,5 +1,6 @@
 import type { ClientConfig } from '../shared/pageConfig';
 import type { Tool } from '../tools/useDraft';
+import { ICONS } from './icons';
 
 // Who may pick a drawing tool (API.md "작성자"): anyone signed in, consented and not banned, while connected.
 export type DrawAccess = 'loading' | 'anonymous' | 'consent' | 'banned' | 'offline' | 'ok';
@@ -21,16 +22,18 @@ interface Props {
   // Opens the "내 낙서" panel (D-13); absent for people who cannot have doodles.
   onMine?: () => void;
   mineOpen?: boolean;
+  // Zoom buttons for people without a wheel or pinch; absent when the screen offers none.
+  zoom?: { percent: number; onIn?: () => void; onOut?: () => void };
 }
 
 // D-07 palette order. A palette that grows beyond it falls back to numbered names.
 const COLOR_NAMES = ['검정', '흰색', '빨강', '주황', '노랑', '초록', '하늘', '파랑', '보라', '분홍', '갈색', '회색'];
 
-const TOOLS: { tool: Tool; label: string }[] = [
-  { tool: 'move', label: '이동' },
-  { tool: 'pen', label: '펜' },
-  { tool: 'text', label: '텍스트' },
-  { tool: 'eraser', label: '지우개' },
+// No eraser button (taken off at the owner's request); useDraft still knows the tool.
+const TOOLS: { tool: Tool; label: string; icon: string }[] = [
+  { tool: 'move', label: '이동', icon: ICONS.pointer },
+  { tool: 'pen', label: '펜', icon: ICONS.pencil },
+  { tool: 'text', label: '텍스트', icon: ICONS.text },
 ];
 
 const ACCESS_HINT: Partial<Record<DrawAccess, string>> = {
@@ -60,9 +63,6 @@ export default function Toolbar(props: Props) {
     if (t === 'text') {
       return draftKind === 'DRAWING';
     }
-    if (t === 'eraser') {
-      return draftKind !== 'DRAWING';
-    }
     return draftKind === 'TEXT';
   };
 
@@ -74,11 +74,14 @@ export default function Toolbar(props: Props) {
           <button
             key={t.tool}
             type="button"
+            className="icon-button"
+            aria-label={t.label}
+            title={t.label}
             aria-pressed={tool === t.tool}
             disabled={disabled(t.tool)}
             onClick={() => pick(t.tool)}
           >
-            {t.label}
+            <img src={t.icon} alt="" />
           </button>
         ))}
       </div>
@@ -121,12 +124,45 @@ export default function Toolbar(props: Props) {
       )}
       {props.onMine && (
         <div className="toolbar-group">
-          <button type="button" aria-pressed={props.mineOpen ?? false} disabled={draftKind !== null} onClick={props.onMine}>
-            내 낙서
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="내 낙서"
+            title="내 낙서"
+            aria-pressed={props.mineOpen ?? false}
+            disabled={draftKind !== null}
+            onClick={props.onMine}
+          >
+            <img src={ICONS.find} alt="" />
           </button>
         </div>
       )}
       {hint && <span className="toolbar-hint">{hint}</span>}
+      {props.zoom && (
+        <div className="toolbar-group" aria-label="확대·축소">
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="축소"
+            title="축소"
+            disabled={!props.zoom.onOut}
+            onClick={props.zoom.onOut}
+          >
+            <img src={ICONS.minus} alt="" />
+          </button>
+          <span className="zoom-level">{props.zoom.percent}%</span>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="확대"
+            title="확대"
+            disabled={!props.zoom.onIn}
+            onClick={props.zoom.onIn}
+          >
+            <img src={ICONS.plus} alt="" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import type { MyDoodles } from '../mine/useMyDoodles';
+import { ICONS } from './icons';
 
 interface Props {
   mine: MyDoodles;
@@ -32,14 +33,30 @@ export default function MyDoodlesPanel({ mine, canDelete }: Props) {
             <button type="button" onClick={picked === count ? mine.clearSelection : mine.selectAll}>
               {picked === count ? '고르기 취소' : '모두 고르기'}
             </button>
-            {canDelete && (
-              <button type="button" disabled={picked === 0 || mine.busy} onClick={mine.askDelete}>
-                고른 낙서 지우기
+            <span className="mine-icons">
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="고른 낙서 PNG로 저장"
+                title="고른 낙서 PNG로 저장"
+                disabled={picked === 0 || mine.busy}
+                onClick={() => void mine.save()}
+              >
+                <img src={ICONS.download} alt="" />
               </button>
-            )}
-            <button type="button" disabled={mine.busy} onClick={() => void mine.save()}>
-              {picked > 0 ? '고른 낙서 PNG로 저장' : '모두 PNG로 저장'}
-            </button>
+              {canDelete && (
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label="고른 낙서 지우기"
+                  title="고른 낙서 지우기"
+                  disabled={picked === 0 || mine.busy}
+                  onClick={mine.askDelete}
+                >
+                  <img src={ICONS.bin} alt="" />
+                </button>
+              )}
+            </span>
           </div>
         </>
       )}

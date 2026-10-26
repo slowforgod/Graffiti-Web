@@ -48,7 +48,43 @@ describe('Toolbar', () => {
   it('keeps the other kind of tool off while a draft is open (D-10)', () => {
     show('ok', 'DRAWING', 'pen');
     expect(screen.getByRole('button', { name: '텍스트' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '지우개' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '펜' })).toBeEnabled();
+  });
+
+  it('shows the tools as pictures and offers no eraser', () => {
+    show('ok');
+    for (const name of ['이동', '펜', '텍스트']) {
+      expect(screen.getByRole('button', { name }).querySelector('img')).not.toBeNull();
+    }
+    expect(screen.queryByRole('button', { name: '지우개' })).not.toBeInTheDocument();
+  });
+
+  it('puts the zoom buttons last and turns one off at its limit', async () => {
+    const onIn = vi.fn();
+    render(
+      <Toolbar
+        config={TEST_CONFIG}
+        access="ok"
+        tool="move"
+        onTool={vi.fn()}
+        onLogin={vi.fn()}
+        draftKind={null}
+        color={0}
+        onColor={vi.fn()}
+        width={4}
+        onWidth={vi.fn()}
+        fontSize={24}
+        onFontSize={vi.fn()}
+        zoom={{ percent: 400, onIn: undefined, onOut: onIn }}
+      />,
+    );
+    const buttons = screen.getAllByRole('button');
+    expect(buttons.at(-1)).toHaveAccessibleName('확대');
+    expect(buttons.at(-2)).toHaveAccessibleName('축소');
+    expect(screen.getByRole('button', { name: '확대' })).toBeDisabled();
+    expect(screen.getByText('400%')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '축소' }));
+    expect(onIn).toHaveBeenCalled();
   });
 
   it('offers the configured palette, widths and font sizes (INV-10)', () => {
