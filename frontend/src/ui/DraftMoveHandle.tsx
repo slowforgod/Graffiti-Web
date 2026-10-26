@@ -3,21 +3,28 @@ import type { Rect, Size, Viewport } from '../canvas/viewport';
 import { ICONS } from './icons';
 
 interface Props {
+  // The box the handle sits above: the dashed size square for a drawing, the text box for a text.
   bounds: Rect;
   viewport: Viewport;
   screen: Size;
   disabled?: boolean;
+  // While a stroke is being drawn the pointer passes through, so a stroke under the handle goes on.
+  passThrough?: boolean;
   // A world delta for each pointer move while the handle is held, then the end of the drag.
   onMove: (dx: number, dy: number) => void;
   onMoveEnd: () => void;
 }
 
 const SIZE = 32;
+// Below the header and the page status, when the box's top is off screen.
+const TOP_MIN = 48;
 
-// The move handle just outside the top left corner of the draft: drag it to move the whole draft.
-export default function DraftMoveHandle({ bounds, viewport, screen, disabled, onMove, onMoveEnd }: Props) {
+// The move handle just above the top left corner of the box, outside it so it never covers the drawing:
+// drag it to move the whole draft.
+export default function DraftMoveHandle(props: Props) {
+  const { bounds, viewport, screen, disabled, passThrough, onMove, onMoveEnd } = props;
   const last = useRef<{ x: number; y: number } | null>(null);
-  const left = bounds.x * viewport.scale + viewport.x - SIZE;
+  const left = bounds.x * viewport.scale + viewport.x;
   const top = bounds.y * viewport.scale + viewport.y - SIZE - 4;
   const end = () => {
     if (last.current) {
@@ -28,13 +35,13 @@ export default function DraftMoveHandle({ bounds, viewport, screen, disabled, on
   return (
     <button
       type="button"
-      className="draft-move icon-button"
+      className={passThrough ? 'draft-move icon-button pass-through' : 'draft-move icon-button'}
       aria-label="낙서 옮기기"
       title="끌어서 옮기기"
       disabled={disabled}
       style={{
         left: Math.min(Math.max(0, left), screen.width - SIZE),
-        top: Math.min(Math.max(0, top), screen.height - SIZE),
+        top: Math.min(Math.max(TOP_MIN, top), screen.height - SIZE),
       }}
       onPointerDown={(e) => {
         e.currentTarget.setPointerCapture?.(e.pointerId);

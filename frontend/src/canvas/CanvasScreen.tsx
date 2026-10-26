@@ -182,6 +182,8 @@ function PageCanvas({ page, link, me, onPageEnded: pageEnded, turnNotice }: Page
   // The cooldown this screen learned from its own posts; until then the one from /api/me.
   const [postedCooldown, setPostedCooldown] = useState<string | null>();
   const [publishing, setPublishing] = useState(false);
+  // A pen stroke is under way: the buttons over the canvas let the pointer through until it ends.
+  const [stroking, setStroking] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   // The same page loaded again (the end passed without page:turned) brings the server's latest times.
@@ -267,6 +269,8 @@ function PageCanvas({ page, link, me, onPageEnded: pageEnded, turnNotice }: Page
       ? sizeGuide(heldGuide, drawingBounds, visibleWorldRect(viewport, size), config)
       : null;
   const nextHeld = drawingBounds ? guide : null;
+  // A drawing's buttons sit on the dashed square, which the strokes cannot leave, so they never block a stroke.
+  const controlsBox = drawingBounds ? guide : null;
   if (!sameRect(nextHeld, heldGuide)) {
     setHeldGuide(nextHeld);
   }
@@ -366,9 +370,15 @@ function PageCanvas({ page, link, me, onPageEnded: pageEnded, turnNotice }: Page
         ownDraft={own}
         sizeGuide={guide}
         otherDrafts={drafts}
-        onDrawStart={tools.pointerDown}
+        onDrawStart={(p, scale) => {
+          setStroking(true);
+          tools.pointerDown(p, scale);
+        }}
         onDrawMove={tools.pointerMove}
-        onDrawEnd={tools.pointerUp}
+        onDrawEnd={() => {
+          setStroking(false);
+          tools.pointerUp();
+        }}
         selection={
           mine.open && mine.items ? { items: mine.items, selected: mine.selected, onToggle: mine.toggle } : null
         }
@@ -383,7 +393,8 @@ function PageCanvas({ page, link, me, onPageEnded: pageEnded, turnNotice }: Page
       )}
       {own && bounds && (
         <DraftMoveHandle
-          bounds={bounds}
+          bounds={controlsBox ?? bounds}
+          passThrough={stroking}
           viewport={viewport}
           screen={size}
           disabled={publishing}
@@ -393,7 +404,8 @@ function PageCanvas({ page, link, me, onPageEnded: pageEnded, turnNotice }: Page
       )}
       {own && bounds && (
         <DraftActions
-          bounds={bounds}
+          bounds={controlsBox ?? bounds}
+          passThrough={stroking}
           viewport={viewport}
           screen={size}
           onPublish={canPost ? () => void publish() : undefined}

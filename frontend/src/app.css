@@ -73,6 +73,11 @@ body {
   cursor: not-allowed;
 }
 
+.pass-through,
+.pass-through * {
+  pointer-events: none;
+}
+
 .draft-move {
   position: fixed;
   z-index: 11;

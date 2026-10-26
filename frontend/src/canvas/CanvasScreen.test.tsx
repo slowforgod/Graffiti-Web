@@ -285,6 +285,17 @@ describe('CanvasScreen', () => {
       expect(screen.queryByRole('button', { name: '취소' })).not.toBeInTheDocument();
     });
 
+    it('lets the pointer through the draft buttons while a stroke is drawn', async () => {
+      await open();
+      draw();
+      act(() => screen.getByRole('button', { name: 'down' }).click());
+      expect(screen.getByRole('button', { name: '게시' }).parentElement).toHaveClass('pass-through');
+      expect(screen.getByRole('button', { name: '낙서 옮기기' })).toHaveClass('pass-through');
+      act(() => screen.getByRole('button', { name: 'up' }).click());
+      expect(screen.getByRole('button', { name: '게시' }).parentElement).not.toHaveClass('pass-through');
+      expect(screen.getByRole('button', { name: '낙서 옮기기' })).not.toHaveClass('pass-through');
+    });
+
     it('moves the draft with the handle and relays it again at the new place', async () => {
       const { drafts } = await open();
       draw();
