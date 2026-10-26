@@ -7,6 +7,7 @@ import java.io.IOException;
 import kr.ac.khu.graffiti.auth.KhuOidcUserService;
 import kr.ac.khu.graffiti.auth.LoginFailureHandler;
 import kr.ac.khu.graffiti.auth.LoginSuccessHandler;
+import kr.ac.khu.graffiti.auth.LogoutMark;
 import kr.ac.khu.graffiti.common.error.ApiError;
 import kr.ac.khu.graffiti.common.error.ErrorCode;
 import org.springframework.context.annotation.Bean;
@@ -19,7 +20,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
+import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
@@ -44,11 +47,8 @@ class SecurityConfig {
         CookieCsrfTokenRepository csrfTokens = CookieCsrfTokenRepository.withHttpOnlyFalse();
         csrfTokens.setCookieCustomizer(c -> c.secure(true).sameSite("Lax").path("/"));
 
-        DefaultOAuth2AuthorizationRequestResolver authorizationRequests =
-                new DefaultOAuth2AuthorizationRequestResolver(registrations, AUTHORIZATION_BASE_URI);
-        // Hint Google to show school accounts only; the server still verifies (SEC-04).
-        authorizationRequests.setAuthorizationRequestCustomizer(
-                c -> c.additionalParameters(p -> p.put("hd", props.auth().allowedDomain())));
+        OAuth2AuthorizationRequestResolver authorizationRequests = new AfterLogout(
+                authorizationRequests(registrations, props, false), authorizationRequests(registrations, props, true));
 
         http
                 .authorizeHttpRequests(a -> a
@@ -81,6 +81,38 @@ class SecurityConfig {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
         json.writeValue(response.getOutputStream(), ApiError.of(code, code.defaultMessage(), null));
+    }
+
+    private static DefaultOAuth2AuthorizationRequestResolver authorizationRequests(
+            ClientRegistrationRepository registrations, GraffitiProperties props, boolean chooseAccount) {
+        DefaultOAuth2AuthorizationRequestResolver resolver =
+                new DefaultOAuth2AuthorizationRequestResolver(registrations, AUTHORIZATION_BASE_URI);
+        // Hint Google to show school accounts only; the server still verifies (SEC-04).
+        resolver.setAuthorizationRequestCustomizer(c -> c.additionalParameters(p -> {
+            p.put("hd", props.auth().allowedDomain());
+            if (chooseAccount) {
+                p.put("prompt", "select_account");
+            }
+        }));
+        return resolver;
+    }
+
+    /**
+     * After a logout ({@link LogoutMark}) Google shows its account chooser, so the user signs in again
+     * instead of being let back in with the last account.
+     */
+    private record AfterLogout(OAuth2AuthorizationRequestResolver usual, OAuth2AuthorizationRequestResolver chooser)
+            implements OAuth2AuthorizationRequestResolver {
+
+        @Override
+        public OAuth2AuthorizationRequest resolve(HttpServletRequest request) {
+            return (LogoutMark.isSet(request) ? chooser : usual).resolve(request);
+        }
+
+        @Override
+        public OAuth2AuthorizationRequest resolve(HttpServletRequest request, String clientRegistrationId) {
+            return (LogoutMark.isSet(request) ? chooser : usual).resolve(request, clientRegistrationId);
+        }
     }
 
     /** Google's access token is never needed after login, so it is not kept in the session. */

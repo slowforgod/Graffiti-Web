@@ -33,6 +33,7 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
         context.setAuthentication(slim);
         SecurityContextHolder.setContext(context);
         contexts.saveContext(context, request, response);
+        LogoutMark.clear(response);
 
         response.sendRedirect(request.getContextPath() + "/");
     }

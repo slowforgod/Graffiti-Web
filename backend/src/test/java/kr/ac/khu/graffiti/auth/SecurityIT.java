@@ -223,6 +223,9 @@ class SecurityIT extends WebIntegrationTest {
         Integer rows = jdbc.queryForObject("SELECT COUNT(*) FROM SPRING_SESSION WHERE PRINCIPAL_NAME = ?",
                 Integer.class, String.valueOf(user.getId()));
         assertThat(rows).isZero();
+        assertThat(setCookie(res, LogoutMark.COOKIE))
+                .contains("HttpOnly", "Secure", "SameSite=Lax", "Path=/")
+                .doesNotContain("Max-Age");
     }
 
     @Test
@@ -232,6 +235,18 @@ class SecurityIT extends WebIntegrationTest {
         assertThat(res.statusCode()).isEqualTo(302);
         assertThat(res.headers().firstValue("Location").orElseThrow())
                 .startsWith("https://accounts.google.com/")
-                .contains("hd=khu.ac.kr", "scope=openid%20email%20profile", "nonce=");
+                .contains("hd=khu.ac.kr", "scope=openid%20email%20profile", "nonce=")
+                .doesNotContain("prompt=");
+    }
+
+    @Test
+    void oauthStartAfterLogoutAsksGoogleToChooseTheAccountAgain() throws Exception {
+        HttpResponse<String> res = send(request("/oauth2/authorization/google")
+                .header("Cookie", LogoutMark.COOKIE + "=1").GET());
+
+        assertThat(res.statusCode()).isEqualTo(302);
+        assertThat(res.headers().firstValue("Location").orElseThrow())
+                .startsWith("https://accounts.google.com/")
+                .contains("hd=khu.ac.kr", "prompt=select_account");
     }
 }
