@@ -101,7 +101,7 @@ CI(`.github/workflows/ci.yml`)는 PR과 main push마다 backend `./gradlew test`
 7. **Gate Integrity.** 테스트 삭제, `@Disabled`, `.skip`, 타임아웃이나 임계값 완화, 빈 catch, `@SuppressWarnings`, `eslint-disable`, `--no-verify`, CI 단계 skip은 **사람이 이유와 함께 승인해야** 한다. 스스로 하지 않는다.
 8. **AUTO-FIX vs ASK.** 시니어 개발자가 논의 없이 고칠 기계적 수정(죽은 코드, 매직 넘버, N+1, 낡은 주석)은 바로 고친다. 보안, 경쟁 조건, 설계 결정, 20줄 넘는 수정, 기능 제거, 사용자에게 보이는 동작 변경은 묻는다. (기준: `.claude/skills/gf-review/checklist.md`)
 9. **Honest Work.** "완료"라고 하기 전에 테스트를 **실제로 실행하고** 결과(통과/실패/스킵 수)를 첨부한다. 실행하지 않았으면 "완료(미검증)"라고 구분해서 쓴다. mock 결과를 실제 동작 증명으로 제시하지 않는다. 근거 없이 "원래 있던 문제"라고 하지 않는다.
-10. **커밋 규칙.** 커밋 하나에 논리적 변경 하나(bisect 가능). 파일을 지정해서 stage하고 `git add -A`/`git add .`는 쓰지 않는다. force push 금지, main 직접 push 금지. 메시지는 Conventional Commits(`feat(publish): ...`).
+10. **커밋 규칙.** 커밋 하나에 논리적 변경 하나(bisect 가능). 파일을 지정해서 stage하고 `git add -A`/`git add .`는 쓰지 않는다. force push 금지, main 직접 push 금지. 메시지는 Conventional Commits(`feat(publish): ...`). 브랜치 이름은 `<type>/[NN-]<짧은-설명>`(`docs/PIPELINE.md` §5).
 11. **문서와 다이어그램은 코드와 같은 커밋에서** 갱신한다: API → `API.md`, 스키마 → `DB.md`, 흐름·컴포넌트 → `ARCHITECTURE.md`.
 12. **완료 상태는 4가지로 보고한다**: `DONE` / `DONE_WITH_CONCERNS`(우려 목록 포함) / `BLOCKED`(무엇이 막혔고 무엇이 필요한지) / `NEEDS_CONTEXT`(무엇을 모르는지).
 13. **결정은 스스로 바꾸지 않는다.** 결정과 다르게 가야 하면 멈추고 보고한다. 팀이 합의하면 `docs/DECISIONS.md`에 새 항목을 추가하고 기존 항목은 `SUPERSEDED`로 표시한다.
