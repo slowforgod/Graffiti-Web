@@ -43,7 +43,8 @@ def multipart(png: bytes, request_id: str) -> tuple[bytes, str]:
     return b"".join(parts), f"multipart/form-data; boundary={boundary}"
 
 
-def moderate(server: str, png: bytes, request_id: str) -> tuple[str | None, float]:
+def moderate_image(server: str, png: bytes, request_id: str) -> tuple[dict | None, float]:
+    """The ``image`` part of the server's answer (label and scores), or None on any failure, and the latency."""
     body, content_type = multipart(png, request_id)
     request = urllib.request.Request(
         f"{server.rstrip('/')}/v1/moderate", data=body, headers={"Content-Type": content_type}, method="POST"
@@ -51,10 +52,15 @@ def moderate(server: str, png: bytes, request_id: str) -> tuple[str | None, floa
     started = time.perf_counter()
     try:
         with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as res:
-            label = json.load(res)["image"]["label"]
+            image = json.load(res)["image"]
     except (urllib.error.URLError, TimeoutError, KeyError, ValueError):
-        label = None
-    return label, (time.perf_counter() - started) * 1000
+        image = None
+    return image, (time.perf_counter() - started) * 1000
+
+
+def moderate(server: str, png: bytes, request_id: str) -> tuple[str | None, float]:
+    image, latency = moderate_image(server, png, request_id)
+    return (image or {}).get("label"), latency
 
 
 def main(argv: list[str]) -> int:
