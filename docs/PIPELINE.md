@@ -73,7 +73,8 @@ DRAFT ──(G1 사람 승인)──▶ APPROVED ──(구현 시작)──▶ 
 | 05 | draft | 툴바, 펜, 텍스트, 지우개(초안), ✓/✗ UI, 초안 중계, 10분 자동 취소 | 04 | D-07, D-10, D-11, D-33 |
 | 06 | publish | 게시 REST, `DoodleValidator`, 쿨다운, 점유율 갱신, 브로드캐스트 (모더레이션은 항상 통과하는 임시 구현) | 05 | D-12, D-27, D-28, INV-05/08 |
 | 07 | moderation | 금칙어, ChatKHU, OpenAI, `DoodleRenderer`, REJECTED/UNCHECKED, 타임아웃 | 06 | D-18, D-19, SEC-05/15 |
-| 07b | ml-moderation | `ml/serving`(FastAPI, CLIP 제로샷 이미지 분류 + OCR), `MlModerationProvider`, 병렬 호출, OCR 글자 → 텍스트 검사, `ml_prediction` 기록, **SHADOW 모드**, 평가 스크립트 | 07 (ML 서버 자체는 00 이후 병행 가능) | D-34~D-40, INV-13, SEC-17 |
+| ml-zeroshot | ml-zeroshot | OpenCLIP 제로샷 이미지 분류기(`ml/serving`), `models.lock` 확장(arch, 문장 파일), 평가 세트 생성과 임계값 보정(`ml/eval`) | ml-prep | D-36, D-37, D-39, D-40, SEC-16/17 |
+| 07b | ml-moderation | OCR(`ml/serving`), `MlModerationProvider`, 병렬 호출, OCR 글자 → 텍스트 검사, `ml_prediction` 기록, **SHADOW 모드**, compose `ml` 서비스 | 07, ml-zeroshot | D-34~D-40, INV-13, SEC-17 |
 | 08 | my-doodles | 내 doodle 삭제, 선택 삭제, PNG 저장 | 06 | D-13 |
 | 09 | page-turn-ux | 상단 상태바, T−5분 카운트다운과 경고, `page:turned` 처리, 초안 폐기 | 04, 06 | D-16 |
 | 10 | admin | 관리자 API와 화면, 차단, 복구, 조치 기록 | 07 | D-23, SEC-14 |
@@ -86,7 +87,7 @@ DRAFT ──(G1 사람 승인)──▶ APPROVED ──(구현 시작)──▶ 
     │                               │      └─ 10 ──┼─ 11
     │                               ├─ 08          │
     │                               └─ 09 ─────────┘
-    ├─ ml-prep (병행): 평가 세트 그리기, ml/serving 단독 개발, 제로샷 카테고리 문장 튜닝
+    ├─ ml-prep ── ml-zeroshot (병행): ml/serving 단독 개발, 제로샷 분류기, 평가 세트와 임계값 보정
     └─ 12 (병행)
 ```
 

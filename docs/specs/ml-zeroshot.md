@@ -158,16 +158,16 @@ negative = ["a crude line drawing of a person", "a black-and-white doodle of a b
 critical gap: 0
 
 ## 7. 수용 기준 (테스트 가능하게)
-- [ ] AC-1: Given 무작위 초기화 ViT-B-32를 저장한 safetensors와 맞는 `models.lock`, When 서버 시작, Then `/health` 200, `modelVersion`이 lock 버전
-- [ ] AC-2: Given AC-1 서버, When PNG를 보내면, Then `scores` 키가 `models.lock` 임계값 키와 정확히 같고 값은 모두 0~1 (`safe` 키 없음. API.md §7 예시도 같은 PR에서 맞춤)
-- [ ] AC-3: 같은 PNG를 두 번 보내면 같은 점수
-- [ ] AC-4: 투명 배경에 검은 선을 그린 RGBA PNG와, 흰 배경에 같은 선을 그린 RGB PNG의 점수가 같음
-- [ ] AC-5: 문장 파일 sha256이 다르거나 카테고리가 임계값 키와 다르면 `/health` 503
-- [ ] AC-6: `version = "none"`이면 지금처럼 503 (회귀 없음)
-- [ ] AC-7: `crop_to_content = true`일 때 캔버스 구석의 작은 그림이 잘린 뒤 정사각형으로 들어감 (전처리 단위 테스트, 결과 이미지의 bbox로 확인)
-- [ ] AC-8: `calibrate.py`가 보정 세트에서 결정 5 규칙으로 임계값을 고르고, 보고 세트의 오탐률·재현율·p95·표본 수와 D-39 통과 여부를 출력
-- [ ] AC-9 (SEC-16): 새 의존성이 전이 포함 전부 `==` 고정, torch는 CPU 휠
-- [ ] AC-10 (SEC-17): 운영 코드에서 `pretrained=`에 태그 이름을 넘기는 경로가 없음. 컨테이너에 `HF_HUB_OFFLINE=1`. 요청 로그에 점수 없음 (기존 caplog 테스트 유지)
+- [x] AC-1: Given 무작위 초기화 ViT-B-32를 저장한 safetensors와 맞는 `models.lock`, When 서버 시작, Then `/health` 200, `modelVersion`이 lock 버전
+- [x] AC-2: Given AC-1 서버, When PNG를 보내면, Then `scores` 키가 `models.lock` 임계값 키와 정확히 같고 값은 모두 0~1 (`safe` 키 없음. API.md §7 예시도 같은 PR에서 맞춤)
+- [x] AC-3: 같은 PNG를 두 번 보내면 같은 점수
+- [x] AC-4: 투명 배경에 검은 선을 그린 RGBA PNG와, 흰 배경에 같은 선을 그린 RGB PNG의 점수가 같음
+- [x] AC-5: 문장 파일 sha256이 다르거나 카테고리가 임계값 키와 다르면 `/health` 503
+- [x] AC-6: `version = "none"`이면 지금처럼 503 (회귀 없음)
+- [x] AC-7: `crop_to_content = true`일 때 캔버스 구석의 작은 그림이 잘린 뒤 정사각형으로 들어감 (전처리 단위 테스트, 결과 이미지의 bbox로 확인)
+- [x] AC-8: `calibrate.py`가 보정 세트에서 결정 5 규칙으로 임계값을 고르고, 보고 세트의 오탐률·재현율·p95·표본 수와 D-39 통과 여부를 출력
+- [x] AC-9 (SEC-16): 새 의존성이 전이 포함 전부 `==` 고정, torch는 CPU 휠
+- [x] AC-10 (SEC-17): 운영 코드에서 `pretrained=`에 태그 이름을 넘기는 경로가 없음. 컨테이너에 `HF_HUB_OFFLINE=1`. 요청 로그에 점수 없음 (기존 caplog 테스트 유지)
 - [ ] AC-11: 실제 가중치로 띄운 서버에 팀 평가 세트를 돌린 보고서를 PR에 첨부 (수치만, 이미지 없음)
 
 ## 8. 테스트 계획

@@ -82,9 +82,9 @@
   - **영어로** 씁니다. 모델이 영어로만 학습됐고, 모델 카드도 영어 외 사용을 권하지 않습니다.
   - "a crude line drawing of ...", "a black-and-white doodle of ..."처럼 선 그림이라는 도메인을 문장에 넣습니다.
   - 카테고리마다 여러 문장을 써서 평균을 냅니다(프롬프트 앙상블). 템플릿 예시는 open_clip의 `zero_shot_metadata.py`에 있습니다(예: "a rendering of a {}", "graffiti of a {}").
-  - 정상(`safe`) 문장도 여러 개 둡니다. 정상 낙서가 갈 곳이 부족하면 오탐이 늘어납니다(D-39 오탐 ≤ 2%).
+  - 카테고리마다 정상 쪽(`negative`) 문장도 여러 개 둡니다. 가장 비슷한 평범한 낙서를 적어야 오탐이 줄어듭니다(D-39 오탐 ≤ 2%).
 - **점수 형식**: 카테고리 이름 → 0~1 점수의 dict입니다. 카테고리 이름은 `docs/FILTER.md`의 카테고리 이름(`PROFANITY`, `HATE`, `SEXUAL`, `PERSONAL_INFO`)을 그대로 쓰고(2026-10-28 결정), `models.lock`의 임계값 키와 같아야 합니다. 이미지로 판별할 수 있는 카테고리만 둡니다. 폭력처럼 FILTER에 없는 내용의 처리는 `ml-zeroshot` 명세의 결정을 따릅니다. paired 방식에는 `safe` 점수가 없습니다.
-  - 점수를 내는 방식은 명세에서 평가 세트 결과로 정합니다. 라벨 결정이 "하나라도 임계값 이상이면 FLAGGED"라서 방식에 따라 임계값 의미가 달라집니다. 후보는 아래 둘입니다.
+  - 점수 방식은 `ml-zeroshot` 명세 결정 1에서 **paired**로 정했습니다(2026-10-28). 라벨 결정이 "하나라도 임계값 이상이면 FLAGGED"라서 방식에 따라 임계값 의미가 달라집니다. 후보는 아래 둘입니다.
     - **paired (추천 후보)**: 카테고리마다 positive 문장(부적절한 그림)과 negative 문장(평범한 낙서)을 짝지어 `sigmoid(logit_scale × (cos(이미지, positive) − cos(이미지, negative)))`로 계산합니다. 카테고리끼리 서로 독립이라 "하나라도 넘으면 FLAGGED"와 잘 맞고, 점수가 그대로 0~1입니다. open_clip main의 `scripts/multilabel_zeroshot.py`(`score_features`의 `paired`)와 `docs/multilabel_zeroshot.md`가 같은 방식입니다.
     - **softmax**: 모든 카테고리와 `safe`를 한 번에 softmax합니다. README 예제 방식입니다. 카테고리를 하나 추가하면 다른 카테고리의 점수까지 바뀝니다.
   - paired를 고르면 문장 파일에 카테고리마다 `positive`와 `negative` 목록이 있어야 합니다. 서버는 시작할 때 문장 파일의 카테고리가 `[image.thresholds]`와 정확히 같고 목록이 비어 있지 않은지 검사하고, 다르면 로드하지 않습니다(`multilabel_zeroshot.py`의 `validate_prompts`가 같은 검사).

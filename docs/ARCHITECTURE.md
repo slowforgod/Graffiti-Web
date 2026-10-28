@@ -92,12 +92,14 @@ ml/
 │   ├── tests/     pytest (가짜 분류기로 API, 잘못된 입력, 체크섬, 로그에 OCR 글자 없음)
 │   └── Dockerfile 비 root, 빌드 컨텍스트는 ml/
 ├── training/      미세조정 스크립트 (운영 데이터 추출본 사용, 작성자 정보 없음) — 07b 이후
-├── eval/          evaluate.py(서버 호출) + metrics.py(D-39 지표, 순수). 평가 이미지는 sets/(git 제외)와 S3
-└── models.lock    TOML. 모델 버전, S3 경로, 파일 이름, sha256, 카테고리별 임계값 (가중치 파일은 git에 없음)
+├── prompts/       카테고리 문장 <version>.toml (models.lock이 이름과 sha256으로 잠금)
+├── eval/          build_set.py(세트 생성), calibrate.py(임계값 보정), evaluate.py(서버 호출), metrics.py·calibration.py(순수). 평가 이미지는 sets/(git 제외)와 S3
+└── models.lock    TOML. 모델 버전, arch, S3 경로, 파일 이름, sha256, 문장 파일과 sha256, crop_to_content, 카테고리별 임계값 (가중치 파일은 git에 없음)
 ```
 
-- 서버는 시작할 때 `models.lock`을 읽고 `MODEL_DIR/<file>`의 sha256이 맞을 때만 분류기를 만듭니다. 모델이 없거나 체크섬이 다르면 뜨기는 하지만 `/health`와 `/v1/moderate`가 503입니다(INV-13: Spring은 판정 없음으로 처리).
-- 라벨은 서버가 정합니다: `safe`가 아닌 카테고리 중 하나라도 `models.lock`의 임계값 이상이면 `FLAGGED`.
+- 서버는 시작할 때 `models.lock`을 읽고 `MODEL_DIR/<file>`(가중치)과 `ml/prompts/<prompts>`(카테고리 문장)의 sha256이 둘 다 맞을 때만 분류기를 만듭니다. 모델이 없거나 체크섬이 다르면 뜨기는 하지만 `/health`와 `/v1/moderate`가 503입니다(INV-13: Spring은 판정 없음으로 처리).
+- 분류기는 OpenCLIP 제로샷(paired)입니다. 카테고리마다 `sigmoid(logit_scale × (cos(이미지, positive) − cos(이미지, negative)))`로 0~1 점수를 냅니다(`ml/serving/app/clip_classifier.py`).
+- 라벨은 서버가 정합니다: 카테고리 중 하나라도 `models.lock`의 임계값 이상이면 `FLAGGED`.
 - 현재 시각은 항상 주입받은 `java.time.Clock`으로 얻습니다. 타이머와 쿨다운 테스트에서 시간을 조작하기 위해서예요.
 
 ## 3. 프론트엔드 구조

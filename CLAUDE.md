@@ -38,6 +38,8 @@ cd frontend && npm run build               # 프로덕션 빌드
 cd ml/serving && pip install -r requirements-dev.txt && uvicorn app.main:build --factory --port 8000   # ML 서버 (MODEL_DIR의 가중치를 models.lock 체크섬으로 검증, 모델이 없으면 503)
 cd ml/serving && pytest                     # ML 서버 테스트
 cd ml/eval && pytest && python evaluate.py --manifest <세트>/manifest.csv   # 평가 세트로 D-39 지표 계산 (ml/README.md)
+cd ml/eval && python build_set.py --out sets/<세트> --quickdraw <ndjson...> --hate-variants 300 --team <폴더>   # 평가 세트 생성
+cd ml/eval && python calibrate.py --manifest sets/<세트>/manifest.csv   # 카테고리별 임계값 보정 + 보고 세트 D-39 지표
 ```
 
 **전체 검사** (PR 전, `/gf-ship`이 실행): `./gradlew test` + `npm test` + `npm run lint` + `npm run build` + `pytest`(ml/serving, ml/eval)
