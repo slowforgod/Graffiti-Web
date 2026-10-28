@@ -65,5 +65,23 @@
 - **What**: 손글씨 한국어 욕설 대응 (범용 비전 LLM 등)
 - **Context**: `ModerationProvider` 인터페이스로 교체 가능 (D-19)
 
+### OpenAI 검사와 DoodleRenderer (07 나머지, 공개 전 게이트)
+- **What**: OpenAI omni-moderation(텍스트 `openai-text`, 이미지 `openai-image`)과 그림 렌더링(`DoodleRenderer`)을 만들어 `text-checks`와 `drawing-checks`의 스텁을 대체
+- **Why**: SEC-05는 텍스트를 금칙어 + ChatKHU + OpenAI 이중 검사로 정한다. `07-moderation-text`는 ChatKHU까지만 연결하므로 이것 없이는 SEC-05가 완성되지 않고, 스텁이 남아 있는 동안 모든 텍스트가 보류(`HELD`)된다
+- **Context**: OpenAI 키(`OPENAI_API_KEY`)를 아직 확인하지 않았다. OpenAI 카테고리를 `FILTER.md`의 4개에 어떻게 대응시킬지 정해야 한다
+- **Depends on**: 07-moderation-text, `FILTER.md` 확정
+
+### 보류된 욕설을 관리자가 게시할 때 자동 축소
+- **What**: `AdminReviewService.publish`가 `moderation_detail`에 `SHRINK`가 있는 doodle을 게시할 때 글자 크기를 줄이고 bbox, 청크, 점유율을 다시 계산
+- **Why**: 지금은 관리자 게시가 저장된 payload를 그대로 올려서 보류된 욕설이 원래 크기로 나온다(`07-moderation-text` 결정 필요 2의 B)
+- **Context**: `PublishWithheld` 큐 명령이 행의 payload, bbox, 청크를 다시 써야 한다. 관리자의 크기 되돌리기와 함께 설계
+- **Depends on**: 07-moderation-text, 10 나머지
+
+### ChatKHU 크레딧 잔액 감시
+- **What**: `GET /v1/gateway/credits/`로 잔액을 읽어 기준 아래로 떨어지면 알린다
+- **Why**: 월 배정이 약 $4로 추정되고(1 크레딧 ≈ $0.001) 소진되면 모든 텍스트가 보류 큐로 몰린다
+- **Context**: 소진 시 응답 코드는 확인하지 못했다. 12b의 경보와 함께 하는 것이 자연스럽다
+- **Depends on**: 07-moderation-text, 12b
+
 ### 수익 구조
 - 설계 범위 밖 (D-04)
