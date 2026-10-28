@@ -29,7 +29,7 @@ def create_app(
     settings: Settings | None = None, factory: ClassifierFactory | None = None, ocr: OcrEngine | None = None
 ) -> FastAPI:
     settings = settings or Settings.from_env()
-    registry = Registry.load(read_lock(settings.models_lock), settings.model_dir, factory, ocr)
+    registry = Registry.load(read_lock(settings.models_lock), settings.model_dir, settings.prompts_dir, factory, ocr)
     app = FastAPI(title="graffiti-ml", docs_url=None, redoc_url=None, openapi_url=None)
 
     @app.get("/health", response_model=HealthResponse)

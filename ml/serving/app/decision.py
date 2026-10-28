@@ -9,7 +9,7 @@ FLAGGED = "FLAGGED"
 def decide(scores: Mapping[str, float], thresholds: Mapping[str, float]) -> str:
     """FLAGGED when any thresholded category scores at or above its threshold.
 
-    Categories without a threshold, including "safe", never flag.
+    Categories without a threshold never flag.
     """
     for category, threshold in thresholds.items():
         if scores.get(category, 0.0) >= threshold:

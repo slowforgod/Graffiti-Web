@@ -21,6 +21,12 @@ class ImageModelLock:
     sha256: str | None = None
     uri: str | None = None
     thresholds: dict[str, float] = field(default_factory=dict)
+    # open_clip architecture name, e.g. "ViT-B-32".
+    arch: str | None = None
+    # Category sentences in ml/prompts/, locked like the weights because they change every score.
+    prompts: str | None = None
+    prompts_sha256: str | None = None
+    crop_to_content: bool = False
 
     @property
     def configured(self) -> bool:
@@ -49,12 +55,14 @@ def read_lock(path: Path) -> ModelsLock:
     if version == NONE:
         return ModelsLock(ImageModelLock(NONE), ocr_version)
 
-    file = _required_str(image, "file", "image")
-    sha256 = _required_str(image, "sha256", "image")
-    if not _SHA256.fullmatch(sha256):
-        raise LockError("image.sha256 must be 64 lowercase hex characters")
-    if Path(file).name != file:
-        raise LockError("image.file must be a bare file name inside MODEL_DIR")
+    arch = _required_str(image, "arch", "image")
+    file = _bare_name(image, "file", "MODEL_DIR")
+    sha256 = _sha256(image, "sha256")
+    prompts = _bare_name(image, "prompts", "PROMPTS_DIR")
+    prompts_sha256 = _sha256(image, "prompts_sha256")
+    crop_to_content = image.get("crop_to_content")
+    if not isinstance(crop_to_content, bool):
+        raise LockError("image.crop_to_content must be true or false")
     thresholds = image.get("thresholds")
     if not isinstance(thresholds, dict) or not thresholds:
         raise LockError("image.thresholds must list at least one category")
@@ -66,7 +74,9 @@ def read_lock(path: Path) -> ModelsLock:
             raise LockError(f"image.thresholds.{category} must be between 0 and 1")
         parsed[category] = float(value)
     return ModelsLock(
-        ImageModelLock(version, file, sha256, image.get("uri"), parsed),
+        ImageModelLock(
+            version, file, sha256, image.get("uri"), parsed, arch, prompts, prompts_sha256, crop_to_content
+        ),
         ocr_version,
     )
 
@@ -80,6 +90,20 @@ def verify_file(path: Path, expected_sha256: str) -> bool:
         for block in iter(lambda: f.read(1 << 20), b""):
             digest.update(block)
     return digest.hexdigest() == expected_sha256
+
+
+def _bare_name(table: dict, key: str, directory: str) -> str:
+    value = _required_str(table, key, "image")
+    if Path(value).name != value:
+        raise LockError(f"image.{key} must be a bare file name inside {directory}")
+    return value
+
+
+def _sha256(table: dict, key: str) -> str:
+    value = _required_str(table, key, "image")
+    if not _SHA256.fullmatch(value):
+        raise LockError(f"image.{key} must be 64 lowercase hex characters")
+    return value
 
 
 def _required_str(table: dict, key: str, name: str) -> str:
