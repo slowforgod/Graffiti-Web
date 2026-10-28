@@ -1,3 +1,6 @@
+import tomllib
+from pathlib import Path
+
 import pytest
 
 from app.prompts import MAX_TOKENS, CategoryPrompts, PromptsError, parse_prompts
@@ -44,3 +47,11 @@ def test_long_sentences_are_rejected_before_the_tokenizer_cuts_them():
     body = PROMPTS.replace("a crude line drawing of genitals", long_sentence)
     with pytest.raises(PromptsError, match="SEXUAL"):
         parse_prompts(body, THRESHOLDS.keys())
+
+
+def test_repository_prompt_files_are_valid():
+    files = sorted((Path(__file__).resolve().parents[2] / "prompts").glob("*.toml"))
+    assert files
+    for path in files:
+        text = path.read_text(encoding="utf-8")
+        assert parse_prompts(text, tomllib.loads(text).keys()), path.name

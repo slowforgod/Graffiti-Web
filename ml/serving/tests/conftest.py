@@ -34,17 +34,25 @@ def write_lock(
     prompts_sha256: str | None = None,
     arch: str = "ViT-B-32",
     crop_to_content: bool = True,
+    weights_path: Path | None = None,
 ) -> Settings:
-    """Writes models.lock, the weights file and the prompts file the way ml/ lays them out."""
+    """Writes models.lock, the weights file and the prompts file the way ml/ lays them out.
+
+    ``weights_path`` links an existing weights file instead of writing ``weights``; pass its sha256 too.
+    """
     model_dir = tmp_path / "models"
     model_dir.mkdir()
     prompts_dir = tmp_path / "prompts"
     prompts_dir.mkdir()
-    if weights is None:
+    if weights is None and weights_path is None:
         lock = '[image]\nversion = "none"\n\n[ocr]\nversion = "none"\n'
     else:
-        (model_dir / "model.safetensors").write_bytes(weights)
-        digest = sha256 or hashlib.sha256(weights).hexdigest()
+        if weights_path is not None:
+            (model_dir / "model.safetensors").symlink_to(weights_path)
+            digest = sha256
+        else:
+            (model_dir / "model.safetensors").write_bytes(weights)
+            digest = sha256 or hashlib.sha256(weights).hexdigest()
         if prompts is not None:
             (prompts_dir / "test-1.toml").write_text(prompts, encoding="utf-8")
         prompts_digest = prompts_sha256 or hashlib.sha256((prompts or "").encode()).hexdigest()

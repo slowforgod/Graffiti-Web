@@ -1,0 +1,40 @@
+# Category sentences for the zero-shot image classifier (D-37, docs/specs/ml-zeroshot.md).
+# models.lock names this file and its sha256: editing it changes every score, so it needs a new version
+# file and a new evaluation (ml/DEVELOPMENT.md section 4). English only, each sentence under 77 tokens.
+# positive = what the category catches; negative = the closest harmless doodle, so the score measures
+# the difference between the two (paired scoring).
+# Category names follow docs/FILTER.md. Violence is not scored (D-37).
+
+[SEXUAL]
+positive = [
+    "a crude line drawing of a penis",
+    "a crude line drawing of genitals",
+    "a black and white doodle of a naked person showing genitals",
+    "a simple sketch of two people having sex",
+    "a doodle of naked breasts",
+]
+negative = [
+    "a crude line drawing of a banana",
+    "a crude line drawing of a person",
+    "a black and white doodle of a person wearing clothes",
+    "a simple sketch of two people holding hands",
+    "a doodle of a smiling face",
+]
+
+[HATE]
+positive = [
+    "a line drawing of a nazi swastika",
+    "a black and white doodle of a swastika symbol",
+    "a drawing of a nazi flag",
+    "a doodle of the SS lightning bolt symbol",
+    "a sketch of a hate symbol",
+]
+negative = [
+    "a line drawing of a plus sign",
+    "a black and white doodle of a geometric pattern",
+    "a drawing of a country flag",
+    "a doodle of a lightning bolt",
+    "a sketch of a star",
+    # The Buddhist manji is common on Korean maps and temples and is not a hate symbol.
+    "a doodle of a buddhist temple manji symbol",
+]
