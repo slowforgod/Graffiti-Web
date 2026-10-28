@@ -3,8 +3,9 @@
 | 경로 | 내용 |
 |---|---|
 | `serving/` | FastAPI 추론 서버. `POST /v1/moderate`, `GET /health` (`docs/API.md` §7) |
-| `eval/` | 평가 세트 생성(`build_set.py`), 임계값 보정(`calibrate.py`), D-39 지표(`evaluate.py`) |
+| `eval/` | 평가 세트 생성(`build_set.py`), 임계값 보정(`calibrate.py`), D-39 지표(`evaluate.py`), OCR 평가(`ocr_eval.py`) |
 | `prompts/` | 제로샷 카테고리 문장 (`<version>.toml`) |
+| `OCR_samples/` | 외부 손글씨 데이터 (로컬 전용, git 제외) |
 | `models.lock` | 서버가 불러올 모델 버전, arch, S3 경로, 파일 이름, sha256, 문장 파일, 카테고리별 임계값 |
 
 개발 규칙과 방향(명세 절차, 모델 선택, 버전 규칙, 테스트)은 `DEVELOPMENT.md`에 있습니다.
@@ -47,6 +48,23 @@ MODEL_DIR=/path/to/weights uvicorn app.main:build --factory --port 8000
 2. `models.lock`에 위 키를 적습니다(임계값은 임시값). `shasum -a 256`으로 두 체크섬을 넣습니다
 3. 서버를 띄우고 아래 평가 세트로 `calibrate.py`를 돌려 임계값을 정합니다
 4. 정한 임계값을 `models.lock`에 넣고, 보고서(수치만)를 같은 PR에 붙입니다
+
+## OCR (D-35, `docs/specs/07b-ml-moderation.md`)
+손글씨는 EasyOCR 1.7.2(한국어+영어, CPU)로 읽습니다(`serving/app/ocr.py`). 글자 덩어리마다 신뢰도가 나오고, `[ocr] min_confidence` 미만인 덩어리는 버립니다. 글자 수 하한은 없습니다. 남은 글자는 Spring이 텍스트 검사 경로로 넘깁니다(07b PR 2).
+
+- 가중치: 공식 릴리스의 `craft_mlt_25k.pth`(글자 위치 검출)와 `korean_g2.pth`(한국어 인식)를 `MODEL_DIR`에 **이 이름 그대로** 둡니다. 서버는 `models.lock`의 sha256과 EasyOCR 자체 md5를 둘 다 확인하고, 다운로드는 끕니다(`download_enabled=False`)
+- 이 파일들은 pickle 형식(`.pth`)이라 바꿔치기되면 코드가 실행될 수 있습니다. 그래서 공식 릴리스에서 받은 파일의 sha256으로만 엽니다(07b 결정 2)
+- `[ocr]` 키: `version`, `engine`(`easyocr`), `langs`, `min_confidence`, `[ocr.detector]`와 `[ocr.recognizer]`의 `file`·`sha256`·`uri`. 하나라도 틀리거나 파일이 없으면 서버는 503입니다
+
+손글씨 평가와 `min_confidence` 고르기 (07b 결정 3: 평범한 글자 덩어리의 90%가 남는 값)
+```bash
+cd ml/eval
+python ocr_eval.py --model-dir <가중치 폴더> --manifest sets/<손글씨 세트>/manifest.csv --out ocr-report.json
+python ocr_eval.py --model-dir <가중치 폴더> --aihub-json ../OCR_samples/jsons/handwriting_data_info_clean.json --images ../OCR_samples/raw --limit 400
+```
+- `manifest.csv`는 `file,text[,category]`입니다. `category`는 일부러 넣은 욕·개인정보 샘플의 FILTER 카테고리, 평범한 글자는 비웁니다
+- 출력: 표본 수, 게이트 전후 글자 오류율(CER, 띄어쓰기 무시), 남는 덩어리 비율, 신뢰도 p10·p50·p90, 카테고리별 CER, 응답 시간 p95. 읽은 글자는 출력하지 않습니다
+- AI Hub "한글 손글씨" 데이터(`ml/OCR_samples/`)는 재배포가 금지돼 있어 git에 올리지 않습니다(`.gitignore`). 종이에 펜으로 쓴 문장이라 우리 캔버스의 마우스 글씨와는 다릅니다. 팀이 캔버스에 쓴 세트로 다시 확인합니다
 
 ## 평가 세트와 지표 (D-37, D-39)
 세트는 `build_set.py`로 만듭니다. 세트는 S3 `s3://<bucket>/eval/<세트 이름>/`에 두고, 로컬에서는 `ml/eval/sets/`(git 제외)에 받아 씁니다.

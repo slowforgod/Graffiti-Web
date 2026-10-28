@@ -40,6 +40,7 @@ cd ml/serving && pytest                     # ML 서버 테스트
 cd ml/eval && pytest && python evaluate.py --manifest <세트>/manifest.csv   # 평가 세트로 D-39 지표 계산 (ml/README.md)
 cd ml/eval && python build_set.py --out sets/<세트> --quickdraw <ndjson...> --hate-variants 300 --team <폴더>   # 평가 세트 생성
 cd ml/eval && python calibrate.py --manifest sets/<세트>/manifest.csv   # 카테고리별 임계값 보정 + 보고 세트 D-39 지표
+cd ml/eval && python ocr_eval.py --model-dir <가중치> --manifest <손글씨 세트>/manifest.csv   # OCR 글자 오류율 + min_confidence
 ```
 
 **전체 검사** (PR 전, `/gf-ship`이 실행): `./gradlew test` + `npm test` + `npm run lint` + `npm run build` + `pytest`(ml/serving, ml/eval)
