@@ -12,6 +12,7 @@
 | 테이블, 쿼리 | `docs/DB.md` |
 | REST, STOMP, 에러 코드 | `docs/API.md` |
 | ChatKHU(LLM 게이트웨이) 호출 | `docs/CHATKHU_API.md` |
+| 텍스트 판정 기준(욕설, 혐오, 성적, 개인정보) | `docs/FILTER.md` |
 | 보안 규칙 | `docs/SECURITY.md` (SEC-xx) |
 | 개발 절차와 게이트, 로드맵 | `docs/PIPELINE.md` |
 | 지금 구현할 기능 | `docs/specs/NN-*.md` (상태가 APPROVED인 것만 구현) |
