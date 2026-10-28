@@ -292,11 +292,12 @@
 ```
 - `scores`의 키는 `models.lock`의 `[image.thresholds]` 키와 같습니다(`docs/FILTER.md` 카테고리 이름). 카테고리마다 독립인 0~1 점수이며 `safe` 점수는 없습니다.
 - `label`은 ML 서버가 `models.lock`의 임계값으로 정합니다. Spring은 `scores`도 그대로 `ml_prediction`에 저장합니다.
+- `ocr.text`는 OCR이 찾은 글자 덩어리 중 신뢰도가 `models.lock`의 `[ocr] min_confidence` 이상인 것만 읽는 순서(위→아래, 왼→오)로 공백 연결한 것입니다. `ocr.confidence`는 남은 덩어리의 평균 신뢰도이고, 남은 덩어리가 없으면 `""`와 `0`입니다. `models.lock`의 OCR이 `"none"`이면 항상 `""`입니다.
 - `ocr.text`가 비어 있지 않으면 Spring이 텍스트 검사 경로(금칙어 → ChatKHU → OpenAI)로 넘깁니다(D-35).
-- 오류: `400`(이미지 아님, 크기 초과), `503`(모델 미로드). Spring은 응답 시간 3초 초과, 4xx, 5xx를 모두 ML 판정 없음으로 처리합니다(INV-13, D-40).
+- 오류: `400`(이미지 아님, 크기 초과), `503`(이미지 모델이나 OCR 미로드, 체크섬 불일치). Spring은 응답 시간 3초 초과, 4xx, 5xx를 모두 ML 판정 없음으로 처리합니다(INV-13, D-40).
 
 `GET /health` 응답
 ```json
-{ "status": "UP", "modelVersion": "clip-zs-2026.11.01", "ocrVersion": "paddleocr-korean-x.y" }
+{ "status": "UP", "modelVersion": "clip-zs-2026.11.01", "ocrVersion": "easyocr-1.7.2-ko" }
 ```
 

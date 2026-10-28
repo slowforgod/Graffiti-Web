@@ -9,8 +9,8 @@ from fastapi.responses import JSONResponse
 
 from .decision import decide
 from .image_input import InvalidImage, read_png
-from .lock import ImageModelLock, read_lock
-from .models import ClassifierFactory, ImageClassifier, OcrEngine, Registry
+from .lock import ImageModelLock, OcrModelLock, read_lock
+from .models import ClassifierFactory, ImageClassifier, OcrEngine, OcrFactory, Registry
 from .prompts import Prompts
 from .schemas import HealthResponse, ImageResult, ModerateResponse, OcrResult
 from .settings import Settings
@@ -30,15 +30,31 @@ def classifier_factory(threads: int) -> ClassifierFactory:
     return build_classifier
 
 
+def easyocr_factory(threads: int) -> OcrFactory:
+    """Builds the EasyOCR engine (D-35) from the verified files in models.lock."""
+
+    def build_ocr(model_dir: Path, lock: OcrModelLock) -> OcrEngine:
+        # Imported here so the API tests with fake engines do not load torch.
+        from .ocr import EasyOcrEngine
+
+        return EasyOcrEngine(model_dir, lock, threads)
+
+    return build_ocr
+
+
 def error(status: int, code: str) -> JSONResponse:
     return JSONResponse(status_code=status, content={"error": {"code": code}})
 
 
 def create_app(
-    settings: Settings | None = None, factory: ClassifierFactory | None = None, ocr: OcrEngine | None = None
+    settings: Settings | None = None,
+    factory: ClassifierFactory | None = None,
+    ocr_factory: OcrFactory | None = None,
 ) -> FastAPI:
     settings = settings or Settings.from_env()
-    registry = Registry.load(read_lock(settings.models_lock), settings.model_dir, settings.prompts_dir, factory, ocr)
+    registry = Registry.load(
+        read_lock(settings.models_lock), settings.model_dir, settings.prompts_dir, factory, ocr_factory
+    )
     app = FastAPI(title="graffiti-ml", docs_url=None, redoc_url=None, openapi_url=None)
 
     @app.get("/health", response_model=HealthResponse)
@@ -46,7 +62,7 @@ def create_app(
         body = HealthResponse(
             status="UP" if registry.ready else "DOWN",
             modelVersion=registry.lock.image.version,
-            ocrVersion=registry.ocr.version,
+            ocrVersion=registry.lock.ocr.version,
         )
         if not registry.ready:
             return JSONResponse(status_code=503, content=body.model_dump())
@@ -90,4 +106,8 @@ def create_app(
 def build() -> FastAPI:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     settings = Settings.from_env()
-    return create_app(settings, factory=classifier_factory(settings.torch_threads))
+    return create_app(
+        settings,
+        factory=classifier_factory(settings.torch_threads),
+        ocr_factory=easyocr_factory(settings.torch_threads),
+    )

@@ -18,7 +18,7 @@ def test_reads_a_configured_lock(tmp_path):
     assert lock.image.prompts == "test-1.toml"
     assert lock.image.crop_to_content is True
     assert lock.image.thresholds == THRESHOLDS
-    assert lock.ocr_version == "none"
+    assert not lock.ocr.configured
 
 
 def test_none_version_means_no_model(tmp_path):
@@ -80,6 +80,61 @@ def test_lock_body_helper_builds_a_valid_lock(tmp_path):
     ],
 )
 def test_malformed_lock_is_rejected(tmp_path, body):
+    path = tmp_path / "models.lock"
+    path.write_text(body, encoding="utf-8")
+    with pytest.raises(LockError):
+        read_lock(path)
+
+
+OCR = {
+    "version": '"easyocr-1.7.2-ko"',
+    "engine": '"easyocr"',
+    "langs": '["ko", "en"]',
+    "min_confidence": "0.3",
+}
+DETECTOR = '[ocr.detector]\nfile = "craft_mlt_25k.pth"\nsha256 = "' + "c" * 64 + '"\n'
+RECOGNIZER = '[ocr.recognizer]\nfile = "korean_g2.pth"\nsha256 = "' + "d" * 64 + '"\n'
+
+
+def ocr_body(detector=DETECTOR, recognizer=RECOGNIZER, **ocr) -> str:
+    keys = {**OCR, **ocr}
+    lines = "".join(f"{k} = {v}\n" for k, v in keys.items() if v is not None)
+    return '[image]\nversion = "none"\n[ocr]\n' + lines + (detector or "") + (recognizer or "")
+
+
+def test_reads_a_configured_ocr_lock(tmp_path):
+    path = tmp_path / "models.lock"
+    path.write_text(ocr_body(), encoding="utf-8")
+
+    ocr = read_lock(path).ocr
+
+    assert ocr.configured
+    assert ocr.version == "easyocr-1.7.2-ko"
+    assert ocr.langs == ("ko", "en")
+    assert ocr.min_confidence == 0.3
+    assert ocr.detector.file == "craft_mlt_25k.pth"
+    assert ocr.recognizer.sha256 == "d" * 64
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        ocr_body(engine='"paddleocr"'),
+        ocr_body(engine=None),
+        ocr_body(langs="[]"),
+        ocr_body(langs='"ko"'),
+        ocr_body(min_confidence="1.5"),
+        ocr_body(min_confidence=None),
+        ocr_body(detector=None),
+        ocr_body(recognizer=RECOGNIZER.replace("korean_g2.pth", "../korean_g2.pth")),
+        ocr_body(recognizer=RECOGNIZER.replace("d" * 64, "abc")),
+    ],
+    ids=[
+        "unknown-engine", "no-engine", "no-langs", "langs-not-list", "confidence-range", "no-confidence",
+        "no-detector", "path-escape", "bad-sha",
+    ],
+)
+def test_malformed_ocr_lock_is_rejected(tmp_path, body):
     path = tmp_path / "models.lock"
     path.write_text(body, encoding="utf-8")
     with pytest.raises(LockError):

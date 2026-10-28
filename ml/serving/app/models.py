@@ -8,7 +8,7 @@ from typing import Protocol
 
 from PIL import Image
 
-from .lock import ImageModelLock, ModelsLock, verify_file
+from .lock import ImageModelLock, ModelsLock, OcrModelLock, verify_file
 from .prompts import Prompts, PromptsError, parse_prompts
 
 log = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ class OcrEngine(Protocol):
 
 
 class NoOcr:
-    """Placeholder until 07b picks an OCR engine: reads nothing."""
+    """Used when models.lock names no OCR engine: reads nothing."""
 
     version = "none"
 
@@ -39,17 +39,20 @@ class NoOcr:
 
 # Builds a classifier from the verified weights file, the parsed category sentences and the lock entry.
 ClassifierFactory = Callable[[Path, Prompts, ImageModelLock], ImageClassifier]
+# Builds the OCR engine from MODEL_DIR once the lock's files are verified.
+OcrFactory = Callable[[Path, OcrModelLock], OcrEngine]
 
 
 @dataclass(frozen=True)
 class Registry:
     lock: ModelsLock
     classifier: ImageClassifier | None
-    ocr: OcrEngine
+    # None when models.lock names an OCR engine that could not be loaded.
+    ocr: OcrEngine | None
 
     @property
     def ready(self) -> bool:
-        return self.classifier is not None
+        return self.classifier is not None and self.ocr is not None
 
     @staticmethod
     def load(
@@ -57,10 +60,10 @@ class Registry:
         model_dir: Path,
         prompts_dir: Path,
         factory: ClassifierFactory | None,
-        ocr: OcrEngine | None = None,
+        ocr_factory: OcrFactory | None = None,
     ) -> "Registry":
         image = lock.image
-        ocr = ocr or NoOcr()
+        ocr = _load_ocr(lock.ocr, model_dir, ocr_factory)
         if not image.configured:
             log.warning("No image model configured in models.lock; answering 503")
             return Registry(lock, None, ocr)
@@ -89,3 +92,22 @@ class Registry:
             return Registry(lock, None, ocr)
         log.info("Loaded image model %s", image.version)
         return Registry(lock, classifier, ocr)
+
+
+def _load_ocr(lock: OcrModelLock, model_dir: Path, factory: OcrFactory | None) -> OcrEngine | None:
+    if not lock.configured:
+        return NoOcr()
+    if factory is None:
+        log.error("models.lock names OCR %s but no OCR factory is installed", lock.version)
+        return None
+    for model_file in lock.files:
+        if not verify_file(model_dir / model_file.file, model_file.sha256):
+            log.error("OCR file for %s is missing or fails its sha256 check; not loading", lock.version)
+            return None
+    try:
+        engine = factory(model_dir, lock)
+    except Exception as e:
+        log.error("OCR %s failed to load: %s", lock.version, type(e).__name__)
+        return None
+    log.info("Loaded OCR %s", lock.version)
+    return engine
