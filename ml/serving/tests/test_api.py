@@ -30,9 +30,17 @@ class FakeOcr:
         return OCR_TEXT, 0.62
 
 
+OCR_FILES = {"craft_mlt_25k.pth": b"detector", "korean_g2.pth": b"recognizer"}
+
+
 def client(tmp_path, classifier, weights=b"weights", sha256=None, ocr=None, **lock):
-    settings = write_lock(tmp_path, weights, sha256, **lock)
-    app = create_app(settings, factory=(lambda path, prompts, image: classifier) if classifier else None, ocr=ocr)
+    """``ocr`` is an engine to load from an [ocr] lock section with OCR_FILES; None leaves OCR at "none"."""
+    settings = write_lock(tmp_path, weights, sha256, ocr=OCR_FILES if ocr else None, **lock)
+    app = create_app(
+        settings,
+        factory=(lambda path, prompts, image: classifier) if classifier else None,
+        ocr_factory=(lambda model_dir, ocr_lock: ocr) if ocr else None,
+    )
     return TestClient(app)
 
 
@@ -160,6 +168,41 @@ def test_logs_carry_no_ocr_text_or_scores(tmp_path, caplog):
     assert "req-42" in caplog.text
     assert OCR_TEXT not in caplog.text
     assert "0.8123" not in caplog.text
+
+
+def test_health_names_the_ocr_version_when_ocr_loads(tmp_path):
+    seen = {}
+
+    def ocr_factory(model_dir, ocr_lock):
+        seen.update(model_dir=model_dir, lock=ocr_lock)
+        return FakeOcr()
+
+    settings = write_lock(tmp_path, b"weights", ocr=OCR_FILES)
+    c = TestClient(create_app(settings, factory=lambda *a: FakeClassifier({}), ocr_factory=ocr_factory))
+
+    assert c.get("/health").json() == {"status": "UP", "modelVersion": "test-1", "ocrVersion": "ocr-test-1"}
+    assert seen["model_dir"] == settings.model_dir
+    assert seen["lock"].langs == ("ko", "en")
+
+
+@pytest.mark.parametrize(
+    "case", ["checksum", "no-factory", "factory-fails"],
+)
+def test_ocr_that_cannot_load_refuses_to_answer(tmp_path, case, caplog):
+    def failing(model_dir, ocr_lock):
+        raise FileNotFoundError("Missing secret/korean_g2.pth and downloads disabled")
+
+    settings = write_lock(
+        tmp_path, b"weights", ocr=OCR_FILES, ocr_sha256="0" * 64 if case == "checksum" else None
+    )
+    factories = {"checksum": lambda *a: FakeOcr(), "no-factory": None, "factory-fails": failing}
+    with caplog.at_level(logging.INFO):
+        c = TestClient(create_app(settings, factory=lambda *a: FakeClassifier({}), ocr_factory=factories[case]))
+
+    assert c.get("/health").status_code == 503
+    assert c.get("/health").json()["ocrVersion"] == "ocr-test-1"
+    assert moderate(c, png_bytes()).status_code == 503
+    assert "secret" not in caplog.text
 
 
 def test_api_docs_are_not_exposed(tmp_path):

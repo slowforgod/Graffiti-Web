@@ -35,10 +35,14 @@ def write_lock(
     arch: str = "ViT-B-32",
     crop_to_content: bool = True,
     weights_path: Path | None = None,
+    ocr: dict[str, bytes] | None = None,
+    ocr_sha256: str | None = None,
 ) -> Settings:
     """Writes models.lock, the weights file and the prompts file the way ml/ lays them out.
 
     ``weights_path`` links an existing weights file instead of writing ``weights``; pass its sha256 too.
+    ``ocr`` maps the detector and recognizer file names to their bytes and adds an [ocr] section;
+    ``ocr_sha256`` overrides the recognizer's checksum.
     """
     model_dir = tmp_path / "models"
     model_dir.mkdir()
@@ -63,6 +67,16 @@ def write_lock(
             f'prompts = "test-1.toml"\nprompts_sha256 = "{prompts_digest}"\n'
             f"crop_to_content = {str(crop_to_content).lower()}\n\n"
             f"[image.thresholds]\n{thresholds}\n\n[ocr]\nversion = \"none\"\n"
+        )
+    if ocr is not None:
+        (detector, detector_bytes), (recognizer, recognizer_bytes) = ocr.items()
+        for name, data in ocr.items():
+            (model_dir / name).write_bytes(data)
+        recognizer_sha = ocr_sha256 or hashlib.sha256(recognizer_bytes).hexdigest()
+        lock = lock.replace('[ocr]\nversion = "none"\n', "") + (
+            '[ocr]\nversion = "ocr-test-1"\nengine = "easyocr"\nlangs = ["ko", "en"]\nmin_confidence = 0.3\n'
+            f'[ocr.detector]\nfile = "{detector}"\nsha256 = "{hashlib.sha256(detector_bytes).hexdigest()}"\n'
+            f'[ocr.recognizer]\nfile = "{recognizer}"\nsha256 = "{recognizer_sha}"\n'
         )
     lock_path = tmp_path / "models.lock"
     lock_path.write_text(lock, encoding="utf-8")

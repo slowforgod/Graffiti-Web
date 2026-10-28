@@ -93,11 +93,12 @@ ml/
 │   └── Dockerfile 비 root, 빌드 컨텍스트는 ml/
 ├── training/      미세조정 스크립트 (운영 데이터 추출본 사용, 작성자 정보 없음) — 07b 이후
 ├── prompts/       카테고리 문장 <version>.toml (models.lock이 이름과 sha256으로 잠금)
-├── eval/          build_set.py(세트 생성), calibrate.py(임계값 보정), evaluate.py(서버 호출), metrics.py·calibration.py(순수). 평가 이미지는 sets/(git 제외)와 S3
+├── eval/          ocr_eval.py·ocr_metrics.py(OCR 평가), build_set.py(세트 생성), calibrate.py(임계값 보정), evaluate.py(서버 호출), metrics.py·calibration.py(순수). 평가 이미지는 sets/(git 제외)와 S3
 └── models.lock    TOML. 모델 버전, arch, S3 경로, 파일 이름, sha256, 문장 파일과 sha256, crop_to_content, 카테고리별 임계값 (가중치 파일은 git에 없음)
 ```
 
-- 서버는 시작할 때 `models.lock`을 읽고 `MODEL_DIR/<file>`(가중치)과 `ml/prompts/<prompts>`(카테고리 문장)의 sha256이 둘 다 맞을 때만 분류기를 만듭니다. 모델이 없거나 체크섬이 다르면 뜨기는 하지만 `/health`와 `/v1/moderate`가 503입니다(INV-13: Spring은 판정 없음으로 처리).
+- 서버는 시작할 때 `models.lock`을 읽고 `MODEL_DIR/<file>`(가중치), `ml/prompts/<prompts>`(카테고리 문장), OCR 파일의 sha256이 모두 맞을 때만 모델을 만듭니다. 모델이 없거나 체크섬이 다르면 뜨기는 하지만 `/health`와 `/v1/moderate`가 503입니다(INV-13: Spring은 판정 없음으로 처리).
+- OCR은 EasyOCR(한국어+영어)입니다. 글자 덩어리 중 `[ocr] min_confidence` 이상만 남겨 `ocr.text`로 돌려줍니다(`ml/serving/app/ocr.py`). OCR 파일도 sha256이 맞아야 로드하며, 하나라도 실패하면 서버는 503입니다.
 - 분류기는 OpenCLIP 제로샷(paired)입니다. 카테고리마다 `sigmoid(logit_scale × (cos(이미지, positive) − cos(이미지, negative)))`로 0~1 점수를 냅니다(`ml/serving/app/clip_classifier.py`).
 - 라벨은 서버가 정합니다: 카테고리 중 하나라도 `models.lock`의 임계값 이상이면 `FLAGGED`.
 - 현재 시각은 항상 주입받은 `java.time.Clock`으로 얻습니다. 타이머와 쿨다운 테스트에서 시간을 조작하기 위해서예요.
