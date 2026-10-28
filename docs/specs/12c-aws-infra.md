@@ -51,7 +51,9 @@
 - `docs/SECURITY.md` SEC-10: "SSH는 팀원 IP만". README §1.2의 "처음에는 22를 열고 12b에서 좁힙니다"와 어긋남 → 이 명세는 **SEC-10을 따른다** (사람이 확정, 2026-10-28)
 - `.github/dependabot.yml`에 `/infra` 항목 없음. `.github/workflows/ci.yml`에 `infra` 작업 없음 (backend, frontend, ml, secret-scan만)
 - `.gitignore`에 `cdk.out/`, `infra/node_modules/` 없음
-- AWS 계정(2026-10-28 읽기 전용 조회): `ap-northeast-2`에 기본 VPC 1개, 인스턴스 0, Elastic IP 0, CloudFormation 스택 0.- Node 22를 frontend와 CI가 이미 사용 중
+- AWS 계정(2026-10-28 읽기 전용 조회): `ap-northeast-2`에 기본 VPC 1개, 인스턴스 0, Elastic IP 0, CloudFormation 스택 0
+- 같은 조회(2026-10-28)로 확인한 것: `t3.medium`은 `ap-northeast-2a`~`2d` 네 AZ 모두에서 제공된다. 기본 VPC의 기본 서브넷 4개는 AZ별로 하나씩이고 모두 공개 IP 자동 할당이 켜져 있다. Canonical(소유자 `099720109477`)의 `ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*` 패턴이 22개 이미지를 찾았고 최신은 2026-10-23 빌드(x86_64, EBS, gp3). 이미지가 1~2주마다 새로 나오므로 조회 결과를 `cdk.context.json`에 캐시하지 않으면 `cdk deploy`마다 인스턴스 교체 위험이 있다(§6)
+- Node 22를 frontend와 CI가 이미 사용 중
 
 ## 5. 설계
 
