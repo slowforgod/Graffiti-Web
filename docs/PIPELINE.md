@@ -97,7 +97,12 @@ DRAFT ──(G1 사람 승인)──▶ APPROVED ──(구현 시작)──▶ 
 
 ## 5. 팀 운영 규칙
 
-- **브랜치**: `feat/NN-<이름>`, `fix/<짧은-설명>`, `docs/<짧은-설명>`. main에 직접 push 금지
+- **브랜치 이름**: `<type>/<짧은-설명>`. 로드맵 명세가 있는 작업은 `<type>/NN-<짧은-설명>`(NN은 `docs/specs/NN-*.md`의 번호 그대로, `12a`처럼 접미사도 명세 파일명과 같게). 예: `feat/06-publish`, `fix/relogin-after-logout`
+  - type은 커밋 type과 같다: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`
+  - 설명은 영어 소문자 kebab-case, 2~4단어. 이름만 보고 무슨 작업인지 알 수 있어야 한다(`a1` 같은 약어 금지)
+  - 같은 명세에서 브랜치를 더 만들 때는 설명으로 구분한다(`feat/09-status-date`)
+  - `dependabot/...`은 자동 생성이라 예외
+- **main 직접 push 금지**
 - **PR과 머지**: PR은 작업 브랜치에서 main으로 연다. G1~G4는 `/gf-ship`이 확인하고, **팀원 1명 이상 승인 + CI 통과(G5) 후 PR 작성자가 직접 머지**한다. Claude Code는 머지하지 않는다
 - **머지 방식은 "Rebase and merge"**: bisect 가능하게 나눈 커밋을 main에 그대로 남기기 위해서다. "Squash and merge"는 쓰지 않는다. 머지 후 작업 브랜치는 삭제한다
 - **브랜치 보호**: 비공개 저장소에서 main 보호 규칙(승인·CI 필수, 직접 push 금지)을 GitHub이 강제하려면 Pro 이상(학생은 Student Developer Pack)이 필요하다. 보호 규칙이 없는 동안에는 이 규칙과 훅(main push 확인)으로 지킨다
