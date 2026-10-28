@@ -79,6 +79,7 @@ DRAFT ──(G1 사람 승인)──▶ APPROVED ──(구현 시작)──▶ 
 | 10 | admin | 관리자 API와 화면, 차단, 복구, 조치 기록 | 07 | D-23, SEC-14 |
 | 11 | security-pass | `/gf-security` 전체 감사와 수정, 속도 제한 마무리 | 01~10 | SEC 전체 |
 | 12 | deploy | EC2, nginx, TLS, Actions 배포, 백업, 복구 리허설 | 00 (언제든 병행 가능) | D-02, D-04, SEC-10/11 |
+| 12c | aws-infra | 스테이징 EC2, 보안 그룹, Elastic IP를 CDK(`infra/`)로 정의. 도메인, 인증서, 비밀값은 제외 | 12a | D-02, D-04, D-36, SEC-10 |
 
 ```
 00 ─┬─ 01 ─┐
