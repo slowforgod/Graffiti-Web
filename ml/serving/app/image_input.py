@@ -5,6 +5,7 @@ import io
 from PIL import Image, UnidentifiedImageError
 
 PNG = "PNG"
+WHITE = (255, 255, 255)
 
 
 class InvalidImage(ValueError):
@@ -27,4 +28,19 @@ def read_png(data: bytes, max_bytes: int, max_side: int) -> Image.Image:
         image.load()
     except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as e:
         raise InvalidImage("unreadable image") from e
+    return on_white(image)
+
+
+def on_white(image: Image.Image) -> Image.Image:
+    """RGB with any transparency composited onto white.
+
+    A plain convert("RGB") keeps the colour of transparent pixels, which is usually black, so a doodle drawn
+    on a transparent canvas would become black strokes on black.
+    """
+    if image.mode == "P" and "transparency" in image.info:
+        image = image.convert("RGBA")
+    if image.mode in ("RGBA", "LA"):
+        rgba = image.convert("RGBA")
+        background = Image.new("RGBA", rgba.size, WHITE + (255,))
+        return Image.alpha_composite(background, rgba).convert("RGB")
     return image.convert("RGB")

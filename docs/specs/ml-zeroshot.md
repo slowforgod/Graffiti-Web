@@ -1,6 +1,6 @@
 # ml-zeroshot: OpenCLIP 제로샷 이미지 분류기
 
-- **상태**: APPROVED
+- **상태**: IN_PROGRESS
 - **승인자**: 현 (slowforgod) / 승인일: 2026-10-28 (결정 1~10 확정)
 - **브랜치**: `feat/ml-zeroshot`
 - **선행 명세**: ml-prep (MERGED, PR #24)
