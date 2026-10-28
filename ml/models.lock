@@ -21,5 +21,17 @@ version = "none"
 # HATE = 0.5
 
 [ocr]
-# OCR engine is chosen in 07b (D-35).
+# EasyOCR (07b, D-35). "none" reads no text: /v1/moderate answers ocr.text "" and the server needs no OCR files.
+# Set it with the files from the official releases (sha256 below) and a min_confidence from ocr_eval.py on
+# the team's canvas handwriting set. Files are pickle (.pth): only open the exact files below (07b decision 2).
 version = "none"
+# version = "easyocr-1.7.2-ko"
+# engine = "easyocr"
+# langs = ["ko", "en"]
+# min_confidence = 0.05                 # AI Hub sentences, 2026-10-28; redo on the canvas set
+# [ocr.detector]                        # github.com/JaidedAI/EasyOCR/releases/download/pre-v1.1.6/craft_mlt_25k.zip
+# file = "craft_mlt_25k.pth"
+# sha256 = "4a5efbfb48b4081100544e75e1e2b57f8de3d84f213004b14b85fd4b3748db17"
+# [ocr.recognizer]                      # github.com/JaidedAI/EasyOCR/releases/download/v1.3/korean_g2.zip
+# file = "korean_g2.pth"
+# sha256 = "ecdead53c909748aad74bc2f2beeab3e3ad751134db6335e97ea19f879ca407e"
