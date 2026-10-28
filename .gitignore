@@ -14,6 +14,8 @@ ml/**/models/
 ml/**/data/
 ml/**/exports/
 ml/eval/sets/
+# 외부 손글씨 데이터 (AI Hub 등, 재배포 금지): 로컬에만 둠
+ml/OCR_samples/
 *.pt
 *.pth
 *.onnx

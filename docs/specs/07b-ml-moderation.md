@@ -1,7 +1,7 @@
 # 07b-ml-moderation: OCR, ML 서버 연결, ml_prediction 기록 (SHADOW)
 
-- **상태**: DRAFT
-- **승인자**: (G1에서 팀원이 기입) / 승인일:
+- **상태**: IN_PROGRESS (PR 1)
+- **승인자**: 현 (slowforgod) / 승인일: 2026-10-28 (결정 1~7 추천대로)
 - **브랜치**: `feat/07b-ml-ocr` (PR 1), `feat/07b-ml-wiring` (PR 2)
 - **선행 명세**: ml-zeroshot (PR #58), 07-moderation-frame (MERGED)
 
@@ -152,7 +152,9 @@ uri = "s3://<bucket>/models/easyocr-1.7.2-ko/korean_g2.pth"
 
 설정값(`GraffitiProperties`, INV-10): `graffiti.moderation.ml.mode|base-url|timeout`(기존), `graffiti.moderation.ml.max-in-flight`(SHADOW 백그라운드 동시 실행 상한, 넘으면 건너뛰고 기록 안 함), `graffiti.moderation.ml.render-max-side`(1024)
 
-### 결정 필요
+### 결정
+> 2026-10-28 현: 1~7 모두 추천대로 확정.
+
 1. **OCR 엔진**: 추천 **EasyOCR 1.7.2**
    - 장점: torch를 CLIP과 같이 써서 이미지가 덜 커짐
    - 장점: 덩어리별 신뢰도를 돌려줌
