@@ -35,6 +35,7 @@ cd frontend && npm ci && npm run dev       # 프론트 (localhost:5173, /api와 
 cd frontend && npm test                    # 프론트 테스트 (Vitest)
 cd frontend && npm run lint                # ESLint (dangerouslySetInnerHTML 금지 규칙 포함)
 cd frontend && npm run build               # 프로덕션 빌드
+cd frontend && pip install -r scripts/requirements-fonts.txt && python -I scripts/build_fonts.py --src <글꼴 원본 폴더>   # 텍스트 글꼴 조각·미리보기 재생성 (13, 원본은 git 밖)
 cd ml/serving && pip install -r requirements-dev.txt && uvicorn app.main:build --factory --port 8000   # ML 서버 (MODEL_DIR의 가중치를 models.lock 체크섬으로 검증, 모델이 없으면 503)
 cd ml/serving && pytest                     # ML 서버 테스트
 cd ml/eval && pytest && python evaluate.py --manifest <세트>/manifest.csv   # 평가 세트로 D-39 지표 계산 (ml/README.md)

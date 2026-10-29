@@ -25,6 +25,9 @@ __pycache__/
 .venv/
 *.pyc
 
+# 글꼴 원본 (대부분 파일 재배포 금지, D-44): 로컬에만 두고 scripts/build_fonts.py 결과만 커밋
+frontend/designs/fonts/
+
 # 보안 감사, QA 리포트의 원본 덤프 (요약은 docs/에 기록)
 .qa-reports/
 
