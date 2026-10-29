@@ -15,18 +15,18 @@ describe('publishBody', () => {
     });
   });
 
-  it('sends a text with its measured size', () => {
-    const draft: TextDraft = { id: 't', kind: 'TEXT', text: '안녕', c: 2, size: 24, x: 10, y: 20, w: 48, h: 24 };
+  it('sends a text with its measured size and its font', () => {
+    const draft: TextDraft = { id: 't', kind: 'TEXT', text: '안녕', c: 2, size: 24, f: 'jalnan', x: 10, y: 20, w: 48, h: 24 };
     expect(publishBody(draft)).toEqual({
       kind: 'TEXT',
-      payload: { v: 1, text: '안녕', c: 2, size: 24, x: 10, y: 20 },
+      payload: { v: 1, text: '안녕', c: 2, size: 24, x: 10, y: 20, f: 'jalnan' },
       bbox: { w: 48, h: 24 },
     });
   });
 
   it('has nothing to send for an empty draft', () => {
     expect(publishBody({ id: 'd', kind: 'DRAWING', strokes: [null] })).toBeNull();
-    expect(publishBody({ id: 't', kind: 'TEXT', text: '', c: 0, size: 24, x: 0, y: 0, w: 1, h: 24 })).toBeNull();
-    expect(publishBody({ id: 't', kind: 'TEXT', text: ' \n ', c: 0, size: 24, x: 0, y: 0, w: 6, h: 48 })).toBeNull();
+    expect(publishBody({ id: 't', kind: 'TEXT', text: '', c: 0, size: 24, f: 'pretendard', x: 0, y: 0, w: 1, h: 24 })).toBeNull();
+    expect(publishBody({ id: 't', kind: 'TEXT', text: ' \n ', c: 0, size: 24, f: 'pretendard', x: 0, y: 0, w: 6, h: 48 })).toBeNull();
   });
 });

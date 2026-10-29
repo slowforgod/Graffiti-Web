@@ -5,6 +5,7 @@ import type { ClientConfig } from '../shared/pageConfig';
 import type { Draft, DrawingDraft, TextDraft } from './draft';
 import { eraseAt, extendStroke, inCanvas, liveStrokes, moveDraft, newDrawing, startStroke, textLength } from './draft';
 import { DraftSender } from './draftSender';
+import { fontInfo, loadFont } from '../fonts/fonts';
 import { measureText } from './textMeasure';
 
 export type Tool = 'move' | 'pen' | 'text' | 'eraser';
@@ -17,7 +18,16 @@ const ERASER_SCREEN_RADIUS = 8;
 
 type Config = Pick<
   ClientConfig,
-  'width' | 'height' | 'maxBbox' | 'strokeWidths' | 'defaultFontSize' | 'textMaxLength' | 'draftIdleTimeoutSec' | 'draftIntervalMs'
+  | 'width'
+  | 'height'
+  | 'maxBbox'
+  | 'strokeWidths'
+  | 'defaultFontSize'
+  | 'defaultFont'
+  | 'textWidthPercent'
+  | 'textMaxLength'
+  | 'draftIdleTimeoutSec'
+  | 'draftIntervalMs'
 >;
 
 interface Options {
@@ -34,6 +44,7 @@ export function useDraft({ pageId, config, link, newId = () => crypto.randomUUID
   const [color, setColorState] = useState(0);
   const [width, setWidth] = useState(config.strokeWidths[Math.min(1, config.strokeWidths.length - 1)]!);
   const [fontSize, setFontSizeState] = useState(config.defaultFontSize);
+  const [font, setFontState] = useState(config.defaultFont);
   const [notice, setNotice] = useState<DraftNotice | null>(null);
   // Read from the link itself, so a connect before this hook listened is not missed.
   const online = useSyncExternalStore(
@@ -125,8 +136,8 @@ export function useDraft({ pageId, config, link, newId = () => crypto.randomUUID
   // Leaving the page (a reload after the page turned) drops the draft.
   useEffect(() => () => drop('cancel'), [drop]);
 
-  const textBox = (text: string, size: number, at: Point) => {
-    const { w, h } = measureText(text, size);
+  const textBox = (text: string, size: number, f: string, at: Point) => {
+    const { w, h } = measureText(text, size, fontInfo(f).family, config.textWidthPercent);
     const fits = w <= config.maxBbox && h <= config.maxBbox && at.x + w <= config.width && at.y + h <= config.height;
     return fits ? { w, h } : null;
   };
@@ -149,12 +160,13 @@ export function useDraft({ pageId, config, link, newId = () => crypto.randomUUID
     } else if (tool === 'eraser' && current?.kind === 'DRAWING') {
       erase(current, p, scale);
     } else if (tool === 'text' && !current && inCanvas(p, config)) {
-      const box = textBox('', fontSize, p);
+      const box = textBox('', fontSize, font, p);
       if (!box) {
         setNotice('too-big');
         return;
       }
-      const d: TextDraft = begin({ id: newId(), kind: 'TEXT', text: '', c: color, size: fontSize, x: p.x, y: p.y, ...box });
+      const d: TextDraft = begin({ id: newId(), kind: 'TEXT', text: '', c: color, size: fontSize, f: font, x: p.x, y: p.y, ...box });
+      void refit(d);
       sender.current?.text({ x: d.x, y: d.y, w: d.w, h: d.h });
       touched();
     }
@@ -214,26 +226,42 @@ export function useDraft({ pageId, config, link, newId = () => crypto.randomUUID
     touched();
   };
 
-  // Applies a new text (or size or colour) to the text draft when it stays within the limits (D-07, D-11).
-  const editText = (next: { text?: string; size?: number; c?: number }): boolean => {
+  // Measures the text draft again once its font has the letters loaded: until then the canvas measured it in
+  // the fallback font (13). A box that no longer fits is left as it was.
+  const refit = async (d: TextDraft): Promise<void> => {
+    if (!(await loadFont(d.f, d.text)) || draft.current !== d) {
+      return;
+    }
+    const box = textBox(d.text, d.size, d.f, d);
+    if (box && (box.w !== d.w || box.h !== d.h)) {
+      Object.assign(d, box);
+      sender.current?.text({ x: d.x, y: d.y, w: d.w, h: d.h });
+      redraw();
+    }
+  };
+
+  // Applies a new text (or size, colour or font) to the text draft when it stays within the limits (D-07, D-11).
+  const editText = (next: { text?: string; size?: number; c?: number; f?: string }): boolean => {
     const d = draft.current;
     if (d?.kind !== 'TEXT') {
       return false;
     }
     const text = next.text ?? d.text;
     const size = next.size ?? d.size;
+    const f = next.f ?? d.f;
     if (textLength(text) > config.textMaxLength) {
       setNotice('text-full');
       return false;
     }
-    const box = textBox(text, size, d);
+    const box = textBox(text, size, f, d);
     if (!box) {
       setNotice('too-big');
       return false;
     }
-    Object.assign(d, { text, size, c: next.c ?? d.c }, box);
+    Object.assign(d, { text, size, f, c: next.c ?? d.c }, box);
     sender.current?.text({ x: d.x, y: d.y, w: d.w, h: d.h });
     touched();
+    void refit(d);
     return true;
   };
 
@@ -248,6 +276,12 @@ export function useDraft({ pageId, config, link, newId = () => crypto.randomUUID
     }
   };
 
+  const setFont = (f: string) => {
+    if (draft.current?.kind !== 'TEXT' || editText({ f })) {
+      setFontState(f);
+    }
+  };
+
   return {
     tool,
     setTool,
@@ -257,6 +291,10 @@ export function useDraft({ pageId, config, link, newId = () => crypto.randomUUID
     setWidth,
     fontSize,
     setFontSize,
+    font,
+    setFont,
+    // Before posting a text: its box measured in its own font, not the fallback. Null for a drawing.
+    settle: (): Promise<void> | null => (draft.current?.kind === 'TEXT' ? refit(draft.current) : null),
     notice,
     clearNotice: () => setNotice(null),
     online,

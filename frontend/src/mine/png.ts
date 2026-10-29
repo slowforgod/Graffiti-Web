@@ -1,5 +1,6 @@
 import type { Doodle } from '../canvas/doodles';
 import type { Rect } from '../canvas/viewport';
+import { fontInfo, loadFont } from '../fonts/fonts';
 
 // Empty space kept around the doodles in a saved picture.
 export const PNG_MARGIN = 16;
@@ -40,7 +41,8 @@ export function pictureBounds(doodles: Doodle[], canvas: { width: number; height
 }
 
 // Draws the doodles as the canvas shows them (DoodleShape): round strokes, a dot for one point, text lines
-// in Konva's default font with a line height of one font size. `origin` is the picture's top left corner.
+// in their font (loaded by the caller) with a line height of one font size. `origin` is the picture's top
+// left corner.
 export function paintDoodles(ctx: Painter, doodles: Doodle[], palette: string[], origin: Rect): void {
   const color = (c: number) => palette[c] ?? palette[0]!;
   ctx.fillStyle = PNG_BACKGROUND;
@@ -49,7 +51,7 @@ export function paintDoodles(ctx: Painter, doodles: Doodle[], palette: string[],
     if (d.kind === 'TEXT') {
       const t = d.payload;
       ctx.fillStyle = color(t.c);
-      ctx.font = `${t.size}px Arial`;
+      ctx.font = `${t.size}px ${fontInfo(t.f).family}`;
       ctx.textBaseline = 'top';
       t.text.split('\n').forEach((line, i) => ctx.fillText(line, t.x - origin.x, t.y - origin.y + i * t.size));
       continue;
@@ -94,6 +96,7 @@ export async function savePng(
   if (!ctx) {
     throw new Error('no 2d context');
   }
+  await Promise.all(doodles.map((d) => (d.kind === 'TEXT' ? loadFont(d.payload.f, d.payload.text) : null)));
   paintDoodles(ctx, doodles, palette, bounds);
   const blob = await new Promise<Blob | null>((resolve) => element.toBlob(resolve, 'image/png'));
   if (!blob) {

@@ -20,6 +20,8 @@ export interface TextDraft {
   text: string;
   c: number;
   size: number;
+  // Font id (13).
+  f: string;
   x: number;
   y: number;
   w: number;

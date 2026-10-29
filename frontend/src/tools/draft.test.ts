@@ -68,10 +68,22 @@ describe('text drafts', () => {
   });
 
   it('measures within the server cap, falling back to it without a canvas (D-31)', () => {
-    expect(measureText('ab\nabcd', 10, () => null)).toEqual({ w: 40, h: 20 });
-    expect(measureText('abcd', 10, (line) => line.length * 5.2)).toEqual({ w: 21, h: 10 });
-    expect(measureText('ab', 10, () => 99)).toEqual({ w: 20, h: 10 });
-    expect(measureText('', 24, () => 0)).toEqual({ w: 1, h: 24 });
+    expect(measureText('ab\nabcd', 10, 'f', 100, () => null)).toEqual({ w: 40, h: 20 });
+    expect(measureText('abcd', 10, 'f', 100, (line) => line.length * 5.2)).toEqual({ w: 21, h: 10 });
+    expect(measureText('ab', 10, 'f', 100, () => 99)).toEqual({ w: 20, h: 10 });
+    expect(measureText('', 24, 'f', 100, () => 0)).toEqual({ w: 1, h: 24 });
+  });
+
+  it('measures in the given font and lets wide fonts go to the width percent, rounded up (13)', () => {
+    const seen: string[] = [];
+    const wide = (line: string, size: number, family: string) => {
+      seen.push(family);
+      return [...line].length * size * 1.1;
+    };
+    expect(measureText('WW', 10, 'gf-jalnan, sans-serif', 125, wide)).toEqual({ w: 22, h: 10 });
+    // 1 x 10 x 125% = 12.5, which the server rounds up to 13 too.
+    expect(measureText('W', 10, 'gf-jalnan, sans-serif', 125, () => 99)).toEqual({ w: 13, h: 10 });
+    expect(seen).toEqual(['gf-jalnan, sans-serif']);
   });
 });
 
@@ -94,7 +106,7 @@ describe('moving a draft', () => {
   });
 
   it('moves a text by its corner', () => {
-    const t = { id: 't', kind: 'TEXT' as const, text: 'hi', c: 0, size: 24, x: 7600, y: 50, w: 60, h: 30 };
+    const t = { id: 't', kind: 'TEXT' as const, text: 'hi', c: 0, size: 24, f: 'pretendard', x: 7600, y: 50, w: 60, h: 30 };
     moveDraft(t, 100, 10, LIMITS);
     expect(t).toMatchObject({ x: 7620, y: 60 });
   });

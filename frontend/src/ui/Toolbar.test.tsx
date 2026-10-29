@@ -8,6 +8,7 @@ import Toolbar from './Toolbar';
 function show(access: DrawAccess, draftKind: 'DRAWING' | 'TEXT' | null = null, tool: 'move' | 'pen' | 'text' = 'move') {
   const onTool = vi.fn();
   const onLogin = vi.fn();
+  const onFont = vi.fn();
   render(
     <Toolbar
       config={TEST_CONFIG}
@@ -22,9 +23,11 @@ function show(access: DrawAccess, draftKind: 'DRAWING' | 'TEXT' | null = null, t
       onWidth={vi.fn()}
       fontSize={24}
       onFontSize={vi.fn()}
+      font="pretendard"
+      onFont={onFont}
     />,
   );
-  return { onTool, onLogin };
+  return { onTool, onLogin, onFont };
 }
 
 describe('Toolbar', () => {
@@ -75,6 +78,8 @@ describe('Toolbar', () => {
         onWidth={vi.fn()}
         fontSize={24}
         onFontSize={vi.fn()}
+        font="pretendard"
+        onFont={vi.fn()}
         zoom={{ percent: 400, onIn: undefined, onOut: onIn }}
       />,
     );
@@ -97,5 +102,55 @@ describe('Toolbar', () => {
     show('ok', null, 'text');
     expect(screen.getByRole('combobox')).toHaveValue('24');
     expect(screen.getAllByRole('option')).toHaveLength(TEST_CONFIG.fontSizes.length);
+  });
+
+  it('shows each font as a picture next to the size and picks one (13)', async () => {
+    const { onFont } = show('ok', null, 'text');
+    const button = screen.getByRole('button', { name: '글꼴: Pretendard' });
+    expect(button.querySelector('img')).not.toBeNull();
+    await userEvent.click(button);
+    const options = screen.getAllByRole('option', { name: /./ }).filter((o) => o.tagName === 'LI');
+    expect(options.map((o) => o.textContent)).toEqual(['Pretendard', '고운돋움', '갈무리', '잘난체', '교보 손글씨', '카페24 써라운드']);
+    for (const o of options) {
+      expect(o.querySelector('img')).not.toBeNull();
+    }
+    expect(options[0]).toHaveAttribute('aria-selected', 'true');
+    await userEvent.click(screen.getByRole('option', { name: '잘난체' }));
+    expect(onFont).toHaveBeenCalledWith('jalnan');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it('moves through the fonts with the keyboard and closes on Escape', async () => {
+    const { onFont } = show('ok', null, 'text');
+    await userEvent.click(screen.getByRole('button', { name: '글꼴: Pretendard' }));
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}{Enter}');
+    expect(onFont).toHaveBeenCalledWith('galmuri');
+    await userEvent.click(screen.getByRole('button', { name: '글꼴: Pretendard' }));
+    await userEvent.keyboard('{ArrowUp}{Escape}');
+    expect(onFont).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it('leaves out fonts the server lists but this build has no files for', async () => {
+    render(
+      <Toolbar
+        config={{ ...TEST_CONFIG, fonts: ['comic-sans', 'jalnan'] }}
+        access="ok"
+        tool="text"
+        onTool={vi.fn()}
+        onLogin={vi.fn()}
+        draftKind={null}
+        color={0}
+        onColor={vi.fn()}
+        width={4}
+        onWidth={vi.fn()}
+        fontSize={24}
+        onFontSize={vi.fn()}
+        font="jalnan"
+        onFont={vi.fn()}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: '글꼴: 잘난체' }));
+    expect(screen.getAllByRole('option').filter((o) => o.tagName === 'LI')).toHaveLength(1);
   });
 });

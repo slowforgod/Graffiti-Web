@@ -64,8 +64,18 @@ describe('paintDoodles', () => {
     expect(calls).toContain('moveTo(60,20)');
     expect(calls).toContain('lineTo(80,30)');
     expect(calls).toContain(`arc(260,120,4,0,${Math.PI * 2})`);
-    expect(calls).toContain('font=24px Arial');
+    // A text from before fonts is drawn in the first font (13).
+    expect(calls).toContain('font=24px gf-pretendard, sans-serif');
     expect(calls).toContain('fillText(안녕,10,220)');
     expect(calls).toContain('fillText(하세요,10,244)');
+  });
+
+  it('draws a text in its own font', () => {
+    const { ctx, calls } = recorder();
+    const jalnan: Doodle = { ...text, payload: { ...text.payload, f: 'jalnan' } };
+
+    paintDoodles(ctx, [jalnan], palette, { x: 40, y: 380, w: 100, h: 100 });
+
+    expect(calls).toContain('font=24px gf-jalnan, sans-serif');
   });
 });
