@@ -9,7 +9,10 @@ export interface ClientConfig {
   zoomMin: number;
   zoomMax: number;
   palette: string[];
-  strokeWidths: number[];
+  // Any whole stroke width in this range, for the pen and the eraser (D-07).
+  strokeWidthMin: number;
+  strokeWidthMax: number;
+  defaultStrokeWidth: number;
   fontSizes: number[];
   defaultFontSize: number;
   // Font ids in picker order and the one picked first (13); fonts/fonts.ts knows their files.
