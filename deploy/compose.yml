@@ -75,7 +75,7 @@ services:
       retries: 30
 
   certbot:
-    image: certbot/certbot:v5.1.0
+    image: certbot/certbot:v5.8.0
     restart: unless-stopped
     volumes:
       - certbot-conf:/etc/letsencrypt
