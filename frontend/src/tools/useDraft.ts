@@ -201,13 +201,16 @@ export function useDraft({ pageId, config, link, newId = () => crypto.randomUUID
     }
   };
 
-  // Drags the draft by a world delta with its move handle. The viewers see the new place when the drag ends.
-  const moveBy = (dx: number, dy: number) => {
+  // Drags the draft by a world delta with its move handle and returns how far it went. The viewers see the
+  // new place when the drag ends.
+  const moveBy = (dx: number, dy: number): Point | null => {
     const d = draft.current;
-    if (d && moveDraft(d, dx, dy, config)) {
+    const delta = d ? moveDraft(d, dx, dy, config) : null;
+    if (delta) {
       moved.current = true;
       touched();
     }
+    return delta;
   };
 
   // Sets the width of the pen or the eraser, whichever is picked, as a whole number in the allowed range.
