@@ -366,6 +366,20 @@ describe('CanvasScreen', () => {
       expect(screen.getByText('12분 뒤에 게시할 수 있어요')).toBeInTheDocument();
     });
 
+    it('says the text went up shrunk when the server shrank it (D-43)', async () => {
+      const { link } = await open(TEST_CONFIG, me, () => reply({ ...published, shrunk: true }, 201));
+      await act(async () => {
+        link.readyAll();
+        await new Promise((r) => setTimeout(r, 0));
+      });
+      draw();
+
+      await act(async () => screen.getByRole('button', { name: '게시' }).click());
+
+      expect(screen.getByRole('status')).toHaveTextContent('욕설이 있어 글자를 작게 줄여 게시했어요.');
+      expect(screen.getByRole('list', { name: 'doodles' })).toHaveTextContent('77');
+    });
+
     it('clears the draft and says it waits for review when the post is held', async () => {
       const { drafts } = await open(TEST_CONFIG, me, () =>
         reply({ held: true, cooldownEndsAt: '2026-10-21T00:30:00Z' }, 202),
