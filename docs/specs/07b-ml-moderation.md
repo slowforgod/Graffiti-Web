@@ -1,6 +1,6 @@
 # 07b-ml-moderation: OCR, ML 서버 연결, ml_prediction 기록 (SHADOW)
 
-- **상태**: IN_PROGRESS (PR 1)
+- **상태**: IN_PROGRESS (PR 1 #59 리뷰 대기, PR 2 구현 완료)
 - **승인자**: 현 (slowforgod) / 승인일: 2026-10-28 (결정 1~7 추천대로)
 - **브랜치**: `feat/07b-ml-ocr` (PR 1), `feat/07b-ml-wiring` (PR 2)
 - **선행 명세**: ml-zeroshot (PR #58), 07-moderation-frame (MERGED)
@@ -195,17 +195,28 @@ uri = "s3://<bucket>/models/easyocr-1.7.2-ko/korean_g2.pth"
 critical gap: 0
 
 ## 7. 수용 기준
-- [ ] AC-1: Given 실제 형식의 `[ocr]` lock과 임시 가중치(테스트용 무작위 초기화 모델 저장), When 서버 시작, Then `/health` 200, `ocrVersion`이 lock 버전
-- [ ] AC-2: 덩어리 `[("안녕", 0.9), ("xx", 0.2)]`, `min_confidence=0.4` → `text="안녕"`, confidence 0.9 (순수 함수)
-- [ ] AC-3: OCR 가중치 sha256이 다르면 `/health` 503
-- [ ] AC-4: SHADOW에서 ML 서버가 503이거나 3초를 넘겨도 게시 응답과 doodle 상태가 ML 없는 경우와 같고, `ml_prediction`에 `TIMEOUT|ERROR` 한 행
-- [ ] AC-5: SHADOW에서 이미지 FLAGGED여도 doodle은 PASSED/UNCHECKED 그대로, `ml_prediction`에 `FLAGGED`와 점수 기록
-- [ ] AC-6: ENFORCE에서 이미지 FLAGGED → REJECTED. OCR 글자 검사 BLOCK(SEXUAL) → REJECTED. BLOCK(PROFANITY) 또는 REVIEW → HELD. ML 장애 → 다른 검사 결과 그대로
-- [ ] AC-7: OCR 글자가 비면 텍스트 검사기를 부르지 않음(호출 0회)
-- [ ] AC-8: `DoodleRenderer`가 흰 배경 RGB PNG를 bbox 크기(최대 1024)로 만들고, 같은 payload는 같은 바이트
-- [ ] AC-9: `ml_prediction`에 작성자 정보 없음(doodle_id만), 로그에 OCR 글자·점수 없음
-- [ ] AC-10: compose의 `ml` 서비스에 `ports:` 없음, nginx 설정에 `ml` 경로 없음(SEC-17)
+- [x] AC-1: Given 실제 형식의 `[ocr]` lock과 임시 가중치(테스트용 무작위 초기화 모델 저장), When 서버 시작, Then `/health` 200, `ocrVersion`이 lock 버전
+- [x] AC-2: 덩어리 `[("안녕", 0.9), ("xx", 0.2)]`, `min_confidence=0.4` → `text="안녕"`, confidence 0.9 (순수 함수)
+- [x] AC-3: OCR 가중치 sha256이 다르면 `/health` 503
+- [x] AC-4: SHADOW에서 ML 서버가 503이거나 3초를 넘겨도 게시 응답과 doodle 상태가 ML 없는 경우와 같고, `ml_prediction`에 `TIMEOUT|ERROR` 한 행
+- [x] AC-5: SHADOW에서 이미지 FLAGGED여도 doodle은 PASSED/UNCHECKED 그대로, `ml_prediction`에 `FLAGGED`와 점수 기록
+- [x] AC-6: ENFORCE에서 이미지 FLAGGED → REJECTED. OCR 글자 검사 BLOCK(SEXUAL) → REJECTED. BLOCK(PROFANITY) 또는 REVIEW → HELD. ML 장애 → 다른 검사 결과 그대로
+- [x] AC-7: OCR 글자가 비면 텍스트 검사기를 부르지 않음(호출 0회)
+- [x] AC-8: `DoodleRenderer`가 흰 배경 RGB PNG를 bbox 크기(최대 1024)로 만들고, 같은 payload는 같은 바이트
+- [x] AC-9: `ml_prediction`에 작성자 정보 없음(doodle_id만), 로그에 OCR 글자·점수 없음
+- [x] AC-10: compose의 `ml` 서비스에 `ports:` 없음, nginx 설정에 `ml` 경로 없음(SEC-17)
 - [ ] AC-11: 손글씨 평가 보고서(글자 오류율, 신뢰도 분포, 고른 `min_confidence`, 욕·개인정보 재현율)를 PR 1에 첨부(수치만)
+
+### PR 2 구현 메모 (2026-10-29)
+명세에 없던 세부를 이렇게 정했다.
+- `ml_prediction.model_version`은 NULL 허용. 서버가 답하지 않은 TIMEOUT·ERROR 행에는 버전을 알 수 없다
+- 텍스트 doodle은 ML 경로를 타지 않는다(행 없음). 이미지 분류와 OCR은 그림 전용이다
+- SHADOW의 `moderation_detail`에는 `ml` 항목이 없다. 판정 때는 아직 분석 전이고, 결과는 `ml_prediction`에만 있다. ENFORCE만 `ml` 항목을 남긴다
+- SHADOW는 저장된 그림 전부(PUBLISHED, HELD, REJECTED)를 분석한다. 관리자 판정과 맞춰 보려면 보류·거부된 것도 필요하다
+- `requestId`는 분석마다 새 UUID. 사용자 정보와 무관하다
+- 쓰이지 않던 `graffiti.moderation.ml.flag-threshold`를 지웠다. 라벨은 ml-zeroshot부터 `models.lock`의 임계값으로 ML 서버가 정한다
+- 검사기 호출 규칙(순서, 타임아웃, BLOCK에서 멈춤, 결과 형식 검사)은 `CheckRunner`로 뽑아 문서 검사와 OCR 글자 검사가 같이 쓴다
+- compose `ml`은 프로필 없이 항상 뜬다. 가중치가 없으면 503이고 앱은 ERROR 행만 남긴다
 
 ## 8. 테스트 계획
 | 층 | 대상 | 파일 (예정) |
@@ -248,6 +259,18 @@ AI Hub "한글 손글씨" 문장 이미지(종이에 펜, 약 3700×180) 중 400
 - 문장을 1024px에 맞추면 글자가 작아져 오류가 늘어난다. 캔버스 낙서는 글자가 더 크므로 팀 캔버스 세트로 다시 잰다(결정 4)
 - 신뢰도가 전반적으로 낮아 결정 3의 규칙으로 고르면 기준이 0.05~0.11이 된다. 걸러지는 건 거의 알아볼 수 없는 덩어리뿐이다
 - 욕·개인정보 재현율은 이 데이터에 해당 샘플이 없어 아직 못 쟀다(AC-11 미완)
+
+### 2026-10-29 PaddleOCR 비교 (결정 1의 조건, 수치만)
+같은 AI Hub 이미지. `korean_PP-OCRv5_mobile_rec` + 검출 `PP-OCRv5_mobile_det`, PaddlePaddle 3.3.1 CPU 2스레드.
+
+| 줄 높이 (같은 100장) | 30px | 50px | 80px | 120px | 180px(원본) |
+|---|---|---|---|---|---|
+| EasyOCR CER | 31.9% | 29.7% | 30.5% | 33.1% | 29.7% |
+| PaddleOCR CER | 11.7% | 14.9% | 17.5% | 28.5% | 46.9% |
+
+- 400장(1024px 축소): EasyOCR 41.7%, Paddle 27.8%. p95는 EasyOCR 0.5초, Paddle 1.0초. 최대 메모리(OCR만): EasyOCR 1.2GB, Paddle 0.6GB
+- 이미지 크기: Paddle은 패키지만 약 1.15GB 추가(EasyOCR 쪽 추가분 0.37GB). torch는 CLIP 때문에 어느 쪽이든 남음
+- 결정(현, 2026-10-29): **EasyOCR 유지**. 낙서는 최대 1024×1024라 글씨가 작지 않고, EasyOCR은 크기에 덜 흔들림
 
 ## 보안 감사 기록 (/gf-security가 추가, 해당 시)
 
