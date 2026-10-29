@@ -57,7 +57,7 @@ class GraffitiPropertiesTest {
             assertThat(p.postCooldown()).isEqualTo(Duration.ZERO);
 
             assertThat(p.realtime().maxMessagesPerSecond()).isEqualTo(20);
-            assertThat(p.realtime().maxSubscriptions()).isEqualTo(60);
+            assertThat(p.realtime().maxSubscriptions()).isEqualTo(61);
             assertThat(p.realtime().inboundMessageMaxBytes()).isEqualTo(65_536);
             assertThat(p.realtime().cursorInterval()).isEqualTo(Duration.ofMillis(100));
             assertThat(p.realtime().draftInterval()).isEqualTo(Duration.ofMillis(100));
@@ -120,6 +120,15 @@ class GraffitiPropertiesTest {
     @Test
     void rejectsNonHexPaletteColor() {
         assertStartupFails("graffiti.doodle.palette[0]=red");
+    }
+
+    @Test
+    void rejectsSubscriptionsThatCannotHoldEveryLoadedChunkAndThePageTopic() {
+        // A view loads up to max-chunks chunk topics and the page's meta topic on one connection.
+        runner.withPropertyValues("graffiti.query.max-chunks=144", "graffiti.realtime.max-subscriptions=144")
+                .run(context -> assertThat(context).hasFailed());
+        runner.withPropertyValues("graffiti.query.max-chunks=144", "graffiti.realtime.max-subscriptions=145")
+                .run(context -> assertThat(context).hasNotFailed());
     }
 
     @Test

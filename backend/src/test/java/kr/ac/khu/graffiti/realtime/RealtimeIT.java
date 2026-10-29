@@ -152,13 +152,14 @@ class RealtimeIT extends WebIntegrationTest {
     }
 
     @Test
-    void theSixtyFirstSubscriptionIsRefused() throws Exception {
+    void aViewOfSixtyChunksAndThePageTopicFitsAndOneMoreIsRefused() throws Exception {
         Client anonymous = connect(null, ORIGIN);
         List<StompSession.Subscription> subs = new ArrayList<>();
+        subs.add(anonymous.subscribe(meta()));
         for (int i = 0; i < 60; i++) {
             subs.add(anonymous.subscribe(chunk(i)));
         }
-        subs.getFirst().unsubscribe();
+        subs.get(1).unsubscribe();
         anonymous.subscribe(chunk(60));
         assertThat(anonymous.errors.poll(1, TimeUnit.SECONDS)).isNull();
 

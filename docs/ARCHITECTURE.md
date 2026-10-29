@@ -339,7 +339,7 @@ ENFORCE에서 ML 결과를 하나의 검사(ml)로 합성 (07b 결정)
 | `graffiti.doodle.draft-idle-timeout` | 10m | D-11 |
 | `graffiti.post-cooldown` | 30m | D-12 |
 | `graffiti.realtime.max-messages-per-second` | 20 | D-12 |
-| `graffiti.realtime.max-subscriptions` | 60 | D-30 |
+| `graffiti.realtime.max-subscriptions` | 61 (`query.max-chunks` + 메타 1보다 작으면 시작 실패) | D-30 |
 | `graffiti.realtime.inbound-message-max-bytes` | 65536 (STOMP 프레임 한도와 WebSocket 컨테이너 버퍼에 같이 사용) | D-27 |
 | `graffiti.realtime.cursor-interval` | 100ms (클라이언트 커서 전송 간격, `cursorIntervalMs`) | 04 |
 | `graffiti.realtime.draft-interval` | 100ms (클라이언트 초안 전송 간격, `draftIntervalMs`. 초당 20회 한도 안) | 05, D-12 |

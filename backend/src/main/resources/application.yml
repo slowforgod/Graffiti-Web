@@ -107,7 +107,7 @@ graffiti:
   post-cooldown: ${POST_COOLDOWN:0s}
   realtime:
     max-messages-per-second: 20
-    max-subscriptions: 60
+    max-subscriptions: 61   # max-chunks chunk topics + the meta topic (D-30)
     inbound-message-max-bytes: 65536
     cursor-interval: 100ms   # the client sends its cursor at most this often
     draft-interval: 100ms    # the client sends new draft points at most this often (stays under max-messages-per-second)

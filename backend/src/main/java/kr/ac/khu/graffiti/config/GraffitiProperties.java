@@ -42,6 +42,12 @@ public record GraffitiProperties(
         return postCooldown != null && !postCooldown.isNegative();
     }
 
+    /** One connection subscribes to every chunk a view loads (up to max-chunks) and the page's meta topic. */
+    @AssertTrue(message = "realtime.max-subscriptions must exceed query.max-chunks (the meta topic needs one more)")
+    public boolean isSubscriptionsEnoughForTheView() {
+        return realtime == null || query == null || realtime.maxSubscriptions() > query.maxChunks();
+    }
+
     @AssertTrue(message = "moderation.shrink-font-size must be one of doodle.font-sizes")
     public boolean isShrinkFontSizeListed() {
         return doodle == null || moderation == null || doodle.fontSizes() == null
