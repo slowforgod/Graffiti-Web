@@ -266,12 +266,15 @@ function PageCanvas({ page, link, me, onPageEnded: pageEnded, turnNotice }: Page
   // With the pen, a dashed square shows how big one drawing may be. It follows the middle of the view
   // until it is held: once the drawing has strokes, or once it was dragged by its move handle (`placed`).
   // While a stroke is drawn it stays still; when the stroke ends it moves just enough to take the drawing in.
+  // Once a drawing is posted or cancelled the square rests (hidden) until the pen is picked or a stroke begins,
+  // so it does not stay over the doodle just posted.
   const drawingBounds = own?.kind === 'DRAWING' ? bounds : null;
   const [heldGuide, setHeldGuide] = useState<Rect | null>(null);
   const [placed, setPlaced] = useState(false);
+  const [guideRests, setGuideRests] = useState(false);
   const penStroke = stroking && tool === 'pen';
   const guide =
-    tool === 'pen' || drawingBounds
+    (tool === 'pen' && !guideRests) || drawingBounds
       ? sizeGuide(heldGuide, penStroke ? null : drawingBounds, visibleWorldRect(viewport, size), config)
       : null;
   const nextHeld = drawingBounds || penStroke || (placed && tool === 'pen') ? guide : null;
@@ -280,9 +283,16 @@ function PageCanvas({ page, link, me, onPageEnded: pageEnded, turnNotice }: Page
   if (!sameRect(nextHeld, heldGuide)) {
     setHeldGuide(nextHeld);
   }
-  if (placed && tool !== 'pen' && !drawingBounds) {
+  if (placed && ((tool !== 'pen' && !drawingBounds) || guideRests)) {
     setPlaced(false);
   }
+  // Drops the open draft; a drawing's square rests with it.
+  const dropDraft = () => {
+    if (own?.kind === 'DRAWING') {
+      setGuideRests(true);
+    }
+    tools.cancel();
+  };
   // The move handle sits on the open draft, or on the empty dashed square while the pen is picked.
   const handleBox = controlsBox ?? bounds ?? (tool === 'pen' ? guide : null);
 
@@ -366,7 +376,7 @@ function PageCanvas({ page, link, me, onPageEnded: pageEnded, turnNotice }: Page
       }
       setPostedCooldown(result.cooldownEndsAt);
       // Tells the viewers to drop the half-transparent draft (ARCHITECTURE.md §4.3).
-      tools.cancel();
+      dropDraft();
     } catch (e) {
       if (e instanceof ApiError && e.code === 'PAGE_ENDED') {
         onPageEnded();
@@ -415,6 +425,7 @@ function PageCanvas({ page, link, me, onPageEnded: pageEnded, turnNotice }: Page
         sizeGuide={guide}
         otherDrafts={drafts}
         onDrawStart={(p) => {
+          setGuideRests(false);
           setStroking(true);
           tools.pointerDown(p);
         }}
@@ -455,14 +466,17 @@ function PageCanvas({ page, link, me, onPageEnded: pageEnded, turnNotice }: Page
           onPublish={canPost ? () => void publish() : undefined}
           publishNote={publishNote}
           busy={publishing}
-          onCancel={tools.cancel}
+          onCancel={dropDraft}
         />
       )}
       <Toolbar
         config={config}
         access={access}
         tool={tool}
-        onTool={tools.setTool}
+        onTool={(t) => {
+          setGuideRests(false);
+          tools.setTool(t);
+        }}
         onLogin={() => window.location.assign(LOGIN_URL)}
         draftKind={own?.kind ?? null}
         color={tools.color}
