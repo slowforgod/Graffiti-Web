@@ -13,15 +13,14 @@ export type Tool = 'move' | 'pen' | 'text' | 'eraser';
 // Why the draft changed without the author asking, shown as a short message.
 export type DraftNotice = 'too-big' | 'text-full' | 'idle' | 'disconnected';
 
-// The eraser's reach on screen, in CSS pixels, whatever the zoom.
-const ERASER_SCREEN_RADIUS = 8;
-
 type Config = Pick<
   ClientConfig,
   | 'width'
   | 'height'
   | 'maxBbox'
-  | 'strokeWidths'
+  | 'strokeWidthMin'
+  | 'strokeWidthMax'
+  | 'defaultStrokeWidth'
   | 'defaultFontSize'
   | 'defaultFont'
   | 'textWidthPercent'
@@ -42,7 +41,9 @@ interface Options {
 export function useDraft({ pageId, config, link, newId = () => crypto.randomUUID() }: Options) {
   const [tool, setTool] = useState<Tool>('move');
   const [color, setColorState] = useState(0);
-  const [width, setWidth] = useState(config.strokeWidths[Math.min(1, config.strokeWidths.length - 1)]!);
+  // The pen and the eraser each keep their own width (D-07). The eraser starts at its widest.
+  const [penWidth, setPenWidth] = useState(config.defaultStrokeWidth);
+  const [eraserWidth, setEraserWidth] = useState(config.strokeWidthMax);
   const [fontSize, setFontSizeState] = useState(config.defaultFontSize);
   const [font, setFontState] = useState(config.defaultFont);
   const [notice, setNotice] = useState<DraftNotice | null>(null);
@@ -142,11 +143,11 @@ export function useDraft({ pageId, config, link, newId = () => crypto.randomUUID
     return fits ? { w, h } : null;
   };
 
-  const pointerDown = (p: Point, scale: number) => {
+  const pointerDown = (p: Point) => {
     const current = draft.current;
     if (tool === 'pen' && current?.kind !== 'TEXT') {
       const d = (current as DrawingDraft | null) ?? begin(newDrawing(newId()));
-      const index = startStroke(d, p, color, width, config);
+      const index = startStroke(d, p, color, penWidth, config);
       if (index === null) {
         setNotice('too-big');
         if (d.strokes.length === 0) {
@@ -158,7 +159,7 @@ export function useDraft({ pageId, config, link, newId = () => crypto.randomUUID
       sender.current?.points(index);
       touched();
     } else if (tool === 'eraser' && current?.kind === 'DRAWING') {
-      erase(current, p, scale);
+      erase(current, p);
     } else if (tool === 'text' && !current && inCanvas(p, config)) {
       const box = textBox('', fontSize, font, p);
       if (!box) {
@@ -172,7 +173,7 @@ export function useDraft({ pageId, config, link, newId = () => crypto.randomUUID
     }
   };
 
-  const pointerMove = (p: Point, scale: number) => {
+  const pointerMove = (p: Point) => {
     const current = draft.current;
     if (tool === 'pen' && current?.kind === 'DRAWING' && stroke.current !== null) {
       const result = extendStroke(current, stroke.current, p, config);
@@ -183,7 +184,7 @@ export function useDraft({ pageId, config, link, newId = () => crypto.randomUUID
         setNotice('too-big');
       }
     } else if (tool === 'eraser' && current?.kind === 'DRAWING') {
-      erase(current, p, scale);
+      erase(current, p);
     }
   };
 
@@ -191,8 +192,9 @@ export function useDraft({ pageId, config, link, newId = () => crypto.randomUUID
     stroke.current = null;
   };
 
-  const erase = (d: DrawingDraft, p: Point, scale: number) => {
-    const erased = eraseAt(d, p, ERASER_SCREEN_RADIUS / scale);
+  // The eraser's width is in canvas pixels, like the pen's.
+  const erase = (d: DrawingDraft, p: Point) => {
+    const erased = eraseAt(d, p, eraserWidth / 2);
     if (erased.length > 0) {
       erased.forEach((i) => sender.current?.erase(i));
       touched();
@@ -205,6 +207,16 @@ export function useDraft({ pageId, config, link, newId = () => crypto.randomUUID
     if (d && moveDraft(d, dx, dy, config)) {
       moved.current = true;
       touched();
+    }
+  };
+
+  // Sets the width of the pen or the eraser, whichever is picked, as a whole number in the allowed range.
+  const setWidth = (w: number) => {
+    const next = Math.min(config.strokeWidthMax, Math.max(config.strokeWidthMin, Math.round(w)));
+    if (tool === 'eraser') {
+      setEraserWidth(next);
+    } else {
+      setPenWidth(next);
     }
   };
 
@@ -287,7 +299,7 @@ export function useDraft({ pageId, config, link, newId = () => crypto.randomUUID
     setTool,
     color,
     setColor,
-    width,
+    width: tool === 'eraser' ? eraserWidth : penWidth,
     setWidth,
     fontSize,
     setFontSize,

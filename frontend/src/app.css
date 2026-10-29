@@ -92,6 +92,19 @@ body {
   cursor: grabbing;
 }
 
+.width-slider {
+  font-size: 13px;
+}
+
+.width-slider input {
+  width: 96px;
+}
+
+.width-value {
+  min-width: 34px;
+  font-variant-numeric: tabular-nums;
+}
+
 .zoom-level {
   min-width: 44px;
   text-align: center;
