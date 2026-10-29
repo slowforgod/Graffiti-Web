@@ -26,14 +26,14 @@ public class KhuOidcUserService implements OAuth2UserService<OidcUserRequest, Oi
     private final UserAccountService accounts;
 
     public KhuOidcUserService(GraffitiProperties props, UserAccountService accounts) {
-        this.verifier = new KhuDomainVerifier(props.auth().allowedDomain());
+        this.verifier = new KhuDomainVerifier(props.auth().allowedDomain(), props.auth().adminEmails());
         this.accounts = accounts;
     }
 
     @Override
     public OidcUser loadUser(OidcUserRequest request) {
         OidcIdToken idToken = request.getIdToken();
-        if (!verifier.isSchoolAccount(idToken.getClaims())) {
+        if (!verifier.isAllowed(idToken.getClaims())) {
             throw new OAuth2AuthenticationException(new OAuth2Error(DOMAIN_NOT_ALLOWED));
         }
         User user = accounts.loginOrRegister(idToken.getSubject(), idToken.getEmail());
