@@ -1,4 +1,109 @@
-# 1차 금칙어 목록 (D-19 ①, docs/FILTER.md §3). 아직 기준이 확정되지 않아 비어 있다.
+# 1차 금칙어 목록 (D-19 ①, docs/FILTER.md §3).
 # 한 줄에 단어 하나. 뒤에 공백과 카테고리를 붙일 수 있다(없으면 PROFANITY). 예: 한남충 HATE
-# 비교 전에 NFKC, 소문자, 공백·문장부호 제거를 한다(TextNormalizer). 목록이 비어 있으면 이 검사는 SKIPPED.
+# 비교 전에 NFKC, 소문자, 공백·문장부호 제거를 한다(TextNormalizer). 부분 문자열로 찾으므로 일반 단어 안에 든 것은 allowed-words.txt에.
 # 고칠 때는 FILTER.md §3과 같은 PR에서, WordListTest에 막는 예와 통과 예를 하나씩 추가한다.
+# 문맥이 필요해서 일부러 뺀 단어(꺼져, 보지, 자지, 홍어, 조선족, 씹)는 ChatKHU 단계 몫이다.
+# 개인정보(PERSONAL_INFO)는 단어로 막지 않고 형식 검사로 막는다(07 명세).
+# ── 1. 욕설·비하 (PROFANITY) ──
+시발
+씨발
+씨바
+시바
+씨빨
+시팔
+씨팔
+ㅅㅂ
+ㅆㅂ
+ㅅ발
+씨ㅂ
+tlqkf
+sibal
+썅
+개새끼
+개새
+새끼
+씹새
+씹년
+씹할
+병신
+븅신
+빙신
+ㅂㅅ
+qudtls
+지랄
+ㅈㄹ
+존나
+졸라
+ㅈㄴ
+좆
+좆같
+좆까
+엿먹어
+닥쳐
+미친놈
+미친년
+미친새
+또라이
+등신
+찐따
+쌍놈
+쌍년
+니애미
+니에미
+느금마
+니미
+엠창
+염병
+개같
+개소리
+개지랄
+fuck
+fxck
+shit
+bitch
+asshole
+
+# ── 2. 혐오·차별 (HATE) ──
+한남충 HATE
+김치녀 HATE
+된장녀 HATE
+맘충 HATE
+급식충 HATE
+틀딱 HATE
+노인충 HATE
+애자 HATE
+장애새끼 HATE
+정신병자 HATE
+전라디언 HATE
+경상디언 HATE
+짱깨 HATE
+쪽바리 HATE
+똥남아 HATE
+깜둥이 HATE
+개슬람 HATE
+페미년 HATE
+메갈년 HATE
+호모새끼 HATE
+게이새끼 HATE
+
+# ── 3. 성적인 내용 (SEXUAL) ──
+섹스 SEXUAL
+섹파 SEXUAL
+야동 SEXUAL
+자위 SEXUAL
+딸딸이 SEXUAL
+따먹 SEXUAL
+강간 SEXUAL
+질싸 SEXUAL
+노콘 SEXUAL
+오랄 SEXUAL
+펠라 SEXUAL
+사까시 SEXUAL
+보빨 SEXUAL
+젖꼭지 SEXUAL
+꼴려 SEXUAL
+꼴린다 SEXUAL
+몸캠 SEXUAL
+조건만남 SEXUAL
+sex SEXUAL
+porn SEXUAL
