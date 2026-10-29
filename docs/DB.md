@@ -197,13 +197,15 @@ CREATE TABLE ml_prediction (                                -- V6, 07b. 그림 d
 
 ```jsonc
 {
-  "checks": [                                   // 설정 순서대로, BLOCK에서 멈춤
-    { "check": "word-filter", "outcome": "PASS" },
+  "checks": [                                   // 설정 순서대로, 거부하는 BLOCK에서 멈춤(욕설 BLOCK은 계속, D-43)
+    { "check": "personal-info", "outcome": "PASS" },  // BLOCK이면 category PERSONAL_INFO, note PHONE·EMAIL·STUDENT_ID·RRN
+    { "check": "word-filter", "outcome": "BLOCK", "category": "PROFANITY" },
     { "check": "chatkhu", "outcome": "ERROR", "note": "TIMEOUT" },     // note: TIMEOUT, EXCEPTION, BAD_RESULT
     { "check": "openai-text", "outcome": "SKIPPED" }                  // SKIPPED = 아직 구현 안 된 검사(스텁)
   ],
   "ml": { "check": "ml", "outcome": "BLOCK", "category": "SEXUAL", "mode": "ENFORCE" },  // ENFORCE의 그림만. SHADOW 결과는 ml_prediction에만
-  "heldAsUnchecked": true                       // 실제 검사가 없어 unchecked=HOLD 설정으로 보류된 경우만
+  "heldAsUnchecked": true,                      // 실제 검사가 없어 unchecked=HOLD 설정으로 보류된 경우만
+  "shrunk": { "fromSize": 24 }                  // 욕설 텍스트를 shrink-font-size로 줄여 게시한 경우만 (원래 크기, D-43)
 }
 ```
 

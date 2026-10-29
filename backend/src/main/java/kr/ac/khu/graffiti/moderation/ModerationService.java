@@ -3,6 +3,7 @@ package kr.ac.khu.graffiti.moderation;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -16,7 +17,8 @@ import org.springframework.stereotype.Service;
  *
  * <p>Runs the configured checks for the doodle's kind in order ({@link CheckRunner}). When
  * {@code graffiti.moderation.ml.mode} is ENFORCE, a drawing's {@link MlAnalysis} also counts, except its
- * failures (INV-13); in SHADOW the analysis runs after the doodle is stored and is only recorded.
+ * failures (INV-13); in SHADOW the analysis runs after the doodle is stored and is only recorded. A profanity
+ * BLOCK does not stop the run (D-43).
  * {@link VerdictCombiner} makes the state.
  */
 @Service
@@ -25,12 +27,24 @@ public class ModerationService {
     /**
      * The outcome. {@code detail} is the JSON stored in {@code moderation_detail}; {@code category} is shown to
      * the author on a rejection, or null. {@code ml} is the ENFORCE analysis to record once the doodle has an
-     * id, or null.
+     * id, or null. {@code shrink}: a text to publish at the shrink size (D-43).
      */
-    public record Verdict(ModerationState state, String detail, String category, MlAnalysis.Result ml) {
+    public record Verdict(ModerationState state, String detail, String category, MlAnalysis.Result ml,
+            boolean shrink) {
 
         public Verdict(ModerationState state, String detail, String category) {
-            this(state, detail, category, null);
+            this(state, detail, category, null, false);
+        }
+
+        /** This verdict with {@code "shrunk": {"fromSize": n}} added to the detail. */
+        public Verdict shrunkFrom(int fromSize, ObjectMapper json) {
+            try {
+                ObjectNode tree = (ObjectNode) json.readTree(detail);
+                tree.putObject("shrunk").put("fromSize", fromSize);
+                return new Verdict(state, json.writeValueAsString(tree), category, ml, shrink);
+            } catch (JsonProcessingException e) {
+                throw new IllegalStateException(e);
+            }
         }
     }
 
@@ -66,8 +80,9 @@ public class ModerationService {
             enforced.add(analysis.enforced());
         }
 
-        VerdictCombiner.Decision decision = VerdictCombiner.combine(enforced, unchecked);
-        return new Verdict(decision.state(), detail(results, analysis, decision), decision.category(), analysis);
+        VerdictCombiner.Decision decision = VerdictCombiner.combine(enforced, unchecked, input.isText());
+        return new Verdict(decision.state(), detail(results, analysis, decision), decision.category(), analysis,
+                decision.shrink());
     }
 
     private ModerationInput input(String kind, Object payload) {

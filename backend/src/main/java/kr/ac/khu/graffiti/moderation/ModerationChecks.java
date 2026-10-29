@@ -21,10 +21,10 @@ import org.springframework.stereotype.Component;
 public class ModerationChecks {
 
     /**
-     * Every check the pipeline knows (D-19, D-34). {@code ml} is not a list entry: {@link MlAnalysis} runs it by
+     * Every check the pipeline knows (D-19, D-34, specs/07-moderation.md). {@code ml} is not a list entry: {@link MlAnalysis} runs it by
      * {@code graffiti.moderation.ml.mode}.
      */
-    public static final Set<String> KNOWN = Set.of("word-filter", "chatkhu", "openai-text", "openai-image", "ml");
+    public static final Set<String> KNOWN = Set.of("personal-info", "word-filter", "chatkhu", "openai-text", "openai-image", "ml");
 
     public static final String ML = "ml";
 
