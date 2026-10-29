@@ -76,6 +76,9 @@ class GraffitiPropertiesTest {
                     .isEqualTo("https://factchat-cloud.mindlogic.ai/v1/gateway");
             assertThat(p.moderation().chatkhu().model()).isEqualTo("gpt-5.6-luna");
             assertThat(p.moderation().chatkhu().timeout()).isEqualTo(Duration.ofSeconds(3));
+            assertThat(p.moderation().openai().baseUrl()).isEqualTo("https://api.openai.com/v1");
+            assertThat(p.moderation().openai().model()).isEqualTo("omni-moderation-latest");
+            assertThat(p.moderation().openai().timeout()).isEqualTo(Duration.ofSeconds(3));
             assertThat(p.moderation().ml().mode()).isEqualTo(GraffitiProperties.MlMode.SHADOW);
             assertThat(p.moderation().ml().baseUrl()).isEqualTo("http://ml:8000");
             assertThat(p.moderation().ml().timeout()).isEqualTo(Duration.ofSeconds(3));
