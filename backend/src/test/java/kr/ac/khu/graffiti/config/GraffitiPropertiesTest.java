@@ -33,7 +33,7 @@ class GraffitiPropertiesTest {
 
             assertThat(p.canvas().width()).isEqualTo(7680);
             assertThat(p.canvas().height()).isEqualTo(4320);
-            assertThat(p.canvas().zoomMin()).isEqualTo(0.1);
+            assertThat(p.canvas().zoomMin()).isEqualTo(0.25);
             assertThat(p.canvas().zoomMax()).isEqualTo(4.0);
             assertThat(p.canvas().chunkSize()).isEqualTo(480);
             assertThat(p.canvas().cellSize()).isEqualTo(48);

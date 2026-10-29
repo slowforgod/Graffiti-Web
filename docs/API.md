@@ -81,7 +81,7 @@
   "serverTime": "2026-10-21T04:12:33.120Z",
   "config": {
     "width": 7680, "height": 4320, "chunkSize": 480, "cellSize": 48,
-    "zoomMin": 0.1, "zoomMax": 4.0,
+    "zoomMin": 0.25, "zoomMax": 4.0,
     "palette": ["#000000", "#FFFFFF", "..."], "strokeWidthMin": 2, "strokeWidthMax": 16, "defaultStrokeWidth": 4,
     "fontSizes": [10,11,12,13,14,15,16,20,24,32,36,40,48,64,96], "defaultFontSize": 24,
     "fonts": ["pretendard", "gowun-dodum", "galmuri", "jalnan", "kyobo-hand", "cafe24-ssurround"],

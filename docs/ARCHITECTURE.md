@@ -319,7 +319,7 @@ ENFORCE에서 ML 결과를 하나의 검사(ml)로 합성 (07b 결정)
 | 키 | 기본값 | 근거 |
 |---|---|---|
 | `graffiti.canvas.width` / `height` | 7680 / 4320 | D-05 |
-| `graffiti.canvas.zoom-min` / `zoom-max` | 0.1 / 4.0 | D-05 |
+| `graffiti.canvas.zoom-min` / `zoom-max` | 0.25 / 4.0 | D-05 |
 | `graffiti.canvas.chunk-size` | 480 | D-06 |
 | `graffiti.canvas.cell-size` | 48 | D-06 |
 | `graffiti.page.countdown-threshold` | 0.70 | D-15 |
