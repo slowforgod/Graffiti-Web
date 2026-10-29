@@ -81,7 +81,7 @@ CI(`.github/workflows/ci.yml`)는 PR과 main push마다 backend `./gradlew test`
 - **SEC-01** 파라미터 바인딩만. SQL 문자열 조립 금지
 - **SEC-02** 서버가 모든 입력을 재검증. 작성자와 권한은 **세션에서만**, 요청 본문의 userId 무시
 - **SEC-03** CSRF 토큰, 쿠키 `HttpOnly`·`Secure`·`SameSite=Lax`, WebSocket `Origin` 허용 목록
-- **SEC-04** 도메인 검증은 `hd`, `email_verified`, `@khu.ac.kr` 접미사 **셋 다**
+- **SEC-04** 도메인 검증은 `hd`, `email_verified`, `@khu.ac.kr` 접미사 **셋 다** (예외: `ADMIN_EMAILS`와 정확히 일치 + `email_verified`, D-23a)
 - **SEC-05** LLM 입력은 구분자로 감싸고, 응답은 스키마로 엄격히 파싱. 텍스트는 이중 검사
 - **SEC-06** 비밀값은 환경변수로만. `.env`는 읽지도, 쓰지도, 커밋하지도 않는다
 - **SEC-07** REST와 STOMP **양쪽 모두** 인증, 인가, 검증 (`ChannelInterceptor`)

@@ -3,6 +3,7 @@ package kr.ac.khu.graffiti.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -54,5 +55,25 @@ class KhuDomainVerifierTest {
         assertThat(verifier.isSchoolAccount(claims("khu.ac.kr", true, "x@notkhu.ac.kr"))).isFalse();
         assertThat(verifier.isSchoolAccount(claims("khu.ac.kr", true, "x@gmail.com"))).isFalse();
         assertThat(verifier.isSchoolAccount(claims("khu.ac.kr", true, null))).isFalse();
+    }
+
+    @Test
+    void acceptsVerifiedExemptAdminOutsideTheSchool() {
+        KhuDomainVerifier withAdmin = new KhuDomainVerifier("khu.ac.kr", List.of(" Admin@Gmail.com ", ""));
+        assertThat(withAdmin.isAllowed(claims(null, true, "admin@gmail.com"))).isTrue();
+        assertThat(withAdmin.isAllowed(claims(null, true, "ADMIN@GMAIL.COM"))).isTrue();
+        assertThat(withAdmin.isAllowed(claims("khu.ac.kr", true, "a@khu.ac.kr"))).isTrue();
+    }
+
+    @Test
+    void rejectsExemptAdminWithoutVerifiedEmailAndOtherOutsideEmails() {
+        KhuDomainVerifier withAdmin = new KhuDomainVerifier("khu.ac.kr", List.of("admin@gmail.com"));
+        assertThat(withAdmin.isAllowed(claims(null, false, "admin@gmail.com"))).isFalse();
+        assertThat(withAdmin.isAllowed(claims(null, null, "admin@gmail.com"))).isFalse();
+        assertThat(withAdmin.isAllowed(claims(null, true, "other@gmail.com"))).isFalse();
+        assertThat(withAdmin.isAllowed(claims(null, true, "xadmin@gmail.com"))).isFalse();
+        assertThat(withAdmin.isAllowed(claims(null, true, "admin@gmail.com.evil.com"))).isFalse();
+        assertThat(withAdmin.isAllowed(claims(null, true, ""))).isFalse();
+        assertThat(verifier.isAllowed(claims(null, true, "admin@gmail.com"))).isFalse();
     }
 }
