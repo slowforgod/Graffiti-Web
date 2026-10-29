@@ -8,11 +8,11 @@ import CursorLayer from './CursorLayer';
 import type { RemoteCursor } from './cursors';
 import DoodleShape from './DoodleShape';
 import DraftLayer from './DraftLayer';
-import GridBackground from './GridBackground';
+import PaperBackground from './PaperBackground';
 import type { Doodle } from './doodles';
 import type { RemoteDraft } from './remoteDrafts';
 import type { Point, Rect as Box, Size, Viewport } from './viewport';
-import { clampPosition, clampScale, toWorld, visibleWorldRect, zoomAt } from './viewport';
+import { clampPosition, clampScale, toWorld, zoomAt } from './viewport';
 
 interface Props {
   config: ClientConfig;
@@ -73,7 +73,6 @@ export default function CanvasView({
   const pinch = useRef<Pinch | null>(null);
   const drawing = useRef<number | null>(null);
   const space = useSpaceHeld();
-  const view = visibleWorldRect(viewport, size);
   const pans = tool === 'move' || space;
 
   const worldOf = (stage: Konva.Stage | null): Point | null => {
@@ -192,7 +191,7 @@ export default function CanvasView({
       }}
     >
       <Layer listening={false}>
-        <GridBackground config={config} view={view} scale={viewport.scale} />
+        <PaperBackground config={config} />
       </Layer>
       <Layer listening={false}>
         {doodles.map((d) => (

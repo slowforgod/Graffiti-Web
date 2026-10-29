@@ -53,7 +53,7 @@ class GraffitiPropertiesTest {
             assertThat(p.doodle().textMaxLength()).isEqualTo(50);
             assertThat(p.doodle().draftIdleTimeout()).isEqualTo(Duration.ofMinutes(10));
 
-            assertThat(p.postCooldown()).isEqualTo(Duration.ofMinutes(30));
+            assertThat(p.postCooldown()).isEqualTo(Duration.ZERO);
 
             assertThat(p.realtime().maxMessagesPerSecond()).isEqualTo(20);
             assertThat(p.realtime().maxSubscriptions()).isEqualTo(60);
@@ -137,8 +137,8 @@ class GraffitiPropertiesTest {
     }
 
     @Test
-    void rejectsNonPositiveCooldown() {
-        assertStartupFails("graffiti.post-cooldown=0s");
+    void rejectsNegativeCooldown() {
+        assertStartupFails("graffiti.post-cooldown=-1s");
     }
 
     @Test
