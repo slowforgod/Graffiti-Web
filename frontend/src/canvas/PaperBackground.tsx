@@ -31,6 +31,8 @@ export default function PaperBackground({ config }: Props) {
       fill="#FFFFFF"
       fillPatternImage={paper ?? undefined}
       fillPatternRepeat="repeat"
+      // Konva paints the color over the pattern unless told otherwise (fillPriority defaults to 'color').
+      fillPriority="pattern"
       listening={false}
     />
   );
