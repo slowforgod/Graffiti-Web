@@ -333,6 +333,9 @@ ENFORCE에서 ML 결과를 하나의 검사(ml)로 합성 (07b 결정)
 | `graffiti.doodle.font-sizes` | [10,11,12,13,14,15,16,20,24,32,36,40,48,64,96] | D-07 |
 | `graffiti.doodle.default-font-size` | 24 (font-sizes 안의 값이어야 함) | D-07 |
 | `graffiti.doodle.text-max-length` | 50 | D-07 |
+| `graffiti.doodle.fonts` | [pretendard, gowun-dodum, galmuri, jalnan, kyobo-hand, cafe24-ssurround]. 글꼴 id. 파일과 미리보기는 프런트 `src/fonts/` | D-44 |
+| `graffiti.doodle.default-font` | pretendard (fonts 안의 값이어야 함) | D-44 |
+| `graffiti.doodle.text-width-percent` | 125 (100 이상). 텍스트 너비 상한 = 크기 × 글자 수 × 이 값% | D-45 |
 | `graffiti.doodle.draft-idle-timeout` | 10m | D-11 |
 | `graffiti.post-cooldown` | 30m | D-12 |
 | `graffiti.realtime.max-messages-per-second` | 20 | D-12 |

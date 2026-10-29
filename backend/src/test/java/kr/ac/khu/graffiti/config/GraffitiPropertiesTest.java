@@ -152,6 +152,16 @@ class GraffitiPropertiesTest {
     }
 
     @Test
+    void rejectsDefaultFontOutsideTheList() {
+        assertStartupFails("graffiti.doodle.default-font=comic-sans");
+    }
+
+    @Test
+    void rejectsATextWidthBelowTheFontSize() {
+        assertStartupFails("graffiti.doodle.text-width-percent=99");
+    }
+
+    @Test
     void rejectsShrinkFontSizeOutsideTheList() {
         assertStartupFails("graffiti.moderation.shrink-font-size=9");
     }

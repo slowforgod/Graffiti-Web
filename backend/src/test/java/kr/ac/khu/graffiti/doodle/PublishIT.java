@@ -161,6 +161,20 @@ class PublishIT extends WebIntegrationTest {
     }
 
     @Test
+    void aTextKeepsItsFontAndATextWithoutOneIsStoredWithout() throws Exception {
+        String withFont = TEXT.replace("\"y\": 900}", "\"y\": 900, \"f\": \"jalnan\"}");
+        String id = read(publish(author, withFont).andExpect(status().isCreated())).at("/doodle/id").asText();
+        clock.advance(props.postCooldown().plusSeconds(1));
+        String plain = read(publish(author, TEXT.replace("1500", "2500")).andExpect(status().isCreated()))
+                .at("/doodle/id").asText();
+
+        assertThat(json.readTree(jdbc.queryForObject("SELECT payload FROM doodle WHERE id = ?", String.class,
+                Long.parseLong(id))).get("f").asText()).isEqualTo("jalnan");
+        assertThat(json.readTree(jdbc.queryForObject("SELECT payload FROM doodle WHERE id = ?", String.class,
+                Long.parseLong(plain))).has("f")).isFalse();
+    }
+
+    @Test
     void aSecondPostWithinTheCooldownIsRefusedAndAdminsAreExempt() throws Exception {
         publish(author, DRAWING).andExpect(status().isCreated());
         Instant first = lastPostedAt(author);
@@ -375,7 +389,8 @@ class PublishIT extends WebIntegrationTest {
                 bad("{\"kind\": \"TEXT\", \"payload\": {\"v\": 1, \"text\": \"a\\u0007\", \"c\": 0, \"size\": 24, \"x\": 0, \"y\": 0}, \"bbox\": {\"w\": 48, \"h\": 24}}", "text"),
                 bad("{\"kind\": \"TEXT\", \"payload\": {\"v\": 1, \"text\": 5, \"c\": 0, \"size\": 24, \"x\": 0, \"y\": 0}, \"bbox\": {\"w\": 48, \"h\": 24}}", "body"),
                 bad("{\"kind\": \"TEXT\", \"payload\": {\"v\": 1, \"text\": \"ab\", \"c\": 0, \"size\": 25, \"x\": 0, \"y\": 0}, \"bbox\": {\"w\": 48, \"h\": 24}}", "size"),
-                bad("{\"kind\": \"TEXT\", \"payload\": {\"v\": 1, \"text\": \"ab\", \"c\": 0, \"size\": 24, \"x\": 0, \"y\": 0}, \"bbox\": {\"w\": 49, \"h\": 24}}", "bbox"),
+                bad("{\"kind\": \"TEXT\", \"payload\": {\"v\": 1, \"text\": \"ab\", \"c\": 0, \"size\": 24, \"x\": 0, \"y\": 0}, \"bbox\": {\"w\": 61, \"h\": 24}}", "bbox"),
+                bad("{\"kind\": \"TEXT\", \"payload\": {\"v\": 1, \"text\": \"ab\", \"c\": 0, \"size\": 24, \"x\": 0, \"y\": 0, \"f\": \"papyrus\"}, \"bbox\": {\"w\": 48, \"h\": 24}}", "f"),
                 bad("{\"kind\": \"TEXT\", \"payload\": {\"v\": 1, \"text\": \"ab\", \"c\": 0, \"size\": 24, \"x\": 0, \"y\": 0}}", "bbox"),
                 bad("{\"kind\": \"TEXT\", \"kind\": \"TEXT\"}", "body"),
                 bad("not json", "body"));

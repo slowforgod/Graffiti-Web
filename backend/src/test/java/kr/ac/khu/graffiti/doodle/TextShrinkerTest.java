@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 class TextShrinkerTest {
 
     private static final Limits LIMITS = new Limits(new CellGeometry(4096, 4096, 16), 512, 12, List.of(2, 4, 8, 16),
-            List.of(10, 12, 24, 96), 1024, 50);
+            List.of(10, 12, 24, 96), 1024, 50, List.of("pretendard"), 125);
 
     @Test
     void scalesTheSizeAndBboxAndKeepsTheCorner() {
@@ -31,12 +31,21 @@ class TextShrinkerTest {
 
     @Test
     void aBoxAtTheD31BoundsStaysValid() {
-        // Width size x longest line, height size x 1.4 x lines: the largest box a 96pt pair of lines may have.
-        Validated widest = text("가나다\n라", 96, 0, 0, 288, 268);
+        // Width size x 1.25 x longest line, height size x 1.4 x lines: the largest box 96pt lines may have.
+        Validated widest = text("가나다\n라", 96, 0, 0, 360, 268);
 
         TextShrinker.Shrunk s = TextShrinker.shrink(widest, 10, LIMITS);
 
-        assertThat(s.doodle().bbox()).isEqualTo(new DoodleValidator.Box(0, 0, 30, 28));
+        // ceil(360 * 10 / 96) = 38 is over 37.5, which the rounded-up bound lets through.
+        assertThat(s.doodle().bbox()).isEqualTo(new DoodleValidator.Box(0, 0, 38, 28));
+    }
+
+    @Test
+    void theFontStays() {
+        Validated big = DoodleValidator.text(new TextPayload(1, "시발", 0, 24, 0, 0, "pretendard"), new Size(48, 24),
+                LIMITS);
+
+        assertThat(((TextPayload) TextShrinker.shrink(big, 10, LIMITS).doodle().payload()).f()).isEqualTo("pretendard");
     }
 
     @Test
@@ -45,6 +54,6 @@ class TextShrinkerTest {
     }
 
     private static Validated text(String text, int size, int x, int y, int w, int h) {
-        return DoodleValidator.text(new TextPayload(1, text, 0, size, x, y), new Size(w, h), LIMITS);
+        return DoodleValidator.text(new TextPayload(1, text, 0, size, x, y, null), new Size(w, h), LIMITS);
     }
 }

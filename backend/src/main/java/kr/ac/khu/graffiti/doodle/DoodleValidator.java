@@ -1,5 +1,6 @@
 package kr.ac.khu.graffiti.doodle;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.ArrayList;
 import java.util.List;
 import kr.ac.khu.graffiti.page.CellGeometry;
@@ -18,9 +19,12 @@ public final class DoodleValidator {
     // D-31: a text line is at most this many times its font size high (in tenths).
     private static final int LINE_HEIGHT_TENTHS = 14;
 
-    /** The page's sizes and the doodle limits from configuration. */
+    /**
+     * The page's sizes and the doodle limits from configuration. {@code textWidthPercent}: how wide a letter
+     * may be, in percent of the font size (D-31, 13).
+     */
     public record Limits(CellGeometry geometry, int chunkSize, int paletteSize, List<Integer> strokeWidths,
-            List<Integer> fontSizes, int maxBbox, int textMaxLength) {
+            List<Integer> fontSizes, int maxBbox, int textMaxLength, List<String> fonts, int textWidthPercent) {
     }
 
     /** {@code payload} of a drawing (DB.md §3). */
@@ -30,8 +34,12 @@ public final class DoodleValidator {
     public record StrokeInput(Integer c, Integer w, int[] p) {
     }
 
-    /** {@code payload} of a text; {@code (x, y)} is the top-left corner. */
-    public record TextPayload(Integer v, String text, Integer c, Integer size, Integer x, Integer y) {
+    /**
+     * {@code payload} of a text; {@code (x, y)} is the top-left corner. {@code f} is the font id (13); texts
+     * from before fonts have none and are stored without it.
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record TextPayload(Integer v, String text, Integer c, Integer size, Integer x, Integer y, String f) {
     }
 
     /** The box size the client measured for a text (D-31). Drawings send none. */
@@ -158,6 +166,9 @@ public final class DoodleValidator {
         if (size == null || !limits.fontSizes().contains(size)) {
             throw invalid("size", "not_allowed");
         }
+        if (payload.f() != null && !limits.fonts().contains(payload.f())) {
+            throw invalid("f", "not_allowed");
+        }
         CellGeometry g = limits.geometry();
         if (payload.x() == null || payload.y() == null || !inCanvas(payload.x(), payload.y(), g)) {
             throw invalid("x", "out_of_canvas");
@@ -173,13 +184,14 @@ public final class DoodleValidator {
                 || (long) x + w > g.width() || (long) y + h > g.height()) {
             throw invalid("bbox", "out_of_range");
         }
-        // D-31 upper bounds, and the lines themselves must fit the bbox limit (06 decision 4).
-        if ((long) w > (long) size * longest || (long) h * 10 > (long) size * LINE_HEIGHT_TENTHS * lines
+        // D-31 upper bounds (the width rounded up, so a shrunk box stays valid), and the lines themselves must
+        // fit the bbox limit (06 decision 4).
+        if ((long) w * 100 > (long) size * longest * limits.textWidthPercent() + 99 || (long) h * 10 > (long) size * LINE_HEIGHT_TENTHS * lines
                 || (long) size * lines > limits.maxBbox()) {
             throw invalid("bbox", "too_big");
         }
         Box box = new Box(x, y, w, h);
-        return new Validated("TEXT", box, new TextPayload(VERSION, text, payload.c(), size, x, y),
+        return new Validated("TEXT", box, new TextPayload(VERSION, text, payload.c(), size, x, y, payload.f()),
                 Footprint.ofBox(x, y, w, h, g), chunks(box, limits));
     }
 
