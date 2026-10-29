@@ -57,10 +57,9 @@ docker info      # 오류 없이 나오면 Docker가 실행 중
 ```bash
 git clone https://github.com/slowforgod/Graffiti-Web.git
 cd Graffiti-Web
-cp .env.example .env
 ```
 
-`.env`를 열어 아래 값을 채웁니다. `.env`는 git에 올리지 않습니다(SEC-06).
+저장소 루트에 `.env` 파일을 만들고 아래 키를 `키=값` 형식으로 한 줄에 하나씩 적습니다. `.env`는 git에 올리지 않습니다(SEC-06). 예시 파일은 두지 않으므로 키 목록은 이 표가 기준입니다.
 
 | 키 | 값 |
 |---|---|
@@ -69,7 +68,15 @@ cp .env.example .env
 | `APP_ORIGIN` | `http://localhost:5173` |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | 팀에서 비공개로 전달받은 값 |
 
-나머지 키(`DB_URL`, `ADMIN_EMAILS`, 모더레이션 키, 배포용 키)는 로컬 실행에 없어도 됩니다.
+아래 키는 로컬 실행에 없어도 됩니다.
+
+| 키 | 값 |
+|---|---|
+| `DB_URL` | 백엔드의 DB 주소. 비우면 `application.yml`의 기본값 |
+| `ADMIN_EMAILS` | 관리자 학교 이메일, 쉼표로 구분 (D-23) |
+| `OPENAI_API_KEY`, `CHATKHU_API_KEY` | 모더레이션 제공자 키 (07) |
+| `MODERATION_UNCHECKED` | `PUBLISH`로 두면 검사하지 않은 낙서도 게시됨. 로컬 그리기 테스트에만, 공개 서버에는 절대 쓰지 않음 |
+| `IMAGE_PREFIX`, `DOMAIN`, `LETSENCRYPT_EMAIL` | 스테이징·운영 서버 전용 (`deploy/README.md` §3) |
 
 ### 3. 실행
 

@@ -24,7 +24,7 @@
 ## 2. 명령어와 설정
 
 > backend, frontend 명령은 `00-bootstrap`, `ml/` 명령은 `ml-prep`에서 확정했다. ML 서버는 Python 3.12.
-> 요구사항: Java 21, Node 22, Docker(로컬 MySQL과 Testcontainers). 비밀값은 `.env.example`을 복사한 `.env`에 사람이 채운다(SEC-06).
+> 요구사항: Java 21, Node 22, Docker(로컬 MySQL과 Testcontainers). 비밀값은 루트의 `.env`에 사람이 채운다(SEC-06, 키 목록은 `README.md`).
 
 ```bash
 docker compose up -d mysql                 # 로컬 DB (.env의 DB_USERNAME/DB_PASSWORD/DB_ROOT_PASSWORD, 127.0.0.1:3306)
@@ -56,7 +56,7 @@ CI(`.github/workflows/ci.yml`)는 PR과 main push마다 backend `./gradlew test`
 - 헬스체크: `/actuator/health`
 - 배포 방식: main 머지 → CI 통과 → `.github/workflows/deploy.yml`이 GHCR에 `graffiti-app`, `graffiti-web`, `graffiti-ml` 이미지(태그 = 커밋 SHA) push → `STAGING_HOST`가 있으면 EC2 `/opt/graffiti`에서 `docker compose pull && up -d`
 - 배포 구성 파일: `deploy/` (Dockerfile 2개, `compose.yml`, nginx 설정, 준비 절차 `README.md`)
-- 환경변수 목록: `.env.example` (값은 GitHub Secrets와 EC2의 `/opt/graffiti/.env`에만)
+- 환경변수 목록: `README.md`의 `.env` 표 (값은 GitHub Secrets와 EC2의 `/opt/graffiti/.env`에만)
 
 ## 3. 범위
 - **MVP에 없는 것을 만들지 않는다**: 아카이브 열람, 신고, 자동 차단, 잉크 시스템, 누적 접속자, 작성자 표시, 텍스트 수정, 게시된 doodle 부분 지우기. 있으면 좋을 것 같은 기능도 코드에 넣지 말고 `TODOS.md`에 추가한다.
