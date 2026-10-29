@@ -35,9 +35,10 @@ public record GraffitiProperties(
     /** What happens to a doodle no real check looked at (a stub stood in): published as UNCHECKED, or held. */
     public enum UncheckedPolicy { PUBLISH, HOLD }
 
-    @AssertTrue(message = "post-cooldown must be positive")
-    public boolean isPostCooldownPositive() {
-        return isPositive(postCooldown);
+    /** Zero turns the cooldown off (posting again right away). */
+    @AssertTrue(message = "post-cooldown must not be negative")
+    public boolean isPostCooldownNotNegative() {
+        return postCooldown != null && !postCooldown.isNegative();
     }
 
     public record Canvas(

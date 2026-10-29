@@ -94,7 +94,8 @@ graffiti:
     default-font-size: 24
     text-max-length: 50
     draft-idle-timeout: 10m
-  post-cooldown: 30m
+  # D-12 says 30m; 0s (no wait) while there are few users. Set POST_COOLDOWN=30m to bring it back.
+  post-cooldown: ${POST_COOLDOWN:0s}
   realtime:
     max-messages-per-second: 20
     max-subscriptions: 60

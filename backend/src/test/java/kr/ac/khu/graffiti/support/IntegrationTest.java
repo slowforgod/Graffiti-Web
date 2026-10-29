@@ -20,7 +20,8 @@ import org.testcontainers.containers.MySQLContainer;
  */
 @SpringBootTest
 // The test clock stands still, so a per-second request cap would count a whole test as one second.
-@TestPropertySource(properties = {"graffiti.moderation.unchecked=PUBLISH",
+// The cooldown is off by default for now; the tests keep D-12's 30 minutes so its rules stay covered.
+@TestPropertySource(properties = {"graffiti.moderation.unchecked=PUBLISH", "graffiti.post-cooldown=30m",
         "graffiti.web.admin-requests-per-second=100000", "graffiti.web.write-requests-per-second=100000"})
 @Import(IntegrationTest.ClockConfig.class)
 public abstract class IntegrationTest {

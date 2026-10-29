@@ -74,6 +74,7 @@ cd Graffiti-Web
 |---|---|
 | `DB_URL` | 백엔드의 DB 주소. 비우면 `application.yml`의 기본값 |
 | `ADMIN_EMAILS` | 관리자 학교 이메일, 쉼표로 구분 (D-23) |
+| `POST_COOLDOWN` | 게시 후 다음 게시까지 기다리는 시간. 기본 `0s`(바로 다시 게시), 사용자가 늘면 `30m` (D-12) |
 | `OPENAI_API_KEY`, `CHATKHU_API_KEY` | 모더레이션 제공자 키 (07) |
 | `MODERATION_UNCHECKED` | `PUBLISH`로 두면 검사하지 않은 낙서도 게시됨. 로컬 그리기 테스트에만, 공개 서버에는 절대 쓰지 않음 |
 | `IMAGE_PREFIX`, `DOMAIN`, `LETSENCRYPT_EMAIL` | 스테이징·운영 서버 전용 (`deploy/README.md` §3) |
