@@ -69,9 +69,10 @@ backend/src/main/java/kr/ac/khu/graffiti/
 │                  내 doodle(MyDoodleController: 목록·삭제·일괄 삭제, MyDoodleService: 행 읽기와 칸 계산은 큐 밖,
 │                  RemoveDoodles 큐 명령으로 전부 아니면 전무, MyDoodleQuery)
 ├── moderation/    ModerationCheck 인터페이스(검사기 하나), ModerationChecks(설정 이름 → 구현, 없으면 StubCheck),
-│                  ModerationService(순서대로 호출·타임아웃·ML 그림자), VerdictCombiner(순수, 판정 합성),
-│                  WordFilterCheck + WordList + TextNormalizer(resources/moderation/*.txt). 07 틀: ChatKhu, OpenAi,
-│                  DoodleRenderer, Ml 구현과 MlPredictionRecorder는 아직 없음(스텁)
+│                  ModerationService(판정), CheckRunner(순서대로 호출·타임아웃), VerdictCombiner(순수, 판정 합성),
+│                  WordFilterCheck + WordList + TextNormalizer(resources/moderation/*.txt). ChatKhu, OpenAi는 아직 스텁.
+│                  07b: DoodleRenderer(순수, PNG), MlModerationProvider(ML 서버 HTTP), MlAnalysis(ML 경로·SHADOW
+│                  백그라운드), MlPredictionRecorder(ml_prediction)
 ├── realtime/      STOMP 설정(WebSocketConfig, 하트비트), RealtimeInterceptor(구독 목적지 검증, SEND 권한·속도 제한),
 │                  SubscribeReceipts(구독 등록 후 RECEIPT, INV-09), StompErrorHandler(ERROR 프레임 = 에러 코드),
 │                  Broadcaster + PageEventRelay(page/event → 메타 토픽, DoodlePublished → 청크 토픽), CursorController(/app/cursor 중계),
@@ -161,8 +162,8 @@ Client                         REST(Controller)          PageCommandProcessor(�
 - ③ 예약(06): `ReservePost`가 DB에서 차단·역할·`last_posted_at`을 읽고, 쿨다운이 지났으면 `UPDATE users SET last_posted_at = now WHERE id = ? AND banned_at IS NULL AND last_posted_at <=> 읽은 값`. 관리자는 아무것도 쓰지 않음. 예약 시각 = `submitted_at`
 - 되돌림(D-28): ④에서 예외가 나거나 ⑤가 `PAGE_ENDED`·DB 오류로 실패하면 `ReleasePost`가 `last_posted_at`을 예약 전 값으로(그사이 바뀌지 않았을 때만). AI 거부(07)는 되돌리지 않음
 - ⑤ 게시(06): doodle과 `doodle_chunk`(bbox가 걸치는 청크) INSERT와 카운트다운 UPDATE가 한 트랜잭션. 커밋 뒤 `DoodlePublished` → 청크마다 `doodle:published`, 이어서 `minimap:diff`, `page:status`
-- ④ 검사(07 틀, `specs/07-moderation-frame.md`): `ModerationService`가 설정한 검사기(`graffiti.moderation.text-checks`, `drawing-checks`)를 순서대로 부르고(각각 타임아웃, BLOCK이면 멈춤) `VerdictCombiner`가 합칩니다. BLOCK → `REJECTED`, REVIEW·ERROR → `HELD`, 모두 PASS → `PASSED`, 스텁(아직 없는 검사기)이 끼어 있으면 `UNCHECKED`이고 `graffiti.moderation.unchecked`(기본 `HOLD`)가 보류할지 게시할지 정합니다. ML은 `ml.mode`대로 따로 돌고 SHADOW면 기록만(INV-13)
-- **실제 검사기는 아직 없습니다**(금칙어는 목록 파일이 비어 있어 SKIPPED, ChatKHU·OpenAI·ML은 스텁). 기본 설정이면 모든 낙서가 보류되므로, `unchecked: PUBLISH`로 바꿔 공개 배포하면 06과 같은 미검사 상태가 됩니다(PIPELINE)
+- ④ 검사(07 틀, `specs/07-moderation-frame.md`): `ModerationService`가 설정한 검사기(`graffiti.moderation.text-checks`, `drawing-checks`)를 순서대로 부르고(각각 타임아웃, BLOCK이면 멈춤) `VerdictCombiner`가 합칩니다. BLOCK → `REJECTED`, REVIEW·ERROR → `HELD`, 모두 PASS → `PASSED`, 스텁(아직 없는 검사기)이 끼어 있으면 `UNCHECKED`이고 `graffiti.moderation.unchecked`(기본 `HOLD`)가 보류할지 게시할지 정합니다. 그림의 ML 분석은 `ml.mode`대로 돌고 SHADOW면 저장 뒤 백그라운드에서 기록만(INV-13, §4.7)
+- **실제 검사기는 아직 없습니다**(금칙어는 목록 파일이 비어 있어 SKIPPED, ChatKHU·OpenAI는 스텁. ML 경로는 연결됐고 SHADOW라 판정에 들어가지 않음). 기본 설정이면 모든 낙서가 보류되므로, `unchecked: PUBLISH`로 바꿔 공개 배포하면 06과 같은 미검사 상태가 됩니다(PIPELINE)
 - 거부·보류되면 `WithholdDoodle`이 `status=REJECTED|HELD`로 저장하고(`doodle_chunk` 포함, 점유율·브로드캐스트 없음) `moderation_action(AI, REJECT|HOLD)`를 같은 트랜잭션에서 기록합니다. 쿨다운은 그대로 소모됩니다(D-12). 그사이 페이지가 넘어갔으면 `PAGE_ENDED` + 되돌림
 - 관리자가 보류·거부를 게시하면(`PublishWithheld`, 현재 페이지만) ⑤와 같이 점유율·`doodle:published`가 나가고 `moderation_action(ADMIN, APPROVE|RESTORE)`가 남습니다
 - DB 쓰기는 큐 작업 안에서 트랜잭션 하나로 묶고, 커밋이 성공한 **뒤에** 메모리 상태 갱신과 브로드캐스트를 합니다. DB가 실패하면 메모리는 그대로입니다.
@@ -264,23 +265,31 @@ PageBootstrap (SmartLifecycle, 웹 서버보다 앞 단계)
 ### 4.7 그림 검사와 자체 ML 모델 (D-34 ~ D-40)
 
 ```
-그림 doodle ─▶ DoodleRenderer (PNG, 큐 밖)
-                 ├──────────────▶ OpenAI omni-moderation (이미지)        ─┐
-                 └──────────────▶ ML 서버 POST /v1/moderate (제한 3초)    │  병렬
-                                   ├─ 이미지 분류 → label, scores        │
-                                   └─ OCR → ocrText                      │
-                                         └─▶ 텍스트 검사 경로             │
-                                             (금칙어 → ChatKHU → OpenAI) ─┤
-                                                                          ▼
-                              ModerationVerdictCombiner (순수 로직)
-                              ├─ OpenAI 이미지 결과: 항상 반영
-                              ├─ ML 이미지 판정 + OCR 텍스트 검사 결과:
-                              │    mode=SHADOW  → 기록만 (최종 판정에 영향 없음, INV-13)
-                              │    mode=ENFORCE → 하나라도 flagged면 REJECTED
-                              │    ML 장애/시간 초과 → ML 판정만 빠진 것으로 처리
-                              └─ OpenAI 장애/시간 초과 → UNCHECKED (D-18)
-                                          │
-                              MlPredictionRecorder → ml_prediction INSERT (큐 밖, 실패해도 게시에 영향 없음)
+그림 doodle ─▶ ④ ModerationService: drawing-checks (openai-image, 07)
+               │   mode=ENFORCE면 여기서 MlAnalysis.analyze 결과도 판정에 넣음
+               ▼
+             ⑤ 저장 (큐) → doodle.id → 201 응답
+               │
+               └─▶ MlAnalysis.afterStored (큐 밖)
+                     mode=SHADOW  → 백그라운드(가상 스레드, 동시 max-in-flight개, 넘치면 건너뜀)에서 analyze
+                     mode=ENFORCE → ④에서 쓴 결과를 기록
+                     mode=OFF     → 아무것도 안 함
+
+MlAnalysis.analyze(payload)
+  DoodleRenderer → PNG (흰 배경, bbox, 최대 render-max-side, 캔버스처럼 둥근 선)
+  MlModerationProvider → ML 서버 POST /v1/moderate (제한 3초, 프록시 없이)
+    ├─ 시간 초과 / 4xx·5xx / 스키마 위반 → TIMEOUT 또는 ERROR (판정 없음)
+    └─ OK → label, scores, ocr.text, ocr.confidence
+  ocr.text가 있으면 텍스트 검사 경로(text-checks: 금칙어 → ChatKHU → OpenAI, CheckRunner 공유)
+    → ocr_text_outcome = PASS | REVIEW | BLOCK | ERROR | SKIPPED (없으면 NONE)
+  MlPredictionRecorder → ml_prediction INSERT (게시 트랜잭션과 분리, 실패해도 게시 결과 불변)
+
+ENFORCE에서 ML 결과를 하나의 검사(ml)로 합성 (07b 결정)
+  이미지 FLAGGED                         → BLOCK (점수가 가장 높은 카테고리)
+  OCR 글자 BLOCK, 카테고리 2~4             → BLOCK
+  OCR 글자 BLOCK(PROFANITY) 또는 REVIEW    → REVIEW (HELD)
+  OCR 글자 검사가 스텁뿐                   → SKIPPED
+  ML 서버·렌더링·OCR 글자 검사 장애        → 판정에서 빠짐 (HELD 아님, INV-13)
 ```
 
 - 모드는 설정값 `graffiti.moderation.ml.mode`(`OFF` / `SHADOW` / `ENFORCE`)로 바꿉니다. `ENFORCE` 전환은 D-39 기준을 넘고 팀이 승인한 뒤에만 합니다.
@@ -343,7 +352,8 @@ PageBootstrap (SmartLifecycle, 웹 서버보다 앞 단계)
 | `graffiti.moderation.ml.mode` | SHADOW | D-34, D-39 |
 | `graffiti.moderation.ml.base-url` | http://ml:8000 (내부망) | D-36 |
 | `graffiti.moderation.ml.timeout` | 3s | D-36 |
-| `graffiti.moderation.ml.flag-threshold` | 모델 버전별 값 (평가로 결정) | D-37, D-39 |
+| `graffiti.moderation.ml.max-in-flight` | 4 (SHADOW 백그라운드 분석 동시 상한, 넘치면 건너뜀) | 07b 결정 6 |
+| `graffiti.moderation.ml.render-max-side` | 1024 (ML 서버로 보내는 PNG의 긴 변) | 07b, API.md §7 |
 | `graffiti.auth.allowed-domain` | khu.ac.kr | D-21 |
 | `graffiti.auth.admin-emails` | 환경변수 `ADMIN_EMAILS` | D-23 |
 | `graffiti.auth.session-timeout` | 30d (세션 쿠키 max-age와 Spring Session 만료에 같이 사용) | D-21 |

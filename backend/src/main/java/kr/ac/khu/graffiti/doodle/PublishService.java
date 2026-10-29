@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.concurrent.CompletionException;
 import kr.ac.khu.graffiti.config.GraffitiProperties;
 import kr.ac.khu.graffiti.doodle.DoodleValidator.Validated;
+import kr.ac.khu.graffiti.moderation.MlAnalysis;
 import kr.ac.khu.graffiti.moderation.ModerationService;
 import kr.ac.khu.graffiti.moderation.ModerationState;
 import kr.ac.khu.graffiti.page.PageCommand;
@@ -20,7 +21,8 @@ import org.springframework.stereotype.Service;
 /**
  * Publishes a checked doodle (ARCHITECTURE.md §4.1): take the post in the queue, moderate outside it,
  * then in the queue publish it, or store it REJECTED or HELD. A post that was taken but not stored is given
- * back (D-28); a rejected or held one keeps it (D-12).
+ * back (D-28); a rejected or held one keeps it (D-12). Once stored, a drawing goes to the ML path
+ * ({@link MlAnalysis#afterStored}), which never changes the result.
  */
 @Service
 public class PublishService {
@@ -41,13 +43,15 @@ public class PublishService {
 
     private final PageCommandProcessor processor;
     private final ModerationService moderation;
+    private final MlAnalysis ml;
     private final ObjectMapper json;
     private final Duration cooldown;
 
-    PublishService(PageCommandProcessor processor, ModerationService moderation, ObjectMapper json,
+    PublishService(PageCommandProcessor processor, ModerationService moderation, MlAnalysis ml, ObjectMapper json,
             GraffitiProperties props) {
         this.processor = processor;
         this.moderation = moderation;
+        this.ml = ml;
         this.json = json;
         this.cooldown = props.postCooldown();
     }
@@ -55,21 +59,24 @@ public class PublishService {
     public Result publish(long pageId, long authorId, Validated doodle) {
         String payload = write(doodle.payload());
         PageCommand.Reservation reservation = await(new PageCommand.ReservePost(pageId, authorId));
+        ModerationService.Verdict verdict;
+        long id;
         try {
-            ModerationService.Verdict verdict = moderation.moderate(doodle.kind(), doodle.payload());
+            verdict = moderation.moderate(doodle.kind(), doodle.payload());
             DoodleValidator.Box b = doodle.bbox();
             PostStore.NewDoodle row = new PostStore.NewDoodle(pageId, authorId, doodle.kind(),
                     verdict.state().name(), verdict.detail(), b.x(), b.y(), b.w(), b.h(), payload,
                     payload.getBytes(StandardCharsets.UTF_8).length, reservation.reservedAt(), doodle.chunks());
-            long id = verdict.state().publishable()
+            id = verdict.state().publishable()
                     ? await(new PageCommand.PublishDoodle(row, doodle.footprint())).doodleId()
                     : await(new PageCommand.WithholdDoodle(row, verdict.state().name()));
-            return new Result(id, doodle, payload, verdict.state(), verdict.category(),
-                    reservation.exempt() ? null : reservation.reservedAt().plus(cooldown));
         } catch (RuntimeException e) {
             giveBack(reservation);
             throw e;
         }
+        ml.afterStored(id, doodle.kind(), payload, verdict.ml());
+        return new Result(id, doodle, payload, verdict.state(), verdict.category(),
+                reservation.exempt() ? null : reservation.reservedAt().plus(cooldown));
     }
 
     private void giveBack(PageCommand.Reservation reservation) {

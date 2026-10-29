@@ -119,7 +119,9 @@ graffiti:
       mode: SHADOW
       base-url: http://ml:8000
       timeout: 3s
-      # flag-threshold: set per model version after evaluation (D-37, D-39)
+      # SHADOW analyses running at once; more are skipped, not queued (07b decision 6)
+      max-in-flight: 4
+      render-max-side: 1024
   auth:
     allowed-domain: khu.ac.kr
     admin-emails: ${ADMIN_EMAILS:}

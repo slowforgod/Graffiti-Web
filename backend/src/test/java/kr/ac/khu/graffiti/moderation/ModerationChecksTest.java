@@ -22,7 +22,6 @@ class ModerationChecksTest {
         assertThat(checks.forKind("TEXT").get(0)).isSameAs(real);
         assertThat(checks.forKind("TEXT").get(1)).isInstanceOf(StubCheck.class);
         assertThat(checks.forKind("DRAWING")).singleElement().isInstanceOf(StubCheck.class);
-        assertThat(checks.ml()).isInstanceOf(StubCheck.class);
     }
 
     @Test
@@ -38,7 +37,7 @@ class ModerationChecksTest {
         Mockito.when(props.moderation()).thenReturn(new GraffitiProperties.Moderation(Duration.ofSeconds(5),
                 GraffitiProperties.UncheckedPolicy.HOLD, text, drawing,
                 new GraffitiProperties.Ml(GraffitiProperties.MlMode.SHADOW, "http://ml:8000", Duration.ofSeconds(3),
-                        null)));
+                        4, 1024)));
         return props;
     }
 }
