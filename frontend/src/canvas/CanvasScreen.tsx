@@ -61,6 +61,9 @@ const PUBLISH_FAILED = '게시하지 못했어요. 잠시 후 다시 시도해 �
 // A held post was taken: it goes on the canvas once an admin approves it.
 const PUBLISH_HELD = '검토 후 게시돼요.';
 
+// A text with profanity went up, but at the smallest size (D-43).
+const PUBLISH_SHRUNK = '욕설이 있어 글자를 작게 줄여 게시했어요.';
+
 // Longest wait between redraws of the cooldown note.
 const COOLDOWN_TICK_MS = 30_000;
 
@@ -319,6 +322,9 @@ function PageCanvas({ page, link, me, onPageEnded: pageEnded, turnNotice }: Page
         setPublishError(PUBLISH_HELD);
       } else {
         sync.current?.addPublished(result.doodle);
+        if (result.shrunk) {
+          setPublishError(PUBLISH_SHRUNK);
+        }
       }
       setPostedCooldown(result.cooldownEndsAt);
       // Tells the viewers to drop the half-transparent draft (ARCHITECTURE.md §4.3).

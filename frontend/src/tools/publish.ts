@@ -13,12 +13,14 @@ export type PublishBody =
       bbox: { w: number; h: number };
     };
 
+// shrunk: the text had profanity and went up at the smallest size (D-43).
 export interface Published {
   doodle: Doodle;
   cooldownEndsAt: string | null;
+  shrunk?: boolean;
 }
 
-// 202: stored, but an admin looks at it before it goes on the canvas (D-42, PROPOSED).
+// 202: stored, but no real check ran, so an admin looks at it before it goes on the canvas.
 export interface Held {
   held: true;
   cooldownEndsAt: string | null;
