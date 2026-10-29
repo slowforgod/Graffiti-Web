@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 class DraftRulesTest {
 
     private static final DraftRules.Limits LIMITS =
-            new DraftRules.Limits(7680, 4320, 480, 12, List.of(2, 4, 8, 16), 1024);
+            new DraftRules.Limits(7680, 4320, 480, 12, 2, 16, 1024);
     private static final String ID = "3f2b8c1e-9a4d-4e6f-8b2a-1c3d5e7f9a0b";
 
     @Test
@@ -31,6 +31,13 @@ class DraftRulesTest {
     }
 
     @Test
+    void anyWholeWidthFromTheMinimumToTheMaximumIsAllowed() {
+        for (int w : new int[] {2, 3, 7, 13, 16}) {
+            assertThat(((DraftRules.Points) DraftRules.check(points(0, 0, w, 10, 10), LIMITS)).width()).isEqualTo(w);
+        }
+    }
+
+    @Test
     void pointsAreRefusedOutsideTheRules() {
         assertThatThrownBy(() -> DraftRules.check(points(0, 0, 4, 7680, 10), LIMITS)).hasMessage("points");
         assertThatThrownBy(() -> DraftRules.check(points(0, 0, 4, -1, 10), LIMITS)).hasMessage("points");
@@ -39,7 +46,8 @@ class DraftRulesTest {
         assertThatThrownBy(() -> DraftRules.check(points(0, 0, 4), LIMITS)).hasMessage("points");
         assertThatThrownBy(() -> DraftRules.check(points(0, 12, 4, 10, 10), LIMITS)).hasMessage("c");
         assertThatThrownBy(() -> DraftRules.check(points(0, -1, 4, 10, 10), LIMITS)).hasMessage("c");
-        assertThatThrownBy(() -> DraftRules.check(points(0, 0, 3, 10, 10), LIMITS)).hasMessage("w");
+        assertThatThrownBy(() -> DraftRules.check(points(0, 0, 1, 10, 10), LIMITS)).hasMessage("w");
+        assertThatThrownBy(() -> DraftRules.check(points(0, 0, 17, 10, 10), LIMITS)).hasMessage("w");
         assertThatThrownBy(() -> DraftRules.check(points(-1, 0, 4, 10, 10), LIMITS)).hasMessage("strokeIndex");
     }
 

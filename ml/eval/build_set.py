@@ -33,7 +33,8 @@ from PIL import Image, ImageDraw
 from metrics import BAD, OK
 
 # Same as graffiti.doodle in backend application.yml and the 1024 px bbox limit (API.md section 3).
-STROKE_WIDTHS = (2, 4, 8, 16)
+# Any whole width from the first to the second (D-07).
+STROKE_WIDTHS = (2, 16)
 INK = ("#000000", "#E53935", "#FB8C00", "#43A047", "#1E88E5", "#8E24AA", "#EC407A", "#795548", "#9E9E9E")
 MAX_SIDE = 1024
 MIN_SIDE = 96
@@ -61,7 +62,7 @@ class Entry:
 def render(strokes: Sequence[Stroke], seed: int) -> bytes:
     """Draws strokes, in any coordinates, as a PNG cropped to the doodle like the server renders it."""
     rng = random.Random(seed)
-    width = rng.choice(STROKE_WIDTHS)
+    width = rng.randint(*STROKE_WIDTHS)
     ink = INK[0] if rng.random() < BLACK_SHARE else rng.choice(INK[1:])
     side = rng.randint(MIN_SIDE, MAX_SIDE)
 

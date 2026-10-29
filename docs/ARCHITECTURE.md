@@ -120,7 +120,7 @@ frontend/src/
 │                  ✓ 게시 본문과 호출(publish.ts), 서버 시각 기준 쿨다운(cooldown.ts)
 ├── mine/          내 낙서(08): 목록·삭제 호출(myDoodles.ts), 선택·삭제 확인·PNG 저장 훅(useMyDoodles.ts),
 │                  브라우저 안에서 그리는 PNG(png.ts: 내 doodle만, 흰 배경, canvas.toBlob, D-13)
-├── ui/            툴바(이동/펜/텍스트/지우개, 색, 굵기, 글자 크기, 내 낙서), ✓/✗(DraftActions), 텍스트 입력 상자,
+├── ui/            툴바(이동/펜/지우개/텍스트, 색, 굵기 슬라이더, 글자 크기, 내 낙서), ✓/✗(DraftActions), 텍스트 입력 상자,
 │                  내 낙서 패널(MyDoodlesPanel: 캔버스에서 고르기, 지우기 확인, PNG 저장),
 │                  상단 상태바(StatusBar: 제N장, 점유율, 남은 시간), T−5분 카운트다운(TurnWarning), 남은 시간 계산
 │                  (pageTime.ts), 미니맵, 토스트
@@ -329,7 +329,7 @@ ENFORCE에서 ML 결과를 하나의 검사(ml)로 합성 (07b 결정)
 | `graffiti.doodle.max-bbox` | 1024 | D-11 |
 | `graffiti.doodle.max-payload-bytes` | 2097152 | D-11 |
 | `graffiti.doodle.palette` | 12색 hex 배열 | D-07 |
-| `graffiti.doodle.stroke-widths` | [2,4,8,16] | D-07 |
+| `graffiti.doodle.stroke-width` | min 2, max 16, default-width 4 (그 사이 정수 아무 값) | D-07 |
 | `graffiti.doodle.font-sizes` | [10,11,12,13,14,15,16,20,24,32,36,40,48,64,96] | D-07 |
 | `graffiti.doodle.default-font-size` | 24 (font-sizes 안의 값이어야 함) | D-07 |
 | `graffiti.doodle.text-max-length` | 50 | D-07 |
