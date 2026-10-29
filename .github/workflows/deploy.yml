@@ -62,8 +62,10 @@ jobs:
           prefix="$(echo "$IMAGE_PREFIX" | tr '[:upper:]' '[:lower:]')"
           docker build -f deploy/app.Dockerfile -t "$prefix-app:$TAG" .
           docker build -f deploy/web.Dockerfile -t "$prefix-web:$TAG" .
+          docker build -f ml/serving/Dockerfile -t "$prefix-ml:$TAG" ml
           docker push "$prefix-app:$TAG"
           docker push "$prefix-web:$TAG"
+          docker push "$prefix-ml:$TAG"
 
   staging:
     needs: images

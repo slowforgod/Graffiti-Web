@@ -365,7 +365,7 @@ ENFORCE에서 ML 결과를 하나의 검사(ml)로 합성 (07b 결정)
 ## 7. 배포 구성
 
 ```
-GitHub main 머지 ─▶ CI 통과 ─▶ deploy.yml: bootJar, npm build ─▶ 이미지 2개를 GHCR에 push (태그 = 커밋 SHA)
+GitHub main 머지 ─▶ CI 통과 ─▶ deploy.yml: bootJar, npm build ─▶ 이미지 3개(app, web, ml)를 GHCR에 push (태그 = 커밋 SHA)
                                          └─▶ (저장소 변수 STAGING_HOST가 있을 때) SSH: compose pull && up -d ─▶ https 헬스체크
 
 EC2 (메모리 4GB급, D-36) 보안 그룹: 80/443, 22는 팀원과 배포용 (SEC-10)
@@ -378,7 +378,7 @@ EC2 (메모리 4GB급, D-36) 보안 그룹: 80/443, 22는 팀원과 배포용 (S
                          └─ /.well-known/acme-challenge ─▶ certbot webroot
   app (Spring, 외부 포트 없음, mem 1g) ── mysql 8.4 (외부 포트 없음, 볼륨, mem 768m)
   certbot (12시간마다 renew), web은 6시간마다 reload
-  ml (07b에서 추가: 내부망 전용, mem_limit, D-36)
+  ml (FastAPI, 외부 포트·nginx 경로 없음, ./models 읽기 전용, mem 1536m, D-36) ◀── app만 http://ml:8000
 ```
 
 - 이미지는 CI가 만든 산출물만 담습니다(`.dockerignore` 허용 목록). 소스, `node_modules`, `.env`는 들어가지 않습니다.
