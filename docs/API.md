@@ -131,9 +131,9 @@
 { "kind": "TEXT", "payload": { "v": 1, "text": "안녕", "c": 0, "size": 24, "x": 1500, "y": 900 }, "bbox": { "w": 52, "h": 34 } }
 ```
 응답
-- `201` `{ "doodle": { "id", "kind", "bbox", "payload" }, "cooldownEndsAt": "..." }`. `bbox`는 서버 값(그림은 캔버스로 자른 값), `payload`는 검증한 필드만 다시 만든 것. 관리자는 `cooldownEndsAt: null`
-- `202` `{ "held": true, "cooldownEndsAt": "..." }`: 검사가 애매하거나 실패해서(또는 실제 검사가 없어서) 관리자 검토를 기다림. 캔버스에 나오지 않고 쿨다운은 소모됨(07 틀, D-42 PROPOSED). doodle 정보는 돌려주지 않음
-- `422 MODERATION_REJECTED` (쿨다운 소모됨, `details.category`, `details.cooldownEndsAt`). 이유 문장은 보내지 않음
+- `201` `{ "doodle": { "id", "kind", "bbox", "payload" }, "cooldownEndsAt": "...", "shrunk": false }`. `bbox`는 서버 값(그림은 캔버스로 자른 값), `payload`는 검증한 필드만 다시 만든 것. 관리자는 `cooldownEndsAt: null`. 검사가 애매하거나 실패한 낙서도 `201`로 게시되고 관리자가 사후에 확인(D-42). `shrunk: true`면 욕설이 있어 `size`를 `shrink-font-size`(10)로, bbox를 비례로 줄여 게시한 것이고 `doodle`은 줄어든 값(D-43)
+- `202` `{ "held": true, "cooldownEndsAt": "..." }`: 실제 검사기가 하나도 없어서(키 없음, `unchecked=HOLD`) 관리자 검토를 기다림. 캔버스에 나오지 않고 쿨다운은 소모됨. doodle 정보는 돌려주지 않음
+- `422 MODERATION_REJECTED` (쿨다운 소모됨, `details.category` = `HATE`·`SEXUAL`·`PERSONAL_INFO`, `details.cooldownEndsAt`). 이유 문장은 보내지 않음. 욕설(`PROFANITY`)만으로는 거부하지 않음
 - `429 COOLDOWN` (`message` "다음 게시까지 N분 남았어요.", `details.retryAfterSec`) / `409 PAGE_ENDED` / `400 VALIDATION_FAILED` / `413 PAYLOAD_TOO_LARGE` / `403 BANNED`
 - 검증 실패, 크기 초과, 끝난 페이지는 쿨다운을 쓰지 않습니다. 검사 중 페이지가 넘어가거나 서버 오류가 나면 쿨다운을 되돌립니다(D-28)
 

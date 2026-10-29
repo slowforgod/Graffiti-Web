@@ -18,7 +18,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
- * Runs checks in order, each under the moderation timeout, and stops at the first BLOCK (D-19). Shared by the
+ * Runs checks in order, each under the moderation timeout, and stops at the first BLOCK that rejects (D-19).
+ * Profanity does not stop the run, so a later check can still find what rejects (D-43). Shared by the
  * doodle's own checks ({@link ModerationService}) and the checks of the handwriting the ML server read
  * ({@link MlAnalysis}), so both follow the same rules.
  */
@@ -45,7 +46,7 @@ class CheckRunner {
         for (ModerationCheck check : checks) {
             CheckResult result = run(check, input);
             results.add(result);
-            if (result.outcome() == CheckOutcome.BLOCK) {
+            if (result.rejects()) {
                 break;
             }
         }

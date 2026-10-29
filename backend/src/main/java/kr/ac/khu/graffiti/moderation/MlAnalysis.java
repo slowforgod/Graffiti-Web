@@ -177,7 +177,12 @@ public class MlAnalysis {
             case REVIEW -> CheckOutcome.REVIEW;
             default -> null;
         };
-        return wanted == null ? null : results.stream().filter(r -> r.outcome() == wanted)
-                .map(CheckResult::category).findFirst().orElse(null);
+        if (wanted == null) {
+            return null;
+        }
+        // A rejecting category outranks profanity found earlier in the run (D-43).
+        return results.stream().filter(r -> r.outcome() == wanted)
+                .min((a, b) -> Boolean.compare(b.rejects(), a.rejects()))
+                .map(CheckResult::category).orElse(null);
     }
 }

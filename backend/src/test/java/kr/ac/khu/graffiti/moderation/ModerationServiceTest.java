@@ -49,19 +49,46 @@ class ModerationServiceTest {
     }
 
     @Test
-    void stopsAtTheFirstBlock() {
-        service = service(UncheckedPolicy.HOLD, MlMode.OFF, List.of(check("a", n -> CheckResult.block(n, "PROFANITY")),
+    void stopsAtTheFirstBlockThatRejects() {
+        service = service(UncheckedPolicy.HOLD, MlMode.OFF, List.of(check("a", n -> CheckResult.block(n, "HATE")),
                 check("b", CheckResult::pass)));
 
         ModerationService.Verdict v = service.moderate("TEXT", TEXT);
 
         assertThat(v.state()).isEqualTo(ModerationState.REJECTED);
-        assertThat(v.category()).isEqualTo("PROFANITY");
+        assertThat(v.category()).isEqualTo("HATE");
         assertThat(called).containsExactly("a");
     }
 
     @Test
-    void aSlowThrowingOrMalformedCheckHolds() throws Exception {
+    void profanityGoesOnToTheNextChecksAndShrinksATextThatPassesThem() {
+        service = service(UncheckedPolicy.HOLD, MlMode.OFF, List.of(
+                check("a", n -> CheckResult.block(n, "PROFANITY")), check("b", CheckResult::pass)));
+
+        ModerationService.Verdict v = service.moderate("TEXT", TEXT);
+
+        assertThat(called).containsExactly("a", "b");
+        assertThat(v.state()).isEqualTo(ModerationState.PASSED);
+        assertThat(v.shrink()).isTrue();
+        assertThat(v.category()).isNull();
+    }
+
+    @Test
+    void profanityThenARejectingBlockRejectsWithTheLaterCategory() {
+        service = service(UncheckedPolicy.HOLD, MlMode.OFF, List.of(
+                check("a", n -> CheckResult.block(n, "PROFANITY")), check("b", n -> CheckResult.block(n,
+                        "PERSONAL_INFO")), check("c", CheckResult::pass)));
+
+        ModerationService.Verdict v = service.moderate("TEXT", TEXT);
+
+        assertThat(called).containsExactly("a", "b");
+        assertThat(v.state()).isEqualTo(ModerationState.REJECTED);
+        assertThat(v.category()).isEqualTo("PERSONAL_INFO");
+        assertThat(v.shrink()).isFalse();
+    }
+
+    @Test
+    void aSlowThrowingOrMalformedCheckIsPublishedUnchecked() throws Exception {
         ModerationCheck slow = check("slow", n -> {
             sleep(TIMEOUT.multipliedBy(5));
             return CheckResult.pass(n);
@@ -71,13 +98,13 @@ class ModerationServiceTest {
         });
         ModerationCheck wrongName = check("named", n -> CheckResult.pass("other"));
         ModerationCheck freeText = check("chatty", n -> CheckResult.block(n, "욕설입니다 비밀 글자"));
-        service = service(UncheckedPolicy.PUBLISH, MlMode.OFF, List.of(slow, throwing, wrongName, freeText));
+        service = service(UncheckedPolicy.HOLD, MlMode.OFF, List.of(slow, throwing, wrongName, freeText));
 
         long started = System.nanoTime();
         ModerationService.Verdict v = service.moderate("TEXT", TEXT);
 
         assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(TIMEOUT.multipliedBy(4));
-        assertThat(v.state()).isEqualTo(ModerationState.HELD);
+        assertThat(v.state()).isEqualTo(ModerationState.UNCHECKED);
         JsonNode checks = json.readTree(v.detail()).get("checks");
         assertThat(checks.findValuesAsText("outcome")).containsExactly("ERROR", "ERROR", "ERROR", "ERROR");
         assertThat(checks.findValuesAsText("note")).containsExactly("TIMEOUT", "EXCEPTION", "BAD_RESULT", "BAD_RESULT");

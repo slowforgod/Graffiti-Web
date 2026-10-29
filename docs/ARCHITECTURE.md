@@ -162,8 +162,8 @@ Client                         REST(Controller)          PageCommandProcessor(�
 - ③ 예약(06): `ReservePost`가 DB에서 차단·역할·`last_posted_at`을 읽고, 쿨다운이 지났으면 `UPDATE users SET last_posted_at = now WHERE id = ? AND banned_at IS NULL AND last_posted_at <=> 읽은 값`. 관리자는 아무것도 쓰지 않음. 예약 시각 = `submitted_at`
 - 되돌림(D-28): ④에서 예외가 나거나 ⑤가 `PAGE_ENDED`·DB 오류로 실패하면 `ReleasePost`가 `last_posted_at`을 예약 전 값으로(그사이 바뀌지 않았을 때만). AI 거부(07)는 되돌리지 않음
 - ⑤ 게시(06): doodle과 `doodle_chunk`(bbox가 걸치는 청크) INSERT와 카운트다운 UPDATE가 한 트랜잭션. 커밋 뒤 `DoodlePublished` → 청크마다 `doodle:published`, 이어서 `minimap:diff`, `page:status`
-- ④ 검사(07 틀, `specs/07-moderation-frame.md`): `ModerationService`가 설정한 검사기(`graffiti.moderation.text-checks`, `drawing-checks`)를 순서대로 부르고(각각 타임아웃, BLOCK이면 멈춤) `VerdictCombiner`가 합칩니다. BLOCK → `REJECTED`, REVIEW·ERROR → `HELD`, 모두 PASS → `PASSED`, 스텁(아직 없는 검사기)이 끼어 있으면 `UNCHECKED`이고 `graffiti.moderation.unchecked`(기본 `HOLD`)가 보류할지 게시할지 정합니다. 그림의 ML 분석은 `ml.mode`대로 돌고 SHADOW면 저장 뒤 백그라운드에서 기록만(INV-13, §4.7)
-- **실제 검사기는 아직 없습니다**(금칙어는 목록 파일이 비어 있어 SKIPPED, ChatKHU·OpenAI는 스텁. ML 경로는 연결됐고 SHADOW라 판정에 들어가지 않음). 기본 설정이면 모든 낙서가 보류되므로, `unchecked: PUBLISH`로 바꿔 공개 배포하면 06과 같은 미검사 상태가 됩니다(PIPELINE)
+- ④ 검사(`specs/07-moderation.md` §5.3): `ModerationService`가 설정한 검사기(`graffiti.moderation.text-checks`, `drawing-checks`)를 순서대로 부르고(각각 타임아웃, 거부하는 BLOCK이면 멈춤, 욕설 BLOCK은 계속) `VerdictCombiner`가 합칩니다. 카테고리 2~4의 BLOCK → `REJECTED`, REVIEW·ERROR → `UNCHECKED`로 게시(관리자 사후 확인, D-42), 욕설만 → 텍스트는 `PASSED`로 축소 게시(`TextShrinker`, `shrink-font-size`, D-43)·그림은 `UNCHECKED` 게시, 모두 PASS → `PASSED`, 스텁(키가 없는 검사기)이 끼어 있으면 `UNCHECKED`이고 `graffiti.moderation.unchecked`(기본 `HOLD`)가 보류할지 게시할지 정합니다. 그림의 ML 분석은 `ml.mode`대로 돌고 SHADOW면 저장 뒤 백그라운드에서 기록만(INV-13, §4.7)
+- **실제 검사기는 개인정보 형식(`personal-info`)과 금칙어(`word-filter`)뿐입니다**(ChatKHU·OpenAI는 스텁. ML 경로는 연결됐고 SHADOW라 판정에 들어가지 않음). 기본 설정이면 모든 낙서가 보류되므로, `unchecked: PUBLISH`로 바꿔 공개 배포하면 06과 같은 미검사 상태가 됩니다(PIPELINE)
 - 거부·보류되면 `WithholdDoodle`이 `status=REJECTED|HELD`로 저장하고(`doodle_chunk` 포함, 점유율·브로드캐스트 없음) `moderation_action(AI, REJECT|HOLD)`를 같은 트랜잭션에서 기록합니다. 쿨다운은 그대로 소모됩니다(D-12). 그사이 페이지가 넘어갔으면 `PAGE_ENDED` + 되돌림
 - 관리자가 보류·거부를 게시하면(`PublishWithheld`, 현재 페이지만) ⑤와 같이 점유율·`doodle:published`가 나가고 `moderation_action(ADMIN, APPROVE|RESTORE)`가 남습니다
 - DB 쓰기는 큐 작업 안에서 트랜잭션 하나로 묶고, 커밋이 성공한 **뒤에** 메모리 상태 갱신과 브로드캐스트를 합니다. DB가 실패하면 메모리는 그대로입니다.
@@ -280,14 +280,14 @@ MlAnalysis.analyze(payload)
   MlModerationProvider → ML 서버 POST /v1/moderate (제한 3초, 프록시 없이)
     ├─ 시간 초과 / 4xx·5xx / 스키마 위반 → TIMEOUT 또는 ERROR (판정 없음)
     └─ OK → label, scores, ocr.text, ocr.confidence
-  ocr.text가 있으면 텍스트 검사 경로(text-checks: 금칙어 → ChatKHU → OpenAI, CheckRunner 공유)
+  ocr.text가 있으면 텍스트 검사 경로(text-checks: 개인정보 → 금칙어 → ChatKHU → OpenAI, CheckRunner 공유)
     → ocr_text_outcome = PASS | REVIEW | BLOCK | ERROR | SKIPPED (없으면 NONE)
   MlPredictionRecorder → ml_prediction INSERT (게시 트랜잭션과 분리, 실패해도 게시 결과 불변)
 
 ENFORCE에서 ML 결과를 하나의 검사(ml)로 합성 (07b 결정)
   이미지 FLAGGED                         → BLOCK (점수가 가장 높은 카테고리)
   OCR 글자 BLOCK, 카테고리 2~4             → BLOCK
-  OCR 글자 BLOCK(PROFANITY) 또는 REVIEW    → REVIEW (HELD)
+  OCR 글자 BLOCK(PROFANITY) 또는 REVIEW    → REVIEW (UNCHECKED로 게시, D-42)
   OCR 글자 검사가 스텁뿐                   → SKIPPED
   ML 서버·렌더링·OCR 글자 검사 장애        → 판정에서 빠짐 (HELD 아님, INV-13)
 ```
@@ -347,7 +347,8 @@ ENFORCE에서 ML 결과를 하나의 검사(ml)로 합성 (07b 결정)
 | `graffiti.web.write-requests-per-second` | 10 (로그인 사용자 한 명의 그 밖의 `/api/**` POST·PUT·PATCH·DELETE, 초당) | SEC-08/09, 11 |
 | `graffiti.moderation.timeout` | 5s (검사기 하나마다) | D-18 |
 | `graffiti.moderation.unchecked` | 환경변수 `MODERATION_UNCHECKED`, 기본 `HOLD`. 실제 검사 없이 스텁만 지난 낙서를 보류(`HOLD`)할지 미검사로 게시(`PUBLISH`, 로컬 전용)할지 | 07 틀, D-42 |
-| `graffiti.moderation.text-checks` | [word-filter, chatkhu, openai-text] (순서대로, 없는 구현은 스텁) | D-19 |
+| `graffiti.moderation.text-checks` | [personal-info, word-filter, chatkhu, openai-text] (순서대로, 없는 구현은 스텁) | D-19, 07 |
+| `graffiti.moderation.shrink-font-size` | 10. 욕설만 걸린 텍스트를 이 크기로 줄이고 bbox도 비례 축소해 게시. `doodle.font-sizes` 안의 값 | D-43 |
 | `graffiti.moderation.drawing-checks` | [openai-image] | D-19 |
 | `graffiti.moderation.ml.mode` | SHADOW | D-34, D-39 |
 | `graffiti.moderation.ml.base-url` | http://ml:8000 (내부망) | D-36 |

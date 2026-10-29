@@ -68,8 +68,10 @@ class GraffitiPropertiesTest {
 
             assertThat(p.moderation().timeout()).isEqualTo(Duration.ofSeconds(5));
             assertThat(p.moderation().unchecked()).isEqualTo(GraffitiProperties.UncheckedPolicy.HOLD);
-            assertThat(p.moderation().textChecks()).containsExactly("word-filter", "chatkhu", "openai-text");
+            assertThat(p.moderation().textChecks())
+                    .containsExactly("personal-info", "word-filter", "chatkhu", "openai-text");
             assertThat(p.moderation().drawingChecks()).containsExactly("openai-image");
+            assertThat(p.moderation().shrinkFontSize()).isEqualTo(10);
             assertThat(p.moderation().ml().mode()).isEqualTo(GraffitiProperties.MlMode.SHADOW);
             assertThat(p.moderation().ml().baseUrl()).isEqualTo("http://ml:8000");
             assertThat(p.moderation().ml().timeout()).isEqualTo(Duration.ofSeconds(3));
@@ -140,6 +142,11 @@ class GraffitiPropertiesTest {
     @Test
     void rejectsDefaultFontSizeOutsideTheList() {
         assertStartupFails("graffiti.doodle.default-font-size=25");
+    }
+
+    @Test
+    void rejectsShrinkFontSizeOutsideTheList() {
+        assertStartupFails("graffiti.moderation.shrink-font-size=9");
     }
 
     @Test
