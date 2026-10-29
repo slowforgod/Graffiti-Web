@@ -314,7 +314,7 @@ class RealtimeIT extends WebIntegrationTest {
         BlockingQueue<JsonNode> chunk0 = watcher.subscribe(chunk(0)).events;
         BlockingQueue<JsonNode> chunk1 = watcher.subscribe(chunk(1)).events;
         DoodleValidator.Limits limits = new DoodleValidator.Limits(page.geometry(), page.chunkSize(), 12,
-                List.of(2, 4, 8, 16), List.of(24), 1024, 50);
+                List.of(2, 4, 8, 16), List.of(24), 1024, 50, List.of("pretendard"), 125);
         DoodleValidator.Validated doodle = DoodleValidator.drawing(new DoodleValidator.DrawingPayload(1,
                 List.of(new DoodleValidator.StrokeInput(3, 8, new int[] {470, 10, 490, 12}))), null, limits);
 

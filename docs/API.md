@@ -84,6 +84,8 @@
     "zoomMin": 0.5, "zoomMax": 4.0,
     "palette": ["#000000", "#FFFFFF", "..."], "strokeWidths": [2,4,8,16],
     "fontSizes": [10,11,12,13,14,15,16,20,24,32,36,40,48,64,96], "defaultFontSize": 24,
+    "fonts": ["pretendard", "gowun-dodum", "galmuri", "jalnan", "kyobo-hand", "cafe24-ssurround"],
+    "defaultFont": "pretendard", "textWidthPercent": 125,
     "textMaxLength": 50, "maxBbox": 1024, "maxChunks": 60,
     "postCooldownSec": 1800, "countdownWarningSec": 300, "draftIdleTimeoutSec": 600,
     "cursorIntervalMs": 100, "draftIntervalMs": 100, "heartbeatMs": 10000,
@@ -128,8 +130,9 @@
 `POST /api/pages/{pageId}/doodles` 요청
 ```json
 { "kind": "DRAWING", "payload": { "v": 1, "strokes": [ ... ] } }
-{ "kind": "TEXT", "payload": { "v": 1, "text": "안녕", "c": 0, "size": 24, "x": 1500, "y": 900 }, "bbox": { "w": 52, "h": 34 } }
+{ "kind": "TEXT", "payload": { "v": 1, "text": "안녕", "c": 0, "size": 24, "x": 1500, "y": 900, "f": "jalnan" }, "bbox": { "w": 52, "h": 34 } }
 ```
+`f`(글꼴 id)는 `config.fonts` 중 하나여야 하고(아니면 `400 VALIDATION_FAILED`, `field: "f"`), 없어도 됨(글꼴 이전 클라이언트, 13)
 응답
 - `201` `{ "doodle": { "id", "kind", "bbox", "payload" }, "cooldownEndsAt": "...", "shrunk": false }`. `bbox`는 서버 값(그림은 캔버스로 자른 값), `payload`는 검증한 필드만 다시 만든 것. 관리자는 `cooldownEndsAt: null`. 검사가 애매하거나 실패한 낙서도 `201`로 게시되고 관리자가 사후에 확인(D-42). `shrunk: true`면 욕설이 있어 `size`를 `shrink-font-size`(10)로, bbox를 비례로 줄여 게시한 것이고 `doodle`은 줄어든 값(D-43)
 - `202` `{ "held": true, "cooldownEndsAt": "..." }`: 실제 검사기가 하나도 없어서(키 없음, `unchecked=HOLD`) 관리자 검토를 기다림. 캔버스에 나오지 않고 쿨다운은 소모됨. doodle 정보는 돌려주지 않음

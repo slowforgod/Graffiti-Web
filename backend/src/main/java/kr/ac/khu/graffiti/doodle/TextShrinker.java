@@ -9,7 +9,7 @@ import kr.ac.khu.graffiti.doodle.DoodleValidator.Validated;
  * Shrinks a text with profanity to the shrink size (D-43, specs/07-moderation.md §5.3): the font size becomes
  * {@code size}, the bbox is scaled by {@code size / original} and rounded up, the top-left corner stays. The
  * result goes through {@link DoodleValidator#text} again, which recomputes the cells and chunks; D-31's bounds
- * are whole multiples of the size, so rounding up never breaks them. Pure.
+ * are checked rounded up, so rounding the scaled box up never breaks them. Pure.
  */
 final class TextShrinker {
 
@@ -28,7 +28,7 @@ final class TextShrinker {
         }
         DoodleValidator.Box b = doodle.bbox();
         Size box = new Size(scaled(b.w(), size, p.size()), scaled(b.h(), size, p.size()));
-        Validated shrunk = DoodleValidator.text(new TextPayload(p.v(), p.text(), p.c(), size, p.x(), p.y()), box,
+        Validated shrunk = DoodleValidator.text(new TextPayload(p.v(), p.text(), p.c(), size, p.x(), p.y(), p.f()), box,
                 limits);
         return new Shrunk(shrunk, p.size());
     }

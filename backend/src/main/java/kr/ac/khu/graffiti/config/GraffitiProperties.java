@@ -3,6 +3,7 @@ package kr.ac.khu.graffiti.config;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -92,11 +93,19 @@ public record GraffitiProperties(
             @NotEmpty List<@NotNull @Positive Integer> fontSizes,
             @Positive int defaultFontSize,
             @Positive int textMaxLength,
-            @NotNull Duration draftIdleTimeout) {
+            @NotNull Duration draftIdleTimeout,
+            @NotEmpty List<@NotNull @Pattern(regexp = "[a-z0-9-]{1,32}") String> fonts,
+            @NotNull String defaultFont,
+            @Min(100) int textWidthPercent) {
 
         @AssertTrue(message = "default-font-size must be one of font-sizes")
         public boolean isDefaultFontSizeListed() {
             return fontSizes != null && fontSizes.contains(defaultFontSize);
+        }
+
+        @AssertTrue(message = "default-font must be one of fonts")
+        public boolean isDefaultFontListed() {
+            return fonts != null && fonts.contains(defaultFont);
         }
 
         @AssertTrue(message = "draft-idle-timeout must be positive")
