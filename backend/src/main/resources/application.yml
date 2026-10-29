@@ -63,7 +63,7 @@ graffiti:
   canvas:
     width: 7680
     height: 4320
-    zoom-min: 0.1
+    zoom-min: 0.25
     zoom-max: 4.0
     chunk-size: 480
     cell-size: 48

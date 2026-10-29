@@ -83,7 +83,7 @@ class CanvasReadIT extends WebIntegrationTest {
                 .andExpect(jsonPath("$.config.height").value(4320))
                 .andExpect(jsonPath("$.config.chunkSize").value(480))
                 .andExpect(jsonPath("$.config.cellSize").value(48))
-                .andExpect(jsonPath("$.config.zoomMin").value(0.1))
+                .andExpect(jsonPath("$.config.zoomMin").value(0.25))
                 .andExpect(jsonPath("$.config.zoomMax").value(4.0))
                 .andExpect(jsonPath("$.config.palette.length()").value(12))
                 .andExpect(jsonPath("$.config.strokeWidthMin").value(2))
