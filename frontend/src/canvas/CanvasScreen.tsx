@@ -263,20 +263,54 @@ function PageCanvas({ page, link, me, onPageEnded: pageEnded, turnNotice }: Page
   const tool = access === 'ok' && !mine.open ? tools.tool : 'move';
   // Anyone signed in and consented has doodles to look at; banned authors may not delete them (API.md §3).
   const hasMine = me?.authenticated === true && !me.consentRequired;
-  // With the pen, a dashed square shows how big one drawing may be. It is kept here once the drawing
-  // has strokes so it does not move with the view.
+  // With the pen, a dashed square shows how big one drawing may be. It follows the middle of the view
+  // until it is held: once the drawing has strokes, or once it was dragged by its move handle (`placed`).
+  // While a stroke is drawn it stays still; when the stroke ends it moves just enough to take the drawing in.
   const drawingBounds = own?.kind === 'DRAWING' ? bounds : null;
   const [heldGuide, setHeldGuide] = useState<Rect | null>(null);
+  const [placed, setPlaced] = useState(false);
+  const penStroke = stroking && tool === 'pen';
   const guide =
     tool === 'pen' || drawingBounds
-      ? sizeGuide(heldGuide, drawingBounds, visibleWorldRect(viewport, size), config)
+      ? sizeGuide(heldGuide, penStroke ? null : drawingBounds, visibleWorldRect(viewport, size), config)
       : null;
-  const nextHeld = drawingBounds ? guide : null;
-  // A drawing's buttons sit on the dashed square, which the strokes cannot leave, so they never block a stroke.
+  const nextHeld = drawingBounds || penStroke || (placed && tool === 'pen') ? guide : null;
+  // A drawing's buttons sit on the dashed square. A stroke may cross them; they let the pointer through then.
   const controlsBox = drawingBounds ? guide : null;
   if (!sameRect(nextHeld, heldGuide)) {
     setHeldGuide(nextHeld);
   }
+  if (placed && tool !== 'pen' && !drawingBounds) {
+    setPlaced(false);
+  }
+  // The move handle sits on the open draft, or on the empty dashed square while the pen is picked.
+  const handleBox = controlsBox ?? bounds ?? (tool === 'pen' ? guide : null);
+
+  // The handle drags a text by itself, and a drawing together with its square. Without strokes it drags the
+  // square alone, which then stays where it was put.
+  const moveBy = (dx: number, dy: number) => {
+    if (own?.kind === 'TEXT') {
+      tools.moveBy(dx, dy);
+      return;
+    }
+    const moved = drawingBounds ? tools.moveBy(dx, dy) : { x: dx, y: dy };
+    const from = guide;
+    if (!moved || !from) {
+      return;
+    }
+    const max = { x: Math.max(0, config.width - from.w), y: Math.max(0, config.height - from.h) };
+    setHeldGuide((g) => {
+      const base = g ?? from;
+      return {
+        ...base,
+        x: Math.min(max.x, Math.max(0, base.x + moved.x)),
+        y: Math.min(max.y, Math.max(0, base.y + moved.y)),
+      };
+    });
+    if (!drawingBounds) {
+      setPlaced(true);
+    }
+  };
   const sendCursor = useMemo(
     () =>
       author &&
@@ -397,14 +431,14 @@ function PageCanvas({ page, link, me, onPageEnded: pageEnded, turnNotice }: Page
           onChange={tools.editText}
         />
       )}
-      {own && bounds && (
+      {handleBox && (
         <DraftMoveHandle
-          bounds={controlsBox ?? bounds}
+          bounds={handleBox}
           passThrough={stroking}
           viewport={viewport}
           screen={size}
           disabled={publishing}
-          onMove={tools.moveBy}
+          onMove={moveBy}
           onMoveEnd={tools.moveEnd}
         />
       )}

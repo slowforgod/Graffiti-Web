@@ -33,6 +33,7 @@ vi.mock('./CanvasView', () => ({
     onDrawMove,
     onDrawEnd,
     selection,
+    sizeGuide,
   }: {
     doodles: Doodle[];
     cursors: RemoteCursor[];
@@ -42,8 +43,10 @@ vi.mock('./CanvasView', () => ({
     onDrawMove?: (p: { x: number; y: number }, scale: number) => void;
     onDrawEnd?: () => void;
     selection?: { items: { id: string }[]; selected: ReadonlySet<string>; onToggle: (id: string) => void } | null;
+    sizeGuide?: { x: number; y: number } | null;
   }) => (
     <>
+      <span data-testid="size-guide">{sizeGuide ? `${sizeGuide.x},${sizeGuide.y}` : 'none'}</span>
       {selection?.items.map((i) => (
         <button key={i.id} type="button" aria-pressed={selection.selected.has(i.id)} onClick={() => selection.onToggle(i.id)}>
           {`pick ${i.id}`}
@@ -314,6 +317,54 @@ describe('CanvasScreen', () => {
       expect(again.draftId).not.toBe(first);
       expect(again).toMatchObject({ op: 'points', strokeIndex: 0 });
       expect((again.points as number[]).slice(0, 2)).toEqual([3820, 2090]);
+    });
+
+    // The handle drags by screen pixels; at the starting zoom of 100% they are canvas pixels too.
+    function dragHandle(dx: number, dy: number) {
+      const handle = screen.getByRole('button', { name: '낙서 옮기기' });
+      vi.stubGlobal('PointerEvent', MouseEvent);
+      fireEvent.pointerDown(handle, { clientX: 100, clientY: 100, pointerId: 1 });
+      fireEvent.pointerMove(handle, { clientX: 100 + dx, clientY: 100 + dy, pointerId: 1 });
+      fireEvent.pointerUp(handle, { clientX: 100 + dx, clientY: 100 + dy, pointerId: 1 });
+    }
+
+    const guide = () => screen.getByTestId('size-guide').textContent;
+
+    it('moves the empty size square with the handle while the pen is picked', async () => {
+      const { drafts } = await open();
+      const start = guide()!.split(',').map(Number);
+      expect(screen.getByRole('button', { name: '낙서 옮기기' })).toBeInTheDocument();
+
+      dragHandle(-300, 200);
+
+      expect(guide()).toBe(`${start[0]! - 300},${start[1]! + 200}`);
+      expect(drafts()).toEqual([]);
+    });
+
+    it('keeps the size square still during a stroke and fits it to the drawing when the stroke ends', async () => {
+      await open();
+      // Move the square away so that the stroke at (3800, 2100) starts outside it.
+      dragHandle(-1500, 0);
+      const before = guide()!;
+      const [x] = before.split(',').map(Number);
+      expect(x! + TEST_CONFIG.maxBbox).toBeLessThan(3800);
+
+      act(() => screen.getByRole('button', { name: 'down' }).click());
+      act(() => screen.getByRole('button', { name: 'drag' }).click());
+      expect(guide()).toBe(before);
+
+      act(() => screen.getByRole('button', { name: 'up' }).click());
+      const [after] = guide()!.split(',').map(Number);
+      // Just far enough right to take in the stroke's right edge (3810 + half of 4px).
+      expect(after).toBe(3812 - TEST_CONFIG.maxBbox);
+    });
+
+    it('moves a drawing and its size square together', async () => {
+      await open();
+      draw();
+      const [x, y] = guide()!.split(',').map(Number);
+      dragHandle(40, -30);
+      expect(guide()).toBe(`${x! + 40},${y! - 30}`);
     });
 
     const published = {

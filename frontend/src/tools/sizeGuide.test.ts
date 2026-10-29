@@ -8,9 +8,14 @@ describe('sizeGuide', () => {
     expect(sizeGuide(null, null, view, limits)).toEqual({ x: 2288, y: 2938, w: 1024, h: 1024 });
   });
 
-  it('follows the view while nothing is drawn, even with an earlier square', () => {
-    const prev = { x: 0, y: 0, w: 1024, h: 1024 };
-    expect(sizeGuide(prev, null, view, limits)).toEqual({ x: 2288, y: 2938, w: 1024, h: 1024 });
+  it('keeps a held square where it is, even before anything is drawn', () => {
+    const prev = { x: 500, y: 600, w: 1024, h: 1024 };
+    expect(sizeGuide(prev, null, view, limits)).toEqual(prev);
+  });
+
+  it('pulls a held square dragged past the edge back inside the canvas', () => {
+    const prev = { x: -40, y: 9500, w: 1024, h: 1024 };
+    expect(sizeGuide(prev, null, view, limits)).toEqual({ x: 0, y: 8976, w: 1024, h: 1024 });
   });
 
   it('stays inside the canvas near its edge', () => {
