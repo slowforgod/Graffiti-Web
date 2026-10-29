@@ -68,7 +68,7 @@ class MlAnalysisTest {
     }
 
     @Test
-    void blockedHandwritingOfCategoriesTwoToFourBlocksAndProfanityOrDoubtIsReviewed() {
+    void blockedHandwritingBlocksProfanityIncludedAndDoubtIsReviewed() {
         when(provider.moderate(any(), any())).thenReturn(answer(MlAnswer.Label.SAFE, "읽은 글자"));
 
         MlAnalysis.Result sexual = analysis(MlMode.ENFORCE, 4, n -> CheckResult.block(n, "SEXUAL")).analyze(DRAWING);
@@ -78,7 +78,7 @@ class MlAnalysisTest {
 
         MlAnalysis.Result profanity = analysis(MlMode.ENFORCE, 4, n -> CheckResult.block(n, "PROFANITY"))
                 .analyze(DRAWING);
-        assertThat(profanity.enforced()).isEqualTo(CheckResult.review("ml", "PROFANITY"));
+        assertThat(profanity.enforced()).isEqualTo(CheckResult.block("ml", "PROFANITY"));
 
         MlAnalysis.Result unsure = analysis(MlMode.ENFORCE, 4, n -> CheckResult.review(n, "PERSONAL_INFO"))
                 .analyze(DRAWING);

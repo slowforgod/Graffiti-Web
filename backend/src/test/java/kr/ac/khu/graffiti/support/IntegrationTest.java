@@ -21,7 +21,9 @@ import org.testcontainers.containers.MySQLContainer;
 @SpringBootTest
 // The test clock stands still, so a per-second request cap would count a whole test as one second.
 // The cooldown is off by default for now; the tests keep D-12's 30 minutes so its rules stay covered.
+// There is no ML server in tests: SHADOW keeps a drawing's detail free of the ML path's ERROR (MlShadowIT tests it).
 @TestPropertySource(properties = {"graffiti.moderation.unchecked=PUBLISH", "graffiti.post-cooldown=30m",
+        "graffiti.moderation.ml.mode=SHADOW",
         "graffiti.web.admin-requests-per-second=100000", "graffiti.web.write-requests-per-second=100000"})
 @Import(IntegrationTest.ClockConfig.class)
 public abstract class IntegrationTest {

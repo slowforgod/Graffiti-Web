@@ -171,7 +171,7 @@ uri = "s3://<bucket>/models/easyocr-1.7.2-ko/korean_g2.pth"
 확정된 것 (2026-10-28, 현)
 - SHADOW에서 ML과 OCR 글자 검사는 게시 응답 뒤에 실행. ENFORCE는 판정 전에 같은 `analyzeDrawing` 호출
 - OCR 게이트는 덩어리별 신뢰도만, `models.lock [ocr]`에 기준값. 글자 수 하한 없음
-- ENFORCE에서 OCR 글자 검사 REVIEW 또는 PROFANITY → HELD, 카테고리 2~4 → 거부. ML 장애는 HELD 아님
+- ENFORCE에서 OCR 글자 검사 REVIEW 또는 PROFANITY → HELD, 카테고리 2~4 → 거부. ML 장애는 HELD 아님 (D-42로 HELD는 `UNCHECKED` 게시가 됐고, D-46으로 PROFANITY는 거부)
 - `ml_prediction`: `ocr_text_flagged` → `ocr_text_outcome`(결과 값), `ocr_confidence` 추가
 
 ## 6. 실패 모드

@@ -29,11 +29,24 @@ class VerdictCombinerTest {
     }
 
     @Test
-    void profanityAloneShrinksATextAndLeavesADrawingUnchecked() {
+    void profanityAloneShrinksATextAndRejectsADrawing() {
         assertThat(VerdictCombiner.combine(List.of(CheckResult.pass("a"), PROFANITY, CheckResult.pass("c")),
                 UncheckedPolicy.HOLD, true)).isEqualTo(new Decision(ModerationState.PASSED, null, false, true));
         assertThat(VerdictCombiner.combine(List.of(PROFANITY), UncheckedPolicy.HOLD, false))
-                .isEqualTo(new Decision(ModerationState.UNCHECKED, null, false, false));
+                .isEqualTo(new Decision(ModerationState.REJECTED, "PROFANITY", false, false));
+    }
+
+    @Test
+    void aDrawingsProfanityRejectsEvenNextToADoubtOrAStubButYieldsToAnotherCategory() {
+        assertThat(VerdictCombiner.combine(List.of(CheckResult.review("openai-image", "VIOLENCE"), PROFANITY),
+                UncheckedPolicy.PUBLISH, false))
+                .isEqualTo(new Decision(ModerationState.REJECTED, "PROFANITY", false, false));
+        assertThat(VerdictCombiner.combine(List.of(CheckResult.skipped("openai-image"), PROFANITY),
+                UncheckedPolicy.HOLD, false))
+                .isEqualTo(new Decision(ModerationState.REJECTED, "PROFANITY", false, false));
+        assertThat(VerdictCombiner.combine(List.of(PROFANITY, CheckResult.block("ml", "HATE")),
+                UncheckedPolicy.HOLD, false))
+                .isEqualTo(new Decision(ModerationState.REJECTED, "HATE", false, false));
     }
 
     @Test

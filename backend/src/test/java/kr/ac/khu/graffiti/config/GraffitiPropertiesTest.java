@@ -80,7 +80,7 @@ class GraffitiPropertiesTest {
             assertThat(p.moderation().openai().baseUrl()).isEqualTo("https://api.openai.com/v1");
             assertThat(p.moderation().openai().model()).isEqualTo("omni-moderation-latest");
             assertThat(p.moderation().openai().timeout()).isEqualTo(Duration.ofSeconds(3));
-            assertThat(p.moderation().ml().mode()).isEqualTo(GraffitiProperties.MlMode.SHADOW);
+            assertThat(p.moderation().ml().mode()).isEqualTo(GraffitiProperties.MlMode.ENFORCE);
             assertThat(p.moderation().ml().baseUrl()).isEqualTo("http://ml:8000");
             assertThat(p.moderation().ml().timeout()).isEqualTo(Duration.ofSeconds(3));
             assertThat(p.moderation().ml().maxInFlight()).isEqualTo(4);

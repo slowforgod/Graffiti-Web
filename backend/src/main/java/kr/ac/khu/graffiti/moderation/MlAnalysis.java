@@ -29,7 +29,6 @@ public class MlAnalysis {
 
     private static final Logger log = LoggerFactory.getLogger(MlAnalysis.class);
     private static final String CHECK = ModerationChecks.ML;
-    private static final String PROFANITY = "PROFANITY";
 
     /**
      * One analysis. {@code ocrOutcome} is null when the ML server gave no answer; {@code ocrCategory} is the
@@ -42,9 +41,9 @@ public class MlAnalysis {
         }
 
         /**
-         * What the analysis says as one check (07b decisions, 2026-10-28): a FLAGGED image or blocked
-         * handwriting of categories 2-4 blocks; handwriting the checks were unsure of, or profanity, is
-         * reviewed; a failure anywhere on the path is an ERROR.
+         * What the analysis says as one check (07b decisions, 2026-10-28; D-46): a FLAGGED image or blocked
+         * handwriting blocks, profanity included; handwriting the checks were unsure of is reviewed; a failure
+         * anywhere on the path is an ERROR.
          */
         public CheckResult summary() {
             if (!answer.ok()) {
@@ -54,8 +53,7 @@ public class MlAnalysis {
                 return CheckResult.block(CHECK, answer.topCategory());
             }
             return switch (ocrOutcome) {
-                case BLOCK -> PROFANITY.equals(ocrCategory)
-                        ? CheckResult.review(CHECK, ocrCategory) : CheckResult.block(CHECK, ocrCategory);
+                case BLOCK -> CheckResult.block(CHECK, ocrCategory);
                 case REVIEW -> CheckResult.review(CHECK, ocrCategory);
                 case ERROR -> CheckResult.error(CHECK, "OCR_TEXT_ERROR");
                 case SKIPPED -> CheckResult.skipped(CHECK);
