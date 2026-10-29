@@ -359,6 +359,26 @@ describe('CanvasScreen', () => {
       expect(after).toBe(3812 - TEST_CONFIG.maxBbox);
     });
 
+    it('rests the size square after the drawing is cancelled until the pen is picked again', async () => {
+      await open();
+      draw();
+      act(() => screen.getByRole('button', { name: '취소' }).click());
+      expect(guide()).toBe('none');
+      expect(screen.queryByRole('button', { name: '낙서 옮기기' })).not.toBeInTheDocument();
+
+      act(() => screen.getByRole('button', { name: '펜' }).click());
+      expect(guide()).not.toBe('none');
+      expect(screen.getByRole('button', { name: '낙서 옮기기' })).toBeInTheDocument();
+    });
+
+    it('brings the rested size square back when a new stroke starts', async () => {
+      await open();
+      draw();
+      act(() => screen.getByRole('button', { name: '취소' }).click());
+      act(() => screen.getByRole('button', { name: 'down' }).click());
+      expect(guide()).not.toBe('none');
+    });
+
     it('moves a drawing and its size square together', async () => {
       await open();
       draw();
@@ -395,6 +415,8 @@ describe('CanvasScreen', () => {
       expect(screen.getByRole('list', { name: 'doodles' })).toHaveTextContent('77');
       expect(drafts().at(-1)).toEqual({ pageId: '3', draftId, op: 'cancel' });
       expect(screen.queryByRole('button', { name: '게시' })).not.toBeInTheDocument();
+      // The size square does not stay over the doodle just posted.
+      expect(screen.getByTestId('size-guide')).toHaveTextContent('none');
 
       // The next draft waits for the cooldown, judged by the server clock of the page load.
       draw();
