@@ -127,12 +127,13 @@ PublishService (큐 밖)
 | `sexual`, `sexual/minors` | BLOCK SEXUAL | BLOCK SEXUAL |
 | `hate`, `hate/threatening` | BLOCK HATE | BLOCK HATE |
 | `harassment` | BLOCK PROFANITY (축소) | (이미지에 없음) |
-| `harassment/threatening`, `violence`, `violence/graphic`, `self-harm*`, `illicit*` | REVIEW (해당 코드) | REVIEW |
+| `harassment/threatening`, `violence`, `violence/graphic`, `self-harm*`, `illicit*` | REVIEW (카테고리 `THREAT`, `VIOLENCE`, `SELF_HARM`, `ILLICIT`) | REVIEW (같음) |
 | 아무것도 아님 | PASS | PASS |
 
 - 폭력, 자해, 불법은 FILTER.md의 4개 카테고리에 없어서 거부하지 않고 REVIEW로 둔다. 그래서 `UNCHECKED`로 게시되고 관리자가 사후에 본다
 - 타임아웃 `graffiti.moderation.openai.timeout`(3s), 실패는 ERROR. 키가 없으면 스텁(ChatKHU와 같음)
 - 응답 파싱은 필요한 필드만, 형식이 틀리면 ERROR
+- 여러 카테고리가 함께 켜지면 SEXUAL → HATE → PROFANITY(축소) → REVIEW 순서로 앞의 것을 쓴다. 그림이 렌더링되지 않으면 호출하지 않고 ERROR(`RENDER`)
 
 ### 5.6 파일과 설정
 | 파일 | 역할 | PR |
