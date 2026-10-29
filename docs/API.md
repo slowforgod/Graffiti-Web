@@ -275,8 +275,8 @@
 | GET | `/health` | 모델 로드 여부와 버전 |
 
 `POST /v1/moderate` 요청 (`multipart/form-data`)
-- `image`: PNG (서버가 렌더링한 doodle, 최대 1024×1024)
-- `requestId`: doodle 게시 요청 ID (로그 상관관계용, 사용자 정보 아님)
+- `image`: PNG (Spring의 `DoodleRenderer`가 렌더링한 그림 doodle, 최대 1024×1024). 텍스트 doodle은 보내지 않습니다
+- `requestId`: 분석마다 Spring이 만드는 UUID (로그 상관관계용, 사용자 정보 아님)
 
 응답 `200`
 ```json

@@ -20,7 +20,10 @@ import org.springframework.stereotype.Component;
 @Component
 public class ModerationChecks {
 
-    /** Every check the pipeline knows (D-19, D-34). {@code ml} runs by {@code graffiti.moderation.ml.mode}. */
+    /**
+     * Every check the pipeline knows (D-19, D-34). {@code ml} is not a list entry: {@link MlAnalysis} runs it by
+     * {@code graffiti.moderation.ml.mode}.
+     */
     public static final Set<String> KNOWN = Set.of("word-filter", "chatkhu", "openai-text", "openai-image", "ml");
 
     public static final String ML = "ml";
@@ -29,7 +32,6 @@ public class ModerationChecks {
 
     private final List<ModerationCheck> text;
     private final List<ModerationCheck> drawing;
-    private final ModerationCheck ml;
 
     @Autowired
     ModerationChecks(List<ModerationCheck> beans, GraffitiProperties props) {
@@ -41,9 +43,8 @@ public class ModerationChecks {
         GraffitiProperties.Moderation m = props.moderation();
         this.text = resolve(m.textChecks(), real);
         this.drawing = resolve(m.drawingChecks(), real);
-        this.ml = real.getOrDefault(ML, new StubCheck(ML));
 
-        List<String> stubbed = Stream.of(text, drawing, List.of(ml)).flatMap(List::stream)
+        List<String> stubbed = Stream.of(text, drawing).flatMap(List::stream)
                 .filter(StubCheck.class::isInstance).map(ModerationCheck::name).distinct().toList();
         if (!stubbed.isEmpty()) {
             log.warn("Moderation checks running as stubs (nothing checked): {}; unchecked doodles are {}",
@@ -51,18 +52,13 @@ public class ModerationChecks {
         }
     }
 
-    ModerationChecks(List<ModerationCheck> text, List<ModerationCheck> drawing, ModerationCheck ml) {
+    ModerationChecks(List<ModerationCheck> text, List<ModerationCheck> drawing) {
         this.text = List.copyOf(text);
         this.drawing = List.copyOf(drawing);
-        this.ml = ml;
     }
 
     public List<ModerationCheck> forKind(String kind) {
         return "TEXT".equals(kind) ? text : drawing;
-    }
-
-    public ModerationCheck ml() {
-        return ml;
     }
 
     private static List<ModerationCheck> resolve(List<String> names, Map<String, ModerationCheck> real) {
