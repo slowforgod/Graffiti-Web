@@ -1,13 +1,15 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { TEST_CONFIG } from '../canvas/testConfig';
+import type { Tool } from '../tools/useDraft';
 import type { DrawAccess } from './Toolbar';
 import Toolbar from './Toolbar';
 
-function show(access: DrawAccess, draftKind: 'DRAWING' | 'TEXT' | null = null, tool: 'move' | 'pen' | 'text' = 'move') {
+function show(access: DrawAccess, draftKind: 'DRAWING' | 'TEXT' | null = null, tool: Tool = 'move') {
   const onTool = vi.fn();
   const onLogin = vi.fn();
+  const onWidth = vi.fn();
   render(
     <Toolbar
       config={TEST_CONFIG}
@@ -19,12 +21,12 @@ function show(access: DrawAccess, draftKind: 'DRAWING' | 'TEXT' | null = null, t
       color={0}
       onColor={vi.fn()}
       width={4}
-      onWidth={vi.fn()}
+      onWidth={onWidth}
       fontSize={24}
       onFontSize={vi.fn()}
     />,
   );
-  return { onTool, onLogin };
+  return { onTool, onLogin, onWidth };
 }
 
 describe('Toolbar', () => {
@@ -49,14 +51,37 @@ describe('Toolbar', () => {
     show('ok', 'DRAWING', 'pen');
     expect(screen.getByRole('button', { name: '텍스트' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '펜' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '지우개' })).toBeEnabled();
   });
 
-  it('shows the tools as pictures and offers no eraser', () => {
-    show('ok');
-    for (const name of ['이동', '펜', '텍스트']) {
+  it('keeps the eraser off while a text is open (D-10)', () => {
+    show('ok', 'TEXT', 'text');
+    expect(screen.getByRole('button', { name: '지우개' })).toBeDisabled();
+  });
+
+  it('shows the tools as pictures, the eraser among them', async () => {
+    const { onTool } = show('ok');
+    for (const name of ['이동', '펜', '지우개', '텍스트']) {
       expect(screen.getByRole('button', { name }).querySelector('img')).not.toBeNull();
     }
-    expect(screen.queryByRole('button', { name: '지우개' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '지우개' }));
+    expect(onTool).toHaveBeenCalledWith('eraser');
+  });
+
+  it.each<Tool>(['pen', 'eraser'])('sets the %s width with a slider over the configured range', (tool) => {
+    const { onWidth } = show('ok', null, tool);
+    const slider = screen.getByRole('slider', { name: /굵기/ });
+    expect(slider).toHaveAttribute('min', String(TEST_CONFIG.strokeWidthMin));
+    expect(slider).toHaveAttribute('max', String(TEST_CONFIG.strokeWidthMax));
+    expect(slider).toHaveValue('4');
+    expect(screen.getByText('4px')).toBeInTheDocument();
+    fireEvent.change(slider, { target: { value: '11' } });
+    expect(onWidth).toHaveBeenCalledWith(11);
+  });
+
+  it('shows no width slider for moving or text', () => {
+    show('ok', null, 'text');
+    expect(screen.queryByRole('slider')).not.toBeInTheDocument();
   });
 
   it('puts the zoom buttons last and turns one off at its limit', async () => {
@@ -87,10 +112,9 @@ describe('Toolbar', () => {
     expect(onIn).toHaveBeenCalled();
   });
 
-  it('offers the configured palette, widths and font sizes (INV-10)', () => {
+  it('offers the configured palette (INV-10)', () => {
     show('ok', null, 'pen');
     expect(screen.getAllByRole('radio', { name: /./ }).filter((r) => r.classList.contains('swatch'))).toHaveLength(12);
-    expect(screen.getByRole('radio', { name: '16px' })).toBeInTheDocument();
   });
 
   it('shows the font sizes for text with the default picked', () => {

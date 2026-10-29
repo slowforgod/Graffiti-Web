@@ -376,9 +376,9 @@ function PageCanvas({ page, link, me, onPageEnded: pageEnded, turnNotice }: Page
         ownDraft={own}
         sizeGuide={guide}
         otherDrafts={drafts}
-        onDrawStart={(p, scale) => {
+        onDrawStart={(p) => {
           setStroking(true);
-          tools.pointerDown(p, scale);
+          tools.pointerDown(p);
         }}
         onDrawMove={tools.pointerMove}
         onDrawEnd={() => {

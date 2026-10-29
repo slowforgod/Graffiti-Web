@@ -339,7 +339,7 @@ describe('CanvasScreen', () => {
 
       expect(sentBody).toEqual({
         kind: 'DRAWING',
-        payload: { v: 1, strokes: [{ c: 0, w: TEST_CONFIG.strokeWidths[1], p: [3800, 2100, 3810, 2105] }] },
+        payload: { v: 1, strokes: [{ c: 0, w: TEST_CONFIG.defaultStrokeWidth, p: [3800, 2100, 3810, 2105] }] },
       });
       expect(screen.getByRole('list', { name: 'doodles' })).toHaveTextContent('77');
       expect(drafts().at(-1)).toEqual({ pageId: '3', draftId, op: 'cancel' });

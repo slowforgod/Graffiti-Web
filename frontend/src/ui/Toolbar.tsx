@@ -6,7 +6,7 @@ import { ICONS } from './icons';
 export type DrawAccess = 'loading' | 'anonymous' | 'consent' | 'banned' | 'offline' | 'ok';
 
 interface Props {
-  config: Pick<ClientConfig, 'palette' | 'strokeWidths' | 'fontSizes'>;
+  config: Pick<ClientConfig, 'palette' | 'strokeWidthMin' | 'strokeWidthMax' | 'fontSizes'>;
   access: DrawAccess;
   tool: Tool;
   onTool: (tool: Tool) => void;
@@ -15,6 +15,7 @@ interface Props {
   draftKind: 'DRAWING' | 'TEXT' | null;
   color: number;
   onColor: (c: number) => void;
+  // The width of the pen or the eraser, whichever is picked.
   width: number;
   onWidth: (w: number) => void;
   fontSize: number;
@@ -29,10 +30,10 @@ interface Props {
 // D-07 palette order. A palette that grows beyond it falls back to numbered names.
 const COLOR_NAMES = ['검정', '흰색', '빨강', '주황', '노랑', '초록', '하늘', '파랑', '보라', '분홍', '갈색', '회색'];
 
-// No eraser button (taken off at the owner's request); useDraft still knows the tool.
 const TOOLS: { tool: Tool; label: string; icon: string }[] = [
   { tool: 'move', label: '이동', icon: ICONS.pointer },
   { tool: 'pen', label: '펜', icon: ICONS.pencil },
+  { tool: 'eraser', label: '지우개', icon: ICONS.eraser },
   { tool: 'text', label: '텍스트', icon: ICONS.text },
 ];
 
@@ -101,14 +102,19 @@ export default function Toolbar(props: Props) {
           ))}
         </div>
       )}
-      {tool === 'pen' && (
-        <div className="toolbar-group" role="radiogroup" aria-label="굵기">
-          {config.strokeWidths.map((w) => (
-            <button key={w} type="button" role="radio" aria-checked={props.width === w} onClick={() => props.onWidth(w)}>
-              {w}px
-            </button>
-          ))}
-        </div>
+      {(tool === 'pen' || tool === 'eraser') && (
+        <label className="toolbar-group width-slider">
+          굵기
+          <input
+            type="range"
+            min={config.strokeWidthMin}
+            max={config.strokeWidthMax}
+            step={1}
+            value={props.width}
+            onChange={(e) => props.onWidth(Number(e.target.value))}
+          />
+          <span className="width-value">{props.width}px</span>
+        </label>
       )}
       {tool === 'text' && (
         <label className="toolbar-group">
