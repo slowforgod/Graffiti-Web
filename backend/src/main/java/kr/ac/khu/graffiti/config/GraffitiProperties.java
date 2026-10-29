@@ -40,6 +40,12 @@ public record GraffitiProperties(
         return isPositive(postCooldown);
     }
 
+    @AssertTrue(message = "moderation.shrink-font-size must be one of doodle.font-sizes")
+    public boolean isShrinkFontSizeListed() {
+        return doodle == null || moderation == null || doodle.fontSizes() == null
+                || doodle.fontSizes().contains(moderation.shrinkFontSize());
+    }
+
     public record Canvas(
             @Positive int width,
             @Positive int height,
@@ -127,6 +133,7 @@ public record GraffitiProperties(
             @NotNull UncheckedPolicy unchecked,
             @NotNull List<@NotBlank String> textChecks,
             @NotNull List<@NotBlank String> drawingChecks,
+            @Positive int shrinkFontSize,
             @NotNull @Valid Ml ml) {
 
         @AssertTrue(message = "moderation timeout must be positive")

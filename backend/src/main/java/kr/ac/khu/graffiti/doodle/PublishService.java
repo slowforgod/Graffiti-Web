@@ -21,7 +21,8 @@ import org.springframework.stereotype.Service;
 /**
  * Publishes a checked doodle (ARCHITECTURE.md §4.1): take the post in the queue, moderate outside it,
  * then in the queue publish it, or store it REJECTED or HELD. A post that was taken but not stored is given
- * back (D-28); a rejected or held one keeps it (D-12). Once stored, a drawing goes to the ML path
+ * back (D-28); a rejected or held one keeps it (D-12). A text with profanity only is published shrunk
+ * ({@link TextShrinker}, D-43). Once stored, a drawing goes to the ML path
  * ({@link MlAnalysis#afterStored}), which never changes the result.
  */
 @Service
@@ -32,9 +33,10 @@ public class PublishService {
     /**
      * What happened to the post. {@code state} is PASSED or UNCHECKED when published, REJECTED or HELD
      * otherwise; {@code category} is set on a rejection. {@code cooldownEndsAt} is null for admins (D-12).
+     * {@code doodle} is what was stored: the shrunk text when {@code shrunk}.
      */
     public record Result(long id, Validated doodle, String payload, ModerationState state, String category,
-            Instant cooldownEndsAt) {
+            Instant cooldownEndsAt, boolean shrunk) {
 
         public boolean published() {
             return state.publishable();
@@ -46,6 +48,7 @@ public class PublishService {
     private final MlAnalysis ml;
     private final ObjectMapper json;
     private final Duration cooldown;
+    private final int shrinkFontSize;
 
     PublishService(PageCommandProcessor processor, ModerationService moderation, MlAnalysis ml, ObjectMapper json,
             GraffitiProperties props) {
@@ -54,15 +57,27 @@ public class PublishService {
         this.ml = ml;
         this.json = json;
         this.cooldown = props.postCooldown();
+        this.shrinkFontSize = props.moderation().shrinkFontSize();
     }
 
-    public Result publish(long pageId, long authorId, Validated doodle) {
-        String payload = write(doodle.payload());
+    /** {@code limits} are the ones {@code doodle} was checked against; a shrunk text is checked again. */
+    public Result publish(long pageId, long authorId, Validated doodle, DoodleValidator.Limits limits) {
         PageCommand.Reservation reservation = await(new PageCommand.ReservePost(pageId, authorId));
         ModerationService.Verdict verdict;
+        String payload;
+        boolean shrunk = false;
         long id;
         try {
             verdict = moderation.moderate(doodle.kind(), doodle.payload());
+            if (verdict.shrink() && verdict.state().publishable()) {
+                TextShrinker.Shrunk s = TextShrinker.shrink(doodle, shrinkFontSize, limits);
+                if (s != null) {
+                    doodle = s.doodle();
+                    verdict = verdict.shrunkFrom(s.fromSize(), json);
+                    shrunk = true;
+                }
+            }
+            payload = write(doodle.payload());
             DoodleValidator.Box b = doodle.bbox();
             PostStore.NewDoodle row = new PostStore.NewDoodle(pageId, authorId, doodle.kind(),
                     verdict.state().name(), verdict.detail(), b.x(), b.y(), b.w(), b.h(), payload,
@@ -76,7 +91,7 @@ public class PublishService {
         }
         ml.afterStored(id, doodle.kind(), payload, verdict.ml());
         return new Result(id, doodle, payload, verdict.state(), verdict.category(),
-                reservation.exempt() ? null : reservation.reservedAt().plus(cooldown));
+                reservation.exempt() ? null : reservation.reservedAt().plus(cooldown), shrunk);
     }
 
     private void giveBack(PageCommand.Reservation reservation) {

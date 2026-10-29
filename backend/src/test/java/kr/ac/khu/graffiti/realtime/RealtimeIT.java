@@ -313,12 +313,12 @@ class RealtimeIT extends WebIntegrationTest {
         Client watcher = connect(null, ORIGIN);
         BlockingQueue<JsonNode> chunk0 = watcher.subscribe(chunk(0)).events;
         BlockingQueue<JsonNode> chunk1 = watcher.subscribe(chunk(1)).events;
+        DoodleValidator.Limits limits = new DoodleValidator.Limits(page.geometry(), page.chunkSize(), 12,
+                List.of(2, 4, 8, 16), List.of(24), 1024, 50);
         DoodleValidator.Validated doodle = DoodleValidator.drawing(new DoodleValidator.DrawingPayload(1,
-                List.of(new DoodleValidator.StrokeInput(3, 8, new int[] {470, 10, 490, 12}))), null,
-                new DoodleValidator.Limits(page.geometry(), page.chunkSize(), 12, List.of(2, 4, 8, 16), List.of(24),
-                        1024, 50));
+                List.of(new DoodleValidator.StrokeInput(3, 8, new int[] {470, 10, 490, 12}))), null, limits);
 
-        long id = context.getBean(PublishService.class).publish(page.id(), author().getId(), doodle).id();
+        long id = context.getBean(PublishService.class).publish(page.id(), author().getId(), doodle, limits).id();
 
         String expected = "{\"type\":\"doodle:published\",\"doodle\":{\"id\":\"" + id
                 + "\",\"kind\":\"DRAWING\",\"bbox\":{\"x\":466,\"y\":6,\"w\":28,\"h\":10},"

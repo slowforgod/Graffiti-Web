@@ -267,6 +267,42 @@ class PublishIT extends WebIntegrationTest {
     }
 
     @Test
+    void aTextWithProfanityIsPublishedShrunkAndKeepsItsOriginalSizeInTheDetail() throws Exception {
+        // The word list (resources/moderation) has 시발; the AI checks are stubs here (unchecked=PUBLISH).
+        String profane = """
+                {"kind": "TEXT", "payload": {"v": 1, "text": "시발 시험", "c": 0, "size": 24, "x": 1500, "y": 900},
+                 "bbox": {"w": 115, "h": 33}}""";
+
+        JsonNode body = read(publish(author, profane).andExpect(status().isCreated()));
+
+        assertThat(body.get("shrunk").asBoolean()).isTrue();
+        assertThat(body.at("/doodle/payload/size").asInt()).isEqualTo(10);
+        assertThat(json.convertValue(body.at("/doodle/bbox"), Map.class))
+                .isEqualTo(Map.of("x", 1500, "y", 900, "w", 48, "h", 14));
+        long id = body.at("/doodle/id").asLong();
+        Map<String, Object> row = jdbc.queryForMap("SELECT * FROM doodle WHERE id = ?", id);
+        assertThat(row).containsEntry("status", "PUBLISHED").containsEntry("moderation_state", "UNCHECKED")
+                .containsEntry("bbox_w", 48).containsEntry("bbox_h", 14);
+        assertThat(json.readTree(row.get("payload").toString()).get("size").asInt()).isEqualTo(10);
+        assertThat(json.readTree(row.get("moderation_detail").toString()).at("/shrunk/fromSize").asInt())
+                .isEqualTo(24);
+        assertThat(events.of(DoodlePublished.class).getFirst().doodleId()).isEqualTo(id);
+    }
+
+    @Test
+    void aPhoneNumberIsRejectedAsPersonalInformation() throws Exception {
+        String phone = """
+                {"kind": "TEXT", "payload": {"v": 1, "text": "010 1234 5678", "c": 0, "size": 10, "x": 0, "y": 0},
+                 "bbox": {"w": 130, "h": 14}}""";
+
+        publish(author, phone).andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error.details.category").value("PERSONAL_INFO"));
+
+        assertThat(jdbc.queryForObject("SELECT status FROM doodle WHERE author_id = ?", String.class,
+                author.getId())).isEqualTo("REJECTED");
+    }
+
+    @Test
     void aPageThatTurnsBeforeAHoldIsStoredGivesThePostBack() throws Exception {
         doAnswer(inv -> {
             clock.set(page.scheduledEndAt().plusSeconds(1));

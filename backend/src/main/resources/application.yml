@@ -111,10 +111,12 @@ graffiti:
     # A doodle only stubs looked at (no real check yet) is HELD for an admin, never published as if checked.
     # PUBLISH puts it on the canvas as UNCHECKED instead: local development only, never a public deploy.
     unchecked: ${MODERATION_UNCHECKED:HOLD}
-    # Run in this order, stopping at the first BLOCK (D-19). Names: word-filter, chatkhu, openai-text,
-    # openai-image. Ones not built yet run as stubs (SKIPPED); see docs/specs/07-moderation-frame.md.
-    text-checks: [word-filter, chatkhu, openai-text]
+    # Run in this order, stopping at the first BLOCK that rejects (D-19; profanity goes on, D-43). Names:
+    # personal-info, word-filter, chatkhu, openai-text, openai-image. Ones not built yet run as stubs (SKIPPED).
+    text-checks: [personal-info, word-filter, chatkhu, openai-text]
     drawing-checks: [openai-image]
+    # A text with profanity only is published at this size, its bbox shrunk alike (D-43). One of font-sizes.
+    shrink-font-size: 10
     ml:
       mode: SHADOW
       base-url: http://ml:8000

@@ -56,7 +56,8 @@ class DoodleController {
     record PublishRequest(String kind, JsonNode payload, DoodleValidator.Size bbox) {
     }
 
-    record Response(ChunkDoodleController.Doodle doodle, Instant cooldownEndsAt) {
+    /** {@code shrunk}: the text had profanity and was published at the shrink size (D-43). */
+    record Response(ChunkDoodleController.Doodle doodle, Instant cooldownEndsAt, boolean shrunk) {
     }
 
     /** {@code 202}: stored, but waiting for an admin (D-42, PROPOSED). Nothing about the doodle goes back. */
@@ -78,8 +79,8 @@ class DoodleController {
             HttpServletRequest request) throws IOException {
         byte[] body = readBody(request);
         PageSnapshot page = pages.requireCurrent(pageId);
-        Validated doodle = validate(body, limits(page));
-        PublishService.Result result = publisher.publish(pageId, user.id(), doodle);
+        DoodleValidator.Limits limits = limits(page);
+        PublishService.Result result = publisher.publish(pageId, user.id(), validate(body, limits), limits);
         if (result.state() == ModerationState.REJECTED) {
             // Absent rather than null: an admin has no cooldown, and a check may block without a category.
             Map<String, Object> details = new LinkedHashMap<>();
@@ -94,10 +95,11 @@ class DoodleController {
         if (!result.published()) {
             return ResponseEntity.status(HttpStatus.ACCEPTED).body(new HeldResponse(true, result.cooldownEndsAt()));
         }
+        Validated doodle = result.doodle();
         DoodleValidator.Box b = doodle.bbox();
         return ResponseEntity.status(HttpStatus.CREATED).body(new Response(new ChunkDoodleController.Doodle(
                 Long.toString(result.id()), doodle.kind(), new ChunkDoodleController.Bbox(b.x(), b.y(), b.w(), b.h()),
-                result.payload()), result.cooldownEndsAt()));
+                result.payload()), result.cooldownEndsAt(), result.shrunk()));
     }
 
     // Reads at most max-payload-bytes; one byte more means the body is too large (SEC-08, D-11).

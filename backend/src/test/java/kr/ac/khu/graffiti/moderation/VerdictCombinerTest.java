@@ -9,44 +9,73 @@ import org.junit.jupiter.api.Test;
 
 class VerdictCombinerTest {
 
-    @Test
-    void anyBlockRejectsWithItsCategory() {
-        Decision d = VerdictCombiner.combine(List.of(CheckResult.review("chatkhu", "HARASSMENT"),
-                CheckResult.block("openai-text", "HATE"), CheckResult.error("x", "TIMEOUT")), UncheckedPolicy.PUBLISH);
+    private static final CheckResult PROFANITY = CheckResult.block("word-filter", "PROFANITY");
 
-        assertThat(d).isEqualTo(new Decision(ModerationState.REJECTED, "HATE", false));
+    @Test
+    void aBlockOfCategoriesTwoToFourRejectsWithItsCategoryOverEverythingElse() {
+        Decision d = VerdictCombiner.combine(List.of(PROFANITY, CheckResult.review("chatkhu", "HATE"),
+                CheckResult.block("openai-text", "PERSONAL_INFO"), CheckResult.error("x", "TIMEOUT")),
+                UncheckedPolicy.PUBLISH, true);
+
+        assertThat(d).isEqualTo(new Decision(ModerationState.REJECTED, "PERSONAL_INFO", false, false));
     }
 
     @Test
-    void reviewOrErrorHolds() {
-        assertThat(VerdictCombiner.combine(List.of(CheckResult.pass("a"), CheckResult.review("b", "HARASSMENT")),
-                UncheckedPolicy.PUBLISH)).isEqualTo(new Decision(ModerationState.HELD, "HARASSMENT", false));
+    void reviewOrErrorIsPublishedUncheckedForAnAdminToLookAtLater() {
+        assertThat(VerdictCombiner.combine(List.of(CheckResult.pass("a"), CheckResult.review("b", "HATE")),
+                UncheckedPolicy.HOLD, true)).isEqualTo(new Decision(ModerationState.UNCHECKED, null, false, false));
         assertThat(VerdictCombiner.combine(List.of(CheckResult.pass("a"), CheckResult.error("b", "TIMEOUT")),
-                UncheckedPolicy.PUBLISH)).isEqualTo(new Decision(ModerationState.HELD, null, false));
+                UncheckedPolicy.HOLD, false)).isEqualTo(new Decision(ModerationState.UNCHECKED, null, false, false));
+    }
+
+    @Test
+    void profanityAloneShrinksATextAndLeavesADrawingUnchecked() {
+        assertThat(VerdictCombiner.combine(List.of(CheckResult.pass("a"), PROFANITY, CheckResult.pass("c")),
+                UncheckedPolicy.HOLD, true)).isEqualTo(new Decision(ModerationState.PASSED, null, false, true));
+        assertThat(VerdictCombiner.combine(List.of(PROFANITY), UncheckedPolicy.HOLD, false))
+                .isEqualTo(new Decision(ModerationState.UNCHECKED, null, false, false));
+    }
+
+    @Test
+    void profanityWithADoubtIsUncheckedAndStillShrunk() {
+        assertThat(VerdictCombiner.combine(List.of(PROFANITY, CheckResult.review("chatkhu", "HATE")),
+                UncheckedPolicy.HOLD, true)).isEqualTo(new Decision(ModerationState.UNCHECKED, null, false, true));
     }
 
     @Test
     void onlyRealPassesArePassed() {
         assertThat(VerdictCombiner.combine(List.of(CheckResult.pass("a"), CheckResult.pass("b")),
-                UncheckedPolicy.HOLD).state()).isEqualTo(ModerationState.PASSED);
+                UncheckedPolicy.HOLD, true)).isEqualTo(new Decision(ModerationState.PASSED, null, false, false));
     }
 
     @Test
     void aStubOrNoCheckAtAllIsUncheckedAndFollowsThePolicy() {
         List<CheckResult> partly = List.of(CheckResult.pass("a"), CheckResult.skipped("b"));
 
-        assertThat(VerdictCombiner.combine(partly, UncheckedPolicy.PUBLISH))
-                .isEqualTo(new Decision(ModerationState.UNCHECKED, null, false));
-        assertThat(VerdictCombiner.combine(partly, UncheckedPolicy.HOLD))
-                .isEqualTo(new Decision(ModerationState.HELD, null, true));
-        assertThat(VerdictCombiner.combine(List.of(), UncheckedPolicy.PUBLISH).state())
+        assertThat(VerdictCombiner.combine(partly, UncheckedPolicy.PUBLISH, true))
+                .isEqualTo(new Decision(ModerationState.UNCHECKED, null, false, false));
+        assertThat(VerdictCombiner.combine(partly, UncheckedPolicy.HOLD, true))
+                .isEqualTo(new Decision(ModerationState.HELD, null, true, false));
+        assertThat(VerdictCombiner.combine(List.of(), UncheckedPolicy.PUBLISH, true).state())
                 .isEqualTo(ModerationState.UNCHECKED);
-        assertThat(VerdictCombiner.combine(List.of(), UncheckedPolicy.HOLD).state()).isEqualTo(ModerationState.HELD);
+        assertThat(VerdictCombiner.combine(List.of(), UncheckedPolicy.HOLD, true).state())
+                .isEqualTo(ModerationState.HELD);
     }
 
     @Test
-    void aBlockWinsEvenNextToStubs() {
-        assertThat(VerdictCombiner.combine(List.of(CheckResult.block("word-filter", "PROFANITY"),
-                CheckResult.skipped("chatkhu")), UncheckedPolicy.PUBLISH).state()).isEqualTo(ModerationState.REJECTED);
+    void profanityNextToStubsFollowsThePolicyAndIsShrunkOnlyWhenPublished() {
+        List<CheckResult> stubbed = List.of(PROFANITY, CheckResult.skipped("chatkhu"));
+
+        assertThat(VerdictCombiner.combine(stubbed, UncheckedPolicy.PUBLISH, true))
+                .isEqualTo(new Decision(ModerationState.UNCHECKED, null, false, true));
+        assertThat(VerdictCombiner.combine(stubbed, UncheckedPolicy.HOLD, true))
+                .isEqualTo(new Decision(ModerationState.HELD, null, true, false));
+    }
+
+    @Test
+    void aRejectingBlockWinsEvenNextToStubs() {
+        assertThat(VerdictCombiner.combine(List.of(CheckResult.block("word-filter", "HATE"),
+                CheckResult.skipped("chatkhu")), UncheckedPolicy.PUBLISH, true).state())
+                .isEqualTo(ModerationState.REJECTED);
     }
 }
