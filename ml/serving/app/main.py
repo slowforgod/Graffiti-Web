@@ -2,23 +2,32 @@
 
 import logging
 import time
+from pathlib import Path
 
 from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import JSONResponse
 
 from .decision import decide
 from .image_input import InvalidImage, read_png
-from .lock import read_lock
-from .models import ClassifierFactory, OcrEngine, Registry
+from .lock import ImageModelLock, read_lock
+from .models import ClassifierFactory, ImageClassifier, OcrEngine, Registry
+from .prompts import Prompts
 from .schemas import HealthResponse, ImageResult, ModerateResponse, OcrResult
 from .settings import Settings
 
 log = logging.getLogger("ml.moderate")
 
 
-def classifier_factory() -> ClassifierFactory | None:
-    """The image classifier to load. None until the ML part adds the zero-shot model (D-37)."""
-    return None
+def classifier_factory(threads: int) -> ClassifierFactory:
+    """Builds the OpenCLIP zero-shot classifier (D-37) from the verified files in models.lock."""
+
+    def build_classifier(weights: Path, prompts: Prompts, image: ImageModelLock) -> ImageClassifier:
+        # Imported here so the API tests with fake classifiers do not load torch.
+        from .clip_classifier import ClipClassifier
+
+        return ClipClassifier(weights, prompts, image.arch, image.crop_to_content, threads)
+
+    return build_classifier
 
 
 def error(status: int, code: str) -> JSONResponse:
@@ -29,7 +38,7 @@ def create_app(
     settings: Settings | None = None, factory: ClassifierFactory | None = None, ocr: OcrEngine | None = None
 ) -> FastAPI:
     settings = settings or Settings.from_env()
-    registry = Registry.load(read_lock(settings.models_lock), settings.model_dir, factory, ocr)
+    registry = Registry.load(read_lock(settings.models_lock), settings.model_dir, settings.prompts_dir, factory, ocr)
     app = FastAPI(title="graffiti-ml", docs_url=None, redoc_url=None, openapi_url=None)
 
     @app.get("/health", response_model=HealthResponse)
@@ -80,4 +89,5 @@ def create_app(
 
 def build() -> FastAPI:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
-    return create_app(factory=classifier_factory())
+    settings = Settings.from_env()
+    return create_app(settings, factory=classifier_factory(settings.torch_threads))

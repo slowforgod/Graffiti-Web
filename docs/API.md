@@ -284,12 +284,13 @@
   "modelVersion": "clip-zs-2026.11.01",
   "image": {
     "label": "FLAGGED",
-    "scores": { "sexual": 0.81, "violence": 0.04, "hate_symbol": 0.02, "safe": 0.13 }
+    "scores": { "SEXUAL": 0.81, "HATE": 0.04 }
   },
   "ocr": { "text": "인식된 글자", "confidence": 0.62 },
   "latencyMs": 840
 }
 ```
+- `scores`의 키는 `models.lock`의 `[image.thresholds]` 키와 같습니다(`docs/FILTER.md` 카테고리 이름). 카테고리마다 독립인 0~1 점수이며 `safe` 점수는 없습니다.
 - `label`은 ML 서버가 `models.lock`의 임계값으로 정합니다. Spring은 `scores`도 그대로 `ml_prediction`에 저장합니다.
 - `ocr.text`가 비어 있지 않으면 Spring이 텍스트 검사 경로(금칙어 → ChatKHU → OpenAI)로 넘깁니다(D-35).
 - 오류: `400`(이미지 아님, 크기 초과), `503`(모델 미로드). Spring은 응답 시간 3초 초과, 4xx, 5xx를 모두 ML 판정 없음으로 처리합니다(INV-13, D-40).

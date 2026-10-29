@@ -30,9 +30,9 @@ class FakeOcr:
         return OCR_TEXT, 0.62
 
 
-def client(tmp_path, classifier, weights=b"weights", sha256=None, ocr=None):
-    settings = write_lock(tmp_path, weights, sha256)
-    app = create_app(settings, factory=(lambda path: classifier) if classifier else None, ocr=ocr)
+def client(tmp_path, classifier, weights=b"weights", sha256=None, ocr=None, **lock):
+    settings = write_lock(tmp_path, weights, sha256, **lock)
+    app = create_app(settings, factory=(lambda path, prompts, image: classifier) if classifier else None, ocr=ocr)
     return TestClient(app)
 
 
@@ -41,7 +41,7 @@ def moderate(c, data, request_id="req-1"):
 
 
 def test_moderate_returns_api_shape_and_flags(tmp_path):
-    c = client(tmp_path, FakeClassifier({"sexual": 0.81, "violence": 0.04, "hate_symbol": 0.02, "safe": 0.13}))
+    c = client(tmp_path, FakeClassifier({"SEXUAL": 0.81, "HATE": 0.04}))
 
     res = moderate(c, png_bytes())
 
@@ -50,27 +50,27 @@ def test_moderate_returns_api_shape_and_flags(tmp_path):
     assert body["modelVersion"] == "test-1"
     assert body["image"] == {
         "label": "FLAGGED",
-        "scores": {"sexual": 0.81, "violence": 0.04, "hate_symbol": 0.02, "safe": 0.13},
+        "scores": {"SEXUAL": 0.81, "HATE": 0.04},
     }
     assert body["ocr"] == {"text": "", "confidence": 0.0}
     assert isinstance(body["latencyMs"], int)
 
 
 def test_moderate_safe_below_thresholds(tmp_path):
-    c = client(tmp_path, FakeClassifier({"sexual": 0.1, "violence": 0.59, "hate_symbol": 0.2, "safe": 0.9}))
+    c = client(tmp_path, FakeClassifier({"SEXUAL": 0.1, "HATE": 0.59}))
     assert moderate(c, png_bytes()).json()["image"]["label"] == "SAFE"
 
 
 @pytest.mark.parametrize("data", [b"plain text", png_bytes(fmt="JPEG"), png_bytes(1025, 1025)], ids=["text", "jpeg", "big"])
 def test_invalid_images_are_400(tmp_path, data):
-    c = client(tmp_path, FakeClassifier({"sexual": 0.1}))
+    c = client(tmp_path, FakeClassifier({"SEXUAL": 0.1}))
     res = moderate(c, data)
     assert res.status_code == 400
     assert res.json() == {"error": {"code": "INVALID_IMAGE"}}
 
 
 def test_oversized_upload_is_400(tmp_path):
-    c = client(tmp_path, FakeClassifier({"sexual": 0.1}))
+    c = client(tmp_path, FakeClassifier({"SEXUAL": 0.1}))
     res = moderate(c, png_bytes() + b"\0" * (2 * 1024 * 1024))
     assert res.status_code == 400
 
@@ -92,9 +92,49 @@ def test_no_model_answers_503(tmp_path):
 
 
 def test_checksum_mismatch_refuses_the_model(tmp_path):
-    c = client(tmp_path, FakeClassifier({"sexual": 0.9}), sha256="0" * 64)
+    c = client(tmp_path, FakeClassifier({"SEXUAL": 0.9}), sha256="0" * 64)
     assert c.get("/health").status_code == 503
     assert moderate(c, png_bytes()).status_code == 503
+
+
+def test_factory_gets_the_verified_files_and_the_lock_entry(tmp_path):
+    seen = {}
+
+    def factory(path, prompts, image):
+        seen.update(path=path, prompts=prompts, image=image)
+        return FakeClassifier({})
+
+    settings = write_lock(tmp_path, b"weights")
+    TestClient(create_app(settings, factory=factory))
+
+    assert seen["path"] == settings.model_dir / "model.safetensors"
+    assert set(seen["prompts"]) == {"SEXUAL", "HATE"}
+    assert seen["image"].arch == "ViT-B-32"
+
+
+@pytest.mark.parametrize(
+    "lock",
+    [
+        {"prompts_sha256": "0" * 64},
+        {"prompts": None},
+        {"prompts": '[SEXUAL]\npositive = ["a"]\nnegative = ["b"]\n'},
+    ],
+    ids=["prompts-checksum", "prompts-missing", "prompts-categories-differ-from-thresholds"],
+)
+def test_bad_prompts_refuse_the_model(tmp_path, lock):
+    c = client(tmp_path, FakeClassifier({"SEXUAL": 0.9}), **lock)
+    assert c.get("/health").status_code == 503
+    assert moderate(c, png_bytes()).status_code == 503
+
+
+def test_factory_failure_refuses_the_model_instead_of_crashing(tmp_path, caplog):
+    def factory(path, prompts, image):
+        raise RuntimeError("unknown arch: secret detail")
+
+    with caplog.at_level(logging.INFO):
+        c = TestClient(create_app(write_lock(tmp_path, b"weights"), factory=factory))
+    assert c.get("/health").status_code == 503
+    assert "secret detail" not in caplog.text
 
 
 def test_missing_factory_refuses_the_model(tmp_path):
@@ -113,7 +153,7 @@ def test_model_failure_is_500_without_details(tmp_path, caplog):
 
 
 def test_logs_carry_no_ocr_text_or_scores(tmp_path, caplog):
-    c = client(tmp_path, FakeClassifier({"sexual": 0.8123}), ocr=FakeOcr())
+    c = client(tmp_path, FakeClassifier({"SEXUAL": 0.8123}), ocr=FakeOcr())
     with caplog.at_level(logging.DEBUG):
         res = moderate(c, png_bytes(), request_id="req-42")
     assert res.json()["ocr"] == {"text": OCR_TEXT, "confidence": 0.62}

@@ -8,14 +8,18 @@ from pathlib import Path
 DEFAULT_MAX_IMAGE_SIDE = 1024
 # Same as the doodle payload limit on the Spring side (D-30).
 DEFAULT_MAX_IMAGE_BYTES = 2 * 1024 * 1024
+# CPU threads for inference (D-36): the ML server shares a 2 vCPU host with Spring.
+DEFAULT_TORCH_THREADS = 2
 
 
 @dataclass(frozen=True)
 class Settings:
     models_lock: Path
     model_dir: Path
+    prompts_dir: Path
     max_image_side: int = DEFAULT_MAX_IMAGE_SIDE
     max_image_bytes: int = DEFAULT_MAX_IMAGE_BYTES
+    torch_threads: int = DEFAULT_TORCH_THREADS
 
     @staticmethod
     def from_env() -> "Settings":
@@ -23,6 +27,8 @@ class Settings:
         return Settings(
             models_lock=Path(os.environ.get("MODELS_LOCK", root / "models.lock")),
             model_dir=Path(os.environ.get("MODEL_DIR", root / "models")),
+            prompts_dir=Path(os.environ.get("PROMPTS_DIR", root / "prompts")),
             max_image_side=int(os.environ.get("MAX_IMAGE_SIDE", DEFAULT_MAX_IMAGE_SIDE)),
             max_image_bytes=int(os.environ.get("MAX_IMAGE_BYTES", DEFAULT_MAX_IMAGE_BYTES)),
+            torch_threads=int(os.environ.get("TORCH_THREADS", DEFAULT_TORCH_THREADS)),
         )

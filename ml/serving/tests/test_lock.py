@@ -13,7 +13,10 @@ def test_reads_a_configured_lock(tmp_path):
 
     assert lock.image.configured
     assert lock.image.version == "test-1"
-    assert lock.image.file == "model.bin"
+    assert lock.image.arch == "ViT-B-32"
+    assert lock.image.file == "model.safetensors"
+    assert lock.image.prompts == "test-1.toml"
+    assert lock.image.crop_to_content is True
     assert lock.image.thresholds == THRESHOLDS
     assert lock.ocr_version == "none"
 
@@ -30,18 +33,51 @@ def test_repository_lock_parses():
     assert lock.image.version
 
 
+GOOD = {
+    "version": '"v1"',
+    "arch": '"ViT-B-32"',
+    "file": '"m.safetensors"',
+    "sha256": '"' + "a" * 64 + '"',
+    "prompts": '"v1.toml"',
+    "prompts_sha256": '"' + "b" * 64 + '"',
+    "crop_to_content": "true",
+}
+
+
+def lock_body(thresholds: str = "SEXUAL = 0.5", **image) -> str:
+    keys = {**GOOD, **image}
+    lines = "".join(f"{k} = {v}\n" for k, v in keys.items() if v is not None)
+    table = f"[image.thresholds]\n{thresholds}\n" if thresholds is not None else ""
+    return f"[image]\n{lines}{table}[ocr]\nversion = \"none\"\n"
+
+
+def test_lock_body_helper_builds_a_valid_lock(tmp_path):
+    path = tmp_path / "models.lock"
+    path.write_text(lock_body(), encoding="utf-8")
+    assert read_lock(path).image.configured
+
+
 @pytest.mark.parametrize(
     "body",
     [
         "not toml [",
         '[ocr]\nversion = "none"\n',
-        '[image]\nversion = "v1"\nfile = "m.bin"\nsha256 = "abc"\n[image.thresholds]\nsexual = 0.5\n[ocr]\nversion = "none"\n',
-        '[image]\nversion = "v1"\nfile = "../m.bin"\nsha256 = "' + "a" * 64 + '"\n[image.thresholds]\nsexual = 0.5\n[ocr]\nversion = "none"\n',
-        '[image]\nversion = "v1"\nfile = "m.bin"\nsha256 = "' + "a" * 64 + '"\n[ocr]\nversion = "none"\n',
-        '[image]\nversion = "v1"\nfile = "m.bin"\nsha256 = "' + "a" * 64 + '"\n[image.thresholds]\nsexual = 1.5\n[ocr]\nversion = "none"\n',
-        '[image]\nversion = "v1"\nfile = "m.bin"\nsha256 = "' + "a" * 64 + '"\n[image.thresholds]\nsafe = 0.5\n[ocr]\nversion = "none"\n',
+        lock_body(sha256='"abc"'),
+        lock_body(file='"../m.safetensors"'),
+        lock_body(thresholds=None),
+        lock_body(thresholds="SEXUAL = 1.5"),
+        lock_body(thresholds="safe = 0.5"),
+        lock_body(arch=None),
+        lock_body(prompts=None),
+        lock_body(prompts='"../v1.toml"'),
+        lock_body(prompts_sha256='"abc"'),
+        lock_body(crop_to_content=None),
+        lock_body(crop_to_content='"yes"'),
     ],
-    ids=["syntax", "no-image", "bad-sha", "path-escape", "no-thresholds", "threshold-range", "safe-threshold"],
+    ids=[
+        "syntax", "no-image", "bad-sha", "path-escape", "no-thresholds", "threshold-range", "safe-threshold",
+        "no-arch", "no-prompts", "prompts-path-escape", "bad-prompts-sha", "no-crop", "crop-not-bool",
+    ],
 )
 def test_malformed_lock_is_rejected(tmp_path, body):
     path = tmp_path / "models.lock"

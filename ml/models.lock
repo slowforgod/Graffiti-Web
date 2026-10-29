@@ -4,16 +4,21 @@
 
 [image]
 # "none" until the first zero-shot model is chosen (D-37). The server then answers 503.
+# Every key below changes the scores, so changing any of them needs a new version and a new evaluation.
 version = "none"
-# uri = "s3://<bucket>/models/<version>/<file>"
-# file = "<file>"
+# arch = "ViT-B-32"                                    # open_clip architecture name
+# uri = "s3://<bucket>/models/<version>/open_clip_model.safetensors"
+# file = "open_clip_model.safetensors"                 # safetensors only, inside MODEL_DIR
 # sha256 = "<64 hex characters>"
+# prompts = "<version>.toml"                           # category sentences in ml/prompts/
+# prompts_sha256 = "<64 hex characters>"
+# crop_to_content = true                               # crop to the drawn part before scoring
 
-# Score at or above which a category flags the doodle. "safe" is never a flagging category.
+# Score at or above which a category flags the doodle. Category names follow docs/FILTER.md and must be
+# exactly the categories in the prompts file. Violence is not scored (D-37).
 # [image.thresholds]
-# sexual = 0.5
-# violence = 0.5
-# hate_symbol = 0.5
+# SEXUAL = 0.5
+# HATE = 0.5
 
 [ocr]
 # OCR engine is chosen in 07b (D-35).
