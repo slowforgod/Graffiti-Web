@@ -134,9 +134,26 @@ public record GraffitiProperties(
             @NotNull List<@NotBlank String> textChecks,
             @NotNull List<@NotBlank String> drawingChecks,
             @Positive int shrinkFontSize,
+            @NotNull @Valid Api chatkhu,
             @NotNull @Valid Ml ml) {
 
         @AssertTrue(message = "moderation timeout must be positive")
+        public boolean isTimeoutPositive() {
+            return isPositive(timeout);
+        }
+    }
+
+    /**
+     * An external moderation API (specs/07-moderation.md §5.4-5.5). A blank {@code apiKey} leaves its checks
+     * as stubs.
+     */
+    public record Api(
+            @NotBlank String baseUrl,
+            @NotBlank String model,
+            @NotNull Duration timeout,
+            @NotNull String apiKey) {
+
+        @AssertTrue(message = "api timeout must be positive")
         public boolean isTimeoutPositive() {
             return isPositive(timeout);
         }

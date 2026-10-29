@@ -110,7 +110,7 @@ PublishService (큐 밖)
 - 응답: `201 { doodle, cooldownEndsAt, shrunk: true }`. 다른 사용자에게는 줄어든 doodle이 `doodle:published`로 간다
 
 ### 5.4 ChatKHU 검사 (`ChatKhuTextCheck`)
-- `POST {base-url}/chat/completions/`, `Authorization: Bearer ${CHATKHU_API_KEY}`, `model = graffiti.moderation.chatkhu.model`, `temperature: 0`, `response_format: {"type": "json_object"}`
+- `POST {base-url}/chat/completions/`, `Authorization: Bearer ${CHATKHU_API_KEY}`, `model = graffiti.moderation.chatkhu.model`, `response_format: {"type": "json_object"}`. `temperature`는 보내지 않는다(gpt-5 계열은 기본값 외의 temperature를 거부할 수 있어서, 보내면 모든 검사가 ERROR가 될 위험)
 - 프롬프트: `resources/moderation/chatkhu-prompt.txt`(시스템 메시지). FILTER.md §1의 카테고리, 막음·통과 예시, "한글로 쓴 연락처와 주소는 PERSONAL_INFO", "@ 아이디는 통과"를 담는다. 사용자 글은 `<<<TEXT` / `TEXT>>>` 구분자 사이에 넣고, 글 안의 구분자 문자열은 지운다(SEC-05)
 - 응답 스키마 (D-42): `{"verdict": "PASS"|"BLOCK"|"REVIEW", "category": "PROFANITY"|"HATE"|"SEXUAL"|"PERSONAL_INFO"|null, "reason": "..."}`
   - `verdict`가 셋 중 하나가 아니거나, BLOCK·REVIEW에 카테고리가 없거나, 모르는 카테고리, 모르는 필드, 본문 16KB 초과 → ERROR

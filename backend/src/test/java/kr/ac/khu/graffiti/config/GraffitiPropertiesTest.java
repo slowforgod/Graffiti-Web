@@ -72,6 +72,10 @@ class GraffitiPropertiesTest {
                     .containsExactly("personal-info", "word-filter", "chatkhu", "openai-text");
             assertThat(p.moderation().drawingChecks()).containsExactly("openai-image");
             assertThat(p.moderation().shrinkFontSize()).isEqualTo(10);
+            assertThat(p.moderation().chatkhu().baseUrl())
+                    .isEqualTo("https://factchat-cloud.mindlogic.ai/v1/gateway");
+            assertThat(p.moderation().chatkhu().model()).isEqualTo("gpt-5.6-luna");
+            assertThat(p.moderation().chatkhu().timeout()).isEqualTo(Duration.ofSeconds(3));
             assertThat(p.moderation().ml().mode()).isEqualTo(GraffitiProperties.MlMode.SHADOW);
             assertThat(p.moderation().ml().baseUrl()).isEqualTo("http://ml:8000");
             assertThat(p.moderation().ml().timeout()).isEqualTo(Duration.ofSeconds(3));
@@ -147,6 +151,11 @@ class GraffitiPropertiesTest {
     @Test
     void rejectsShrinkFontSizeOutsideTheList() {
         assertStartupFails("graffiti.moderation.shrink-font-size=9");
+    }
+
+    @Test
+    void rejectsNonPositiveChatKhuTimeout() {
+        assertStartupFails("graffiti.moderation.chatkhu.timeout=0s");
     }
 
     @Test
