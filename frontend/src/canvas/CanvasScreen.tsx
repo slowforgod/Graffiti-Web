@@ -310,14 +310,18 @@ function PageCanvas({ page, link, me, onPageEnded: pageEnded, turnNotice }: Page
   }, [waitMs]);
 
   const publish = async () => {
-    const body = own && publishBody(own);
-    if (!body || publishing) {
+    if (!own || !publishBody(own) || publishing) {
       return;
     }
     setPublishing(true);
     setPublishError(null);
     try {
-      const result = await publishDoodle(page.id, body);
+      // A text goes with the box of its own font, which may still be loading (13).
+      const settling = tools.settle();
+      if (settling) {
+        await settling;
+      }
+      const result = await publishDoodle(page.id, publishBody(own)!);
       if (isHeld(result)) {
         setPublishError(PUBLISH_HELD);
       } else {
@@ -433,6 +437,8 @@ function PageCanvas({ page, link, me, onPageEnded: pageEnded, turnNotice }: Page
         onWidth={tools.setWidth}
         fontSize={tools.fontSize}
         onFontSize={tools.setFontSize}
+        font={tools.font}
+        onFont={tools.setFont}
         onMine={hasMine ? () => (mine.open ? mine.close() : void mine.show()) : undefined}
         mineOpen={mine.open}
         zoom={{

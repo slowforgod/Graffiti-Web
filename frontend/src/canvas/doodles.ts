@@ -14,7 +14,7 @@ export type Doodle =
       id: string;
       kind: 'TEXT';
       bbox: Rect;
-      payload: { v: number; text: string; c: number; size: number; x: number; y: number };
+      payload: { v: number; text: string; c: number; size: number; x: number; y: number; f?: string };
     };
 
 export async function fetchChunkDoodles(pageId: string, chunks: number[]): Promise<Doodle[]> {

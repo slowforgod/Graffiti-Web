@@ -9,7 +9,7 @@ export type PublishBody =
   | { kind: 'DRAWING'; payload: { v: 1; strokes: Stroke[] } }
   | {
       kind: 'TEXT';
-      payload: { v: 1; text: string; c: number; size: number; x: number; y: number };
+      payload: { v: 1; text: string; c: number; size: number; x: number; y: number; f: string };
       bbox: { w: number; h: number };
     };
 
@@ -36,8 +36,8 @@ export function publishBody(draft: Draft): PublishBody | null {
     return null;
   }
   if (draft.kind === 'TEXT') {
-    const { text, c, size, x, y, w, h } = draft;
-    return { kind: 'TEXT', payload: { v: 1, text, c, size, x, y }, bbox: { w, h } };
+    const { text, c, size, x, y, f, w, h } = draft;
+    return { kind: 'TEXT', payload: { v: 1, text, c, size, x, y, f }, bbox: { w, h } };
   }
   return { kind: 'DRAWING', payload: { v: 1, strokes: liveStrokes(draft).map(({ c, w, p }) => ({ c, w, p: [...p] })) } };
 }

@@ -1,12 +1,14 @@
+import { fontInfo, FONTS } from '../fonts/fonts';
 import type { ClientConfig } from '../shared/pageConfig';
 import type { Tool } from '../tools/useDraft';
+import FontPicker from './FontPicker';
 import { ICONS } from './icons';
 
 // Who may pick a drawing tool (API.md "작성자"): anyone signed in, consented and not banned, while connected.
 export type DrawAccess = 'loading' | 'anonymous' | 'consent' | 'banned' | 'offline' | 'ok';
 
 interface Props {
-  config: Pick<ClientConfig, 'palette' | 'strokeWidths' | 'fontSizes'>;
+  config: Pick<ClientConfig, 'palette' | 'strokeWidths' | 'fontSizes' | 'fonts'>;
   access: DrawAccess;
   tool: Tool;
   onTool: (tool: Tool) => void;
@@ -19,6 +21,8 @@ interface Props {
   onWidth: (w: number) => void;
   fontSize: number;
   onFontSize: (size: number) => void;
+  font: string;
+  onFont: (id: string) => void;
   // Opens the "내 낙서" panel (D-13); absent for people who cannot have doodles.
   onMine?: () => void;
   mineOpen?: boolean;
@@ -40,6 +44,11 @@ const ACCESS_HINT: Partial<Record<DrawAccess, string>> = {
   banned: '이용이 제한된 계정이에요.',
   offline: '연결 중이에요…',
 };
+
+// The server's fonts in its order, leaving out any this build has no files for.
+function pickable(ids: string[]) {
+  return ids.filter((id) => FONTS.some((f) => f.id === id)).map(fontInfo);
+}
 
 export default function Toolbar(props: Props) {
   const { config, access, tool, onTool, onLogin, draftKind } = props;
@@ -111,16 +120,19 @@ export default function Toolbar(props: Props) {
         </div>
       )}
       {tool === 'text' && (
-        <label className="toolbar-group">
-          글자 크기{' '}
-          <select value={props.fontSize} onChange={(e) => props.onFontSize(Number(e.target.value))}>
-            {config.fontSizes.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="toolbar-group">
+          <label>
+            글자 크기{' '}
+            <select value={props.fontSize} onChange={(e) => props.onFontSize(Number(e.target.value))}>
+              {config.fontSizes.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </label>
+          <FontPicker fonts={pickable(config.fonts)} value={props.font} onChange={props.onFont} />
+        </div>
       )}
       {props.onMine && (
         <div className="toolbar-group">

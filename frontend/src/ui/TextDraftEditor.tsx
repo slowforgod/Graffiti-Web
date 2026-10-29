@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { Viewport } from '../canvas/viewport';
 import type { TextDraft } from '../tools/draft';
-import { TEXT_FONT } from '../tools/textMeasure';
+import { fontInfo } from '../fonts/fonts';
 
 interface Props {
   draft: TextDraft;
@@ -31,7 +31,7 @@ export default function TextDraftEditor({ draft, color, viewport, onChange }: Pr
         width: draft.w * s + draft.size * s,
         height: draft.h * s,
         fontSize: draft.size * s,
-        fontFamily: TEXT_FONT,
+        fontFamily: fontInfo(draft.f).family,
         color,
       }}
     />

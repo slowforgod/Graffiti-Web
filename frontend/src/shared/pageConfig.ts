@@ -12,6 +12,11 @@ export interface ClientConfig {
   strokeWidths: number[];
   fontSizes: number[];
   defaultFontSize: number;
+  // Font ids in picker order and the one picked first (13); fonts/fonts.ts knows their files.
+  fonts: string[];
+  defaultFont: string;
+  // How wide a letter may be, in percent of the font size (D-31).
+  textWidthPercent: number;
   textMaxLength: number;
   maxBbox: number;
   maxChunks: number;
