@@ -135,6 +135,7 @@ public record GraffitiProperties(
             @NotNull List<@NotBlank String> drawingChecks,
             @Positive int shrinkFontSize,
             @NotNull @Valid Api chatkhu,
+            @NotNull @Valid Api openai,
             @NotNull @Valid Ml ml) {
 
         @AssertTrue(message = "moderation timeout must be positive")

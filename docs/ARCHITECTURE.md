@@ -350,6 +350,7 @@ ENFORCE에서 ML 결과를 하나의 검사(ml)로 합성 (07b 결정)
 | `graffiti.moderation.text-checks` | [personal-info, word-filter, chatkhu, openai-text] (순서대로, 없는 구현은 스텁) | D-19, 07 |
 | `graffiti.moderation.shrink-font-size` | 10. 욕설만 걸린 텍스트를 이 크기로 줄이고 bbox도 비례 축소해 게시. `doodle.font-sizes` 안의 값 | D-43 |
 | `graffiti.moderation.chatkhu.{base-url, model, timeout, api-key}` | https://factchat-cloud.mindlogic.ai/v1/gateway, gpt-5.6-luna, 3s, `${CHATKHU_API_KEY:}`. 키가 비면 `chatkhu`는 스텁 | 07 §5.4 |
+| `graffiti.moderation.openai.{base-url, model, timeout, api-key}` | https://api.openai.com/v1, omni-moderation-latest, 3s, `${OPENAI_API_KEY:}`. 키가 비면 `openai-text`, `openai-image`는 스텁. 그림은 `ml.render-max-side`로 렌더링한 PNG | 07 §5.5 |
 | `graffiti.moderation.drawing-checks` | [openai-image] | D-19 |
 | `graffiti.moderation.ml.mode` | SHADOW | D-34, D-39 |
 | `graffiti.moderation.ml.base-url` | http://ml:8000 (내부망) | D-36 |
