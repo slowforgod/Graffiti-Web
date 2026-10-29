@@ -63,7 +63,7 @@ graffiti:
   canvas:
     width: 7680
     height: 4320
-    zoom-min: 0.5
+    zoom-min: 0.1
     zoom-max: 4.0
     chunk-size: 480
     cell-size: 48
@@ -107,13 +107,13 @@ graffiti:
   post-cooldown: ${POST_COOLDOWN:0s}
   realtime:
     max-messages-per-second: 20
-    max-subscriptions: 60
+    max-subscriptions: 144
     inbound-message-max-bytes: 65536
     cursor-interval: 100ms   # the client sends its cursor at most this often
     draft-interval: 100ms    # the client sends new draft points at most this often (stays under max-messages-per-second)
     heartbeat: 10s           # STOMP heart-beat both ways; finds dead connections for cursor:leave
   query:
-    max-chunks: 60
+    max-chunks: 144
     max-batch-delete: 50
     admin-page-size-max: 100
   moderation:
