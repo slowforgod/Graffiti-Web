@@ -139,17 +139,19 @@ CREATE TABLE moderation_action (
 
 -- 자체 ML 모델 판정 기록 (D-39 평가 지표 계산용, D-40)
 -- 게시 트랜잭션과 분리해서 기록. 실패해도 게시 결과에 영향 없음 (INV-13)
-CREATE TABLE ml_prediction (
+CREATE TABLE ml_prediction (                                -- V6, 07b. 그림 doodle의 ML 분석 1회 = 1행
   id                 BIGINT       NOT NULL AUTO_INCREMENT,
-  doodle_id          BIGINT       NOT NULL,
-  model_version      VARCHAR(64)  NOT NULL,                  -- models.lock의 버전 이름
-  mode               ENUM('SHADOW','ENFORCE') NOT NULL,       -- 판정 당시 모드
-  outcome            ENUM('OK','TIMEOUT','ERROR') NOT NULL,   -- ML 서버 호출 결과
+  doodle_id          BIGINT       NOT NULL,                  -- 작성자 열은 없음 (SEC-17)
+  model_version      VARCHAR(64)  NULL,                      -- models.lock의 버전 이름 (outcome=OK일 때)
+  mode               ENUM('SHADOW','ENFORCE') NOT NULL,       -- 분석 당시 모드
+  outcome            ENUM('OK','TIMEOUT','ERROR') NOT NULL,   -- ML 서버 호출 결과 (렌더링 실패도 ERROR)
   image_label        ENUM('SAFE','FLAGGED') NULL,             -- 이미지 분류 판정 (outcome=OK일 때)
-  image_scores       JSON         NULL,                       -- 카테고리별 점수
-  ocr_text           VARCHAR(500) NULL,                       -- 손글씨에서 읽은 글자 (로그 출력 금지, SEC-17)
-  ocr_text_flagged   TINYINT(1)   NULL,                       -- OCR 글자의 텍스트 검사 결과
-  latency_ms         INT          NULL,
+  image_scores       JSON         NULL,                       -- 카테고리별 점수 {"SEXUAL":0.81,"HATE":0.04}
+  ocr_text           VARCHAR(500) NULL,                       -- 손글씨에서 읽은 글자, 500자에서 자름 (로그 출력 금지, SEC-17)
+  ocr_text_outcome   ENUM('NONE','PASS','REVIEW','BLOCK','ERROR','SKIPPED') NULL,  -- OCR 글자의 텍스트 검사 결과. NONE = 읽은 글자 없음
+  ocr_text_category  VARCHAR(40)  NULL,                       -- BLOCK, REVIEW일 때 FILTER 카테고리
+  ocr_confidence     DECIMAL(4,3) NULL,                       -- ML 서버가 돌려준 평균 신뢰도
+  latency_ms         INT          NULL,                       -- ML 서버가 잰 처리 시간
   created_at         DATETIME(3)  NOT NULL,
   PRIMARY KEY (id),
   KEY idx_mlp_doodle (doodle_id),
@@ -200,7 +202,7 @@ CREATE TABLE ml_prediction (
     { "check": "chatkhu", "outcome": "ERROR", "note": "TIMEOUT" },     // note: TIMEOUT, EXCEPTION, BAD_RESULT
     { "check": "openai-text", "outcome": "SKIPPED" }                  // SKIPPED = 아직 구현 안 된 검사(스텁)
   ],
-  "ml": { "check": "ml", "outcome": "BLOCK", "category": "SEXUAL", "mode": "SHADOW" },  // ml.mode가 OFF면 없음
+  "ml": { "check": "ml", "outcome": "BLOCK", "category": "SEXUAL", "mode": "ENFORCE" },  // ENFORCE의 그림만. SHADOW 결과는 ml_prediction에만
   "heldAsUnchecked": true                       // 실제 검사가 없어 unchecked=HOLD 설정으로 보류된 경우만
 }
 ```

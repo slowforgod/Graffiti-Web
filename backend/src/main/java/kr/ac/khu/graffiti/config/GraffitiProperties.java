@@ -135,12 +135,17 @@ public record GraffitiProperties(
         }
     }
 
-    /** {@code flagThreshold} is decided per model version by evaluation (D-37, D-39), so it may be unset. */
+    /**
+     * The ML server (D-40). Its image label comes from the thresholds in {@code ml/models.lock}, not from here.
+     * {@code maxInFlight} caps the SHADOW analyses running in the background; {@code renderMaxSide} is the
+     * longest side of the PNG a drawing is rendered to.
+     */
     public record Ml(
             @NotNull MlMode mode,
             @NotBlank String baseUrl,
             @NotNull Duration timeout,
-            @Positive @DecimalMax("1.0") Double flagThreshold) {
+            @Positive int maxInFlight,
+            @Positive int renderMaxSide) {
 
         @AssertTrue(message = "ml timeout must be positive")
         public boolean isTimeoutPositive() {

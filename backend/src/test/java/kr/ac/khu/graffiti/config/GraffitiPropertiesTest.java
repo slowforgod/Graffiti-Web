@@ -73,7 +73,8 @@ class GraffitiPropertiesTest {
             assertThat(p.moderation().ml().mode()).isEqualTo(GraffitiProperties.MlMode.SHADOW);
             assertThat(p.moderation().ml().baseUrl()).isEqualTo("http://ml:8000");
             assertThat(p.moderation().ml().timeout()).isEqualTo(Duration.ofSeconds(3));
-            assertThat(p.moderation().ml().flagThreshold()).isNull();
+            assertThat(p.moderation().ml().maxInFlight()).isEqualTo(4);
+            assertThat(p.moderation().ml().renderMaxSide()).isEqualTo(1024);
 
             assertThat(p.auth().allowedDomain()).isEqualTo("khu.ac.kr");
             assertThat(p.auth().sessionTimeout()).isEqualTo(Duration.ofDays(30));
