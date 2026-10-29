@@ -31,11 +31,15 @@ class WordListTest {
     }
 
     @Test
-    void theShippedListsAreEmptyUntilTheCriteriaAreSettled() {
+    void theShippedListsBlockEachCategoryAndExcuseEverydayWords() {
         WordFilterCheck shipped = new WordFilterCheck();
 
-        assertThat(shipped.check(new ModerationInput("TEXT", "아무 말", "{}")).outcome())
-                .isEqualTo(CheckOutcome.SKIPPED);
+        assertThat(shipped.check(text("시 발 진짜"))).isEqualTo(CheckResult.block("word-filter", "PROFANITY"));
+        assertThat(shipped.check(text("한남충 꺼져"))).isEqualTo(CheckResult.block("word-filter", "HATE"));
+        assertThat(shipped.check(text("몸캠 할 사람"))).isEqualTo(CheckResult.block("word-filter", "SEXUAL"));
+        assertThat(shipped.check(text("시발점에서 만나"))).isEqualTo(CheckResult.pass("word-filter"));
+        assertThat(shipped.check(text("새끼손가락 걸고 약속"))).isEqualTo(CheckResult.pass("word-filter"));
+        assertThat(shipped.check(text("경영 23 화이팅"))).isEqualTo(CheckResult.pass("word-filter"));
     }
 
     @Test
@@ -46,6 +50,10 @@ class WordListTest {
         assertThat(check.check(new ModerationInput("TEXT", "ㅎㅇ 시발", "{}")))
                 .isEqualTo(CheckResult.block("word-filter", "PROFANITY"));
         assertThat(check.check(new ModerationInput("DRAWING", null, "{}")).outcome()).isEqualTo(CheckOutcome.SKIPPED);
+    }
+
+    private static ModerationInput text(String text) {
+        return new ModerationInput("TEXT", text, "{}");
     }
 
     @Test
