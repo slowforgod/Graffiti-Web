@@ -68,7 +68,7 @@
 |---|---|---|---|
 | GET | `/api/pages/current` | 공개 | 현재 페이지 정보와 클라이언트용 설정값 |
 | GET | `/api/pages/{pageId}/minimap` | 공개 | 점유율 비트맵 (현재 페이지만) |
-| GET | `/api/pages/{pageId}/doodles?chunks=0,1,17` | 공개 | 청크별 게시된 doodle (현재 페이지만, 최대 60청크) |
+| GET | `/api/pages/{pageId}/doodles?chunks=0,1,17` | 공개 | 청크별 게시된 doodle (현재 페이지만, 최대 144청크) |
 
 `GET /api/pages/current`
 ```json
@@ -81,12 +81,12 @@
   "serverTime": "2026-10-21T04:12:33.120Z",
   "config": {
     "width": 7680, "height": 4320, "chunkSize": 480, "cellSize": 48,
-    "zoomMin": 0.5, "zoomMax": 4.0,
+    "zoomMin": 0.1, "zoomMax": 4.0,
     "palette": ["#000000", "#FFFFFF", "..."], "strokeWidthMin": 2, "strokeWidthMax": 16, "defaultStrokeWidth": 4,
     "fontSizes": [10,11,12,13,14,15,16,20,24,32,36,40,48,64,96], "defaultFontSize": 24,
     "fonts": ["pretendard", "gowun-dodum", "galmuri", "jalnan", "kyobo-hand", "cafe24-ssurround"],
     "defaultFont": "pretendard", "textWidthPercent": 125,
-    "textMaxLength": 50, "maxBbox": 1024, "maxChunks": 60,
+    "textMaxLength": 50, "maxBbox": 1024, "maxChunks": 144,
     "postCooldownSec": 1800, "countdownWarningSec": 300, "draftIdleTimeoutSec": 600,
     "cursorIntervalMs": 100, "draftIntervalMs": 100, "heartbeatMs": 10000,
     "countdownThresholdPermille": 700, "countdownDurationSec": 21600
@@ -194,7 +194,7 @@
 - 엔드포인트: `wss://<도메인>/ws` (네이티브 WebSocket, SockJS 없음)
 - 핸드셰이크 때 세션 쿠키로 사용자를 식별합니다. 비로그인도 연결과 구독은 가능하고, 전송(SEND)은 `작성자` 권한이 필요합니다.
 - `Origin` 헤더가 `APP_ORIGIN`과 다르면 연결을 거절합니다(SEC-03).
-- 인바운드 메시지 최대 64KB(D-27), 세션당 구독 최대 61개(청크 60 + 메타 1, D-30)
+- 인바운드 메시지 최대 64KB(D-27), 세션당 구독 최대 145개(청크 144 + 메타 1, D-30)
 - 하트비트는 양방향 `heartbeatMs`(페이지 설정, 기본 10초)입니다. 클라이언트는 `/api/pages/current`의 `config.heartbeatMs`를 씁니다.
 
 ### 구독 (SUBSCRIBE)

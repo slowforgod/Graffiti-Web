@@ -152,18 +152,19 @@ class RealtimeIT extends WebIntegrationTest {
     }
 
     @Test
-    void aViewOfSixtyChunksAndThePageTopicFitsAndOneMoreIsRefused() throws Exception {
+    void aViewOfTheWholeCanvasAndThePageTopicFitsAndOneMoreIsRefused() throws Exception {
         Client anonymous = connect(null, ORIGIN);
         List<StompSession.Subscription> subs = new ArrayList<>();
         subs.add(anonymous.subscribe(meta()));
-        for (int i = 0; i < 60; i++) {
+        for (int i = 0; i < 144; i++) {
             subs.add(anonymous.subscribe(chunk(i)));
         }
         subs.get(1).unsubscribe();
-        anonymous.subscribe(chunk(60));
+        anonymous.subscribe(chunk(0));
         assertThat(anonymous.errors.poll(1, TimeUnit.SECONDS)).isNull();
 
-        anonymous.trySubscribe(chunk(61));
+        // A second subscription to a chunk already followed still counts.
+        anonymous.trySubscribe(chunk(1));
         assertThat(anonymous.nextError()).isEqualTo("RATE_LIMITED");
     }
 

@@ -319,7 +319,7 @@ ENFORCE에서 ML 결과를 하나의 검사(ml)로 합성 (07b 결정)
 | 키 | 기본값 | 근거 |
 |---|---|---|
 | `graffiti.canvas.width` / `height` | 7680 / 4320 | D-05 |
-| `graffiti.canvas.zoom-min` / `zoom-max` | 0.5 / 4.0 | D-05 |
+| `graffiti.canvas.zoom-min` / `zoom-max` | 0.1 / 4.0 | D-05 |
 | `graffiti.canvas.chunk-size` | 480 | D-06 |
 | `graffiti.canvas.cell-size` | 48 | D-06 |
 | `graffiti.page.countdown-threshold` | 0.70 | D-15 |
@@ -339,12 +339,12 @@ ENFORCE에서 ML 결과를 하나의 검사(ml)로 합성 (07b 결정)
 | `graffiti.doodle.draft-idle-timeout` | 10m | D-11 |
 | `graffiti.post-cooldown` | 30m | D-12 |
 | `graffiti.realtime.max-messages-per-second` | 20 | D-12 |
-| `graffiti.realtime.max-subscriptions` | 61 (`query.max-chunks` + 메타 1보다 작으면 시작 실패) | D-30 |
+| `graffiti.realtime.max-subscriptions` | 145 (`query.max-chunks` + 메타 1보다 작으면 시작 실패) | D-30 |
 | `graffiti.realtime.inbound-message-max-bytes` | 65536 (STOMP 프레임 한도와 WebSocket 컨테이너 버퍼에 같이 사용) | D-27 |
 | `graffiti.realtime.cursor-interval` | 100ms (클라이언트 커서 전송 간격, `cursorIntervalMs`) | 04 |
 | `graffiti.realtime.draft-interval` | 100ms (클라이언트 초안 전송 간격, `draftIntervalMs`. 초당 20회 한도 안) | 05, D-12 |
 | `graffiti.realtime.heartbeat` | 10s (STOMP 양방향 하트비트, `heartbeatMs`) | 04 |
-| `graffiti.query.max-chunks` / `max-batch-delete` | 60 / 50 | D-30 |
+| `graffiti.query.max-chunks` / `max-batch-delete` | 144 / 50 | D-30 |
 | `graffiti.query.admin-page-size-max` | 100 (관리자 목록 한 번의 최대 개수) | 07 틀 |
 | `graffiti.web.admin-requests-per-second` | 20 (관리자 한 명의 `/api/admin/**` 요청, 초당) | SEC-08/09, 11 |
 | `graffiti.web.write-requests-per-second` | 10 (로그인 사용자 한 명의 그 밖의 `/api/**` POST·PUT·PATCH·DELETE, 초당) | SEC-08/09, 11 |

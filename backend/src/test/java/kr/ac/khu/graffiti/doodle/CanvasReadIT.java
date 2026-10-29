@@ -83,7 +83,7 @@ class CanvasReadIT extends WebIntegrationTest {
                 .andExpect(jsonPath("$.config.height").value(4320))
                 .andExpect(jsonPath("$.config.chunkSize").value(480))
                 .andExpect(jsonPath("$.config.cellSize").value(48))
-                .andExpect(jsonPath("$.config.zoomMin").value(0.5))
+                .andExpect(jsonPath("$.config.zoomMin").value(0.1))
                 .andExpect(jsonPath("$.config.zoomMax").value(4.0))
                 .andExpect(jsonPath("$.config.palette.length()").value(12))
                 .andExpect(jsonPath("$.config.strokeWidthMin").value(2))
@@ -96,7 +96,7 @@ class CanvasReadIT extends WebIntegrationTest {
                 .andExpect(jsonPath("$.config.defaultFontSize").value(24))
                 .andExpect(jsonPath("$.config.textMaxLength").value(50))
                 .andExpect(jsonPath("$.config.maxBbox").value(1024))
-                .andExpect(jsonPath("$.config.maxChunks").value(60))
+                .andExpect(jsonPath("$.config.maxChunks").value(144))
                 .andExpect(jsonPath("$.config.postCooldownSec").value(1800))
                 .andExpect(jsonPath("$.config.countdownWarningSec").value(300))
                 .andExpect(jsonPath("$.config.draftIdleTimeoutSec").value(600))
@@ -161,8 +161,10 @@ class CanvasReadIT extends WebIntegrationTest {
 
     @Test
     void chunkLookupRejectsBadChunkLists() throws Exception {
-        String sixtyOne = IntStream.rangeClosed(0, 60).mapToObj(Integer::toString).collect(Collectors.joining(","));
-        for (String chunks : new String[] {sixtyOne, "144", "a", "0) OR (1=1", ""}) {
+        // One more than max-chunks (144): the count is checked before duplicates are dropped.
+        String tooMany = IntStream.rangeClosed(0, 144).mapToObj(i -> Integer.toString(i % 144))
+                .collect(Collectors.joining(","));
+        for (String chunks : new String[] {tooMany, "144", "a", "0) OR (1=1", ""}) {
             expectError(mvc.perform(get("/api/pages/{p}/doodles", page.id()).param("chunks", chunks)), 400,
                     "VALIDATION_FAILED").andExpect(jsonPath("$.error.details.field").value("chunks"));
         }

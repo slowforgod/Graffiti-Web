@@ -33,7 +33,7 @@ class GraffitiPropertiesTest {
 
             assertThat(p.canvas().width()).isEqualTo(7680);
             assertThat(p.canvas().height()).isEqualTo(4320);
-            assertThat(p.canvas().zoomMin()).isEqualTo(0.5);
+            assertThat(p.canvas().zoomMin()).isEqualTo(0.1);
             assertThat(p.canvas().zoomMax()).isEqualTo(4.0);
             assertThat(p.canvas().chunkSize()).isEqualTo(480);
             assertThat(p.canvas().cellSize()).isEqualTo(48);
@@ -57,13 +57,13 @@ class GraffitiPropertiesTest {
             assertThat(p.postCooldown()).isEqualTo(Duration.ZERO);
 
             assertThat(p.realtime().maxMessagesPerSecond()).isEqualTo(20);
-            assertThat(p.realtime().maxSubscriptions()).isEqualTo(61);
+            assertThat(p.realtime().maxSubscriptions()).isEqualTo(145);
             assertThat(p.realtime().inboundMessageMaxBytes()).isEqualTo(65_536);
             assertThat(p.realtime().cursorInterval()).isEqualTo(Duration.ofMillis(100));
             assertThat(p.realtime().draftInterval()).isEqualTo(Duration.ofMillis(100));
             assertThat(p.realtime().heartbeat()).isEqualTo(Duration.ofSeconds(10));
 
-            assertThat(p.query().maxChunks()).isEqualTo(60);
+            assertThat(p.query().maxChunks()).isEqualTo(144);
             assertThat(p.query().maxBatchDelete()).isEqualTo(50);
             assertThat(p.query().adminPageSizeMax()).isEqualTo(100);
 
