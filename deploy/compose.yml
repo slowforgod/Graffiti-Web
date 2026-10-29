@@ -35,6 +35,8 @@ services:
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?set GOOGLE_CLIENT_ID in .env}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?set GOOGLE_CLIENT_SECRET in .env}
+      # Blank leaves the check a stub (specs/07-moderation.md §5.4)
+      CHATKHU_API_KEY: ${CHATKHU_API_KEY:-}
     mem_limit: 1g
     depends_on:
       mysql:
