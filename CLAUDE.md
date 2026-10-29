@@ -54,7 +54,7 @@ CI(`.github/workflows/ci.yml`)는 PR과 main push마다 backend `./gradlew test`
 ### 배포 설정 (`/gf-deploy-check`가 읽음)
 - 운영 URL: (12b에서 기입) / 스테이징 URL: 저장소 변수 `STAGING_HOST` (서버 준비 후 기입, `deploy/README.md`)
 - 헬스체크: `/actuator/health`
-- 배포 방식: main 머지 → CI 통과 → `.github/workflows/deploy.yml`이 GHCR에 `graffiti-app`, `graffiti-web` 이미지(태그 = 커밋 SHA) push → `STAGING_HOST`가 있으면 EC2 `/opt/graffiti`에서 `docker compose pull && up -d`
+- 배포 방식: main 머지 → CI 통과 → `.github/workflows/deploy.yml`이 GHCR에 `graffiti-app`, `graffiti-web`, `graffiti-ml` 이미지(태그 = 커밋 SHA) push → `STAGING_HOST`가 있으면 EC2 `/opt/graffiti`에서 `docker compose pull && up -d`
 - 배포 구성 파일: `deploy/` (Dockerfile 2개, `compose.yml`, nginx 설정, 준비 절차 `README.md`)
 - 환경변수 목록: `.env.example` (값은 GitHub Secrets와 EC2의 `/opt/graffiti/.env`에만)
 

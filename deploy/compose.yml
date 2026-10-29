@@ -40,6 +40,18 @@ services:
       mysql:
         condition: service_healthy
 
+  # ML moderation server (07b, D-40). Weights are copied to /opt/graffiti/models by a person (README §8);
+  # without them it answers 503 and the app records the drawings as ML errors (INV-13).
+  ml:
+    image: ${IMAGE_PREFIX}-ml:${IMAGE_TAG}
+    restart: unless-stopped
+    # No ports and no nginx route: only the app reaches it on the Docker network (SEC-17).
+    environment:
+      TORCH_THREADS: "2"
+    volumes:
+      - ./models:/models:ro
+    mem_limit: 1536m
+
   mysql:
     image: mysql:8.4.9
     restart: unless-stopped
