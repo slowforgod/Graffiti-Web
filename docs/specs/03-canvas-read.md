@@ -164,6 +164,14 @@ critical gap: 0
 - 응답 DTO에 `authorId`를 넣지 않는다. SELECT에도 `author_id`를 포함하지 않는다
 - 프론트 수치는 `config`에서만. 디바운스 같은 UI 타이밍 상수는 캔버스 규칙 수치가 아니므로 모듈 상수로 둔다
 
+## 9a. 이후 변경: 배경 (2026-10-29)
+- 격자 대신 종이 질감(`canvas/wallpaper.jpg`)을 페이지 전체에 원래 크기로 반복해 깐다 (PR #68, #70)
+- 그 위, 모든 doodle 아래에 가운데 그림(`canvas/background.png`, 원본 `frontend/designs/Background.png`, 1441×1225 투명 PNG, 256색으로 줄여 918KB → 130KB)을 불투명도 20%로 둔다 (현 요청)
+  - 크기: 비율을 유지하며 페이지의 60% 상자 안에 맞춤(7680×4320이면 높이 2592, 약 1.8배 확대). 페이지 전체에 맞추면 3.5배 확대라 흐려져서 60%로 정함. 수치는 `PaperBackground.tsx`의 `CENTER_PICTURE_FIT`, `CENTER_PICTURE_OPACITY` (캔버스 규칙 수치가 아닌 화면 장식이라 config에 넣지 않음)
+  - 순서: 같은 배경 레이어에서 종이 질감 `Rect` 다음에 그려서 질감이 그림을 가리지 않는다. 배경 레이어는 `listening={false}`라 입력을 받지 않는다
+  - 낙서 데이터·게시·검사 이미지에는 들어가지 않는다: 게시 payload는 획·글자만 담고, 검사 이미지(07b)는 서버가 payload로 그리며, PNG 저장(08 `mine/png.ts`)도 doodle만 그린다
+  - 테스트: `PaperBackground.test.ts`가 맞춤 크기와 가운데 위치를 확인
+
 ## 10. 롤백
 PR revert. `V4__doodle.sql`은 빈 테이블 두 개만 만든다. 배포 후 되돌려야 하면 Flyway 기록이 남으므로 revert 대신 다음 마이그레이션에서 처리(06이 같은 테이블을 쓰므로 실제로는 되돌릴 일이 없음).
 
