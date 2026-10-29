@@ -1,6 +1,6 @@
 # 07-moderation: 실제 텍스트·그림 검사 (개인정보, 욕설 축소, ChatKHU, OpenAI)
 
-- **상태**: IN_PROGRESS (PR 1: 개인정보 + 축소 + 미검사 게시)
+- **상태**: MERGED (#63 명세, #67 구현. 실제 키로 하는 QA는 남음)
 - **승인자**: 현 (slowforgod) / 승인일: 2026-10-29 (스레드 요청 "작업해", §11은 추천안대로. 1번은 D-42 수정 반영)
 - **브랜치**: 구현은 PR 3개로 나눈다. `feat/07-personal-info-shrink`, `feat/07-chatkhu`, `feat/07-openai`
 - **선행 명세**: 07-moderation-frame(MERGED, PR #40), 07b-ml-moderation(PR #61 머지)
@@ -197,7 +197,7 @@ critical gap: 0
 | 단위 | 축소 계산, 10pt 이하, 상한 경계, 여러 줄 | `TextShrinkerTest` |
 | 단위 | ChatKHU 요청 본문(구분자), 응답 파싱 모든 오류, 상태 코드 | `ChatKhuTextCheckTest` (JDK `HttpServer` 가짜 서버, `MlModerationProviderTest`와 같은 방식) |
 | 단위 | OpenAI 카테고리 대응, 이미지 data URL, 오류 | `OpenAiTextCheckTest`, `OpenAiImageCheckTest` |
-| 통합 | 축소 게시 저장·점유율·브로드캐스트, 개인정보 거부, 외부 검사 실패 → `UNCHECKED` 게시 | `PublishIT` (가짜 ChatKHU·OpenAI 서버를 `@DynamicPropertySource`로) |
+| 통합 | 축소 게시 저장·점유율·브로드캐스트, 개인정보 거부, 외부 검사 실패 → `UNCHECKED` 게시 | `PublishIT`, `ExternalChecksIT` (가짜 ChatKHU·OpenAI 서버를 `@DynamicPropertySource`로, `unchecked=HOLD`) |
 | 컴포넌트 | 축소 안내 | `CanvasScreen.test` |
 | QA | 실제 키로 FILTER.md 예시 전부를 로컬에서 게시해 보고 결과 표를 이 명세 QA 기록에 남김 (키는 현이 `.env`에) | 수동 |
 
