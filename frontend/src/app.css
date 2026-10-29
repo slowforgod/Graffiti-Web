@@ -266,6 +266,7 @@ body {
   z-index: 11;
   margin: 0;
   padding: 0;
+  box-sizing: content-box;
   border: 1px dashed #5c6bc0;
   background: transparent;
   line-height: 1;
