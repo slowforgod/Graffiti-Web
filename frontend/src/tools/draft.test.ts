@@ -92,7 +92,7 @@ describe('moving a draft', () => {
     const d = newDrawing('a');
     const i = startStroke(d, { x: 100, y: 100 }, 0, 4, LIMITS)!;
     extendStroke(d, i, { x: 110, y: 105 }, LIMITS);
-    expect(moveDraft(d, 20.4, -9.6, LIMITS)).toBe(true);
+    expect(moveDraft(d, 20.4, -9.6, LIMITS)).toEqual({ x: 20, y: -10 });
     expect(d.strokes[i]!.p).toEqual([120, 90, 130, 95]);
   });
 
@@ -100,9 +100,9 @@ describe('moving a draft', () => {
     const d = newDrawing('a');
     startStroke(d, { x: 10, y: 10 }, 0, 4, LIMITS);
     // The bbox starts at 8 (half the width), so it can go 8px left and no further.
-    expect(moveDraft(d, -50, 0, LIMITS)).toBe(true);
+    expect(moveDraft(d, -50, 0, LIMITS)).toEqual({ x: -8, y: 0 });
     expect(draftBounds(d)!.x).toBe(0);
-    expect(moveDraft(d, -5, 0, LIMITS)).toBe(false);
+    expect(moveDraft(d, -5, 0, LIMITS)).toBeNull();
   });
 
   it('moves a text by its corner', () => {

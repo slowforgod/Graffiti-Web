@@ -151,21 +151,21 @@ export function eraseAt(draft: DrawingDraft, p: Point, radius: number): number[]
 }
 
 // Moves the whole draft by (dx, dy), rounded to whole pixels and cut short so it stays on the canvas.
-// Returns false when it could not move at all.
-export function moveDraft(draft: Draft, dx: number, dy: number, limits: Limits): boolean {
+// Returns how far it moved, or null when it could not move at all.
+export function moveDraft(draft: Draft, dx: number, dy: number, limits: Limits): Point | null {
   const bounds = draftBounds(draft);
   if (!bounds || !Number.isFinite(dx) || !Number.isFinite(dy)) {
-    return false;
+    return null;
   }
   const mx = Math.round(Math.min(Math.max(dx, -bounds.x), limits.width - bounds.x - bounds.w));
   const my = Math.round(Math.min(Math.max(dy, -bounds.y), limits.height - bounds.y - bounds.h));
   if (mx === 0 && my === 0) {
-    return false;
+    return null;
   }
   if (draft.kind === 'TEXT') {
     draft.x += mx;
     draft.y += my;
-    return true;
+    return { x: mx, y: my };
   }
   for (const s of draft.strokes) {
     for (let i = 0; s && i + 1 < s.p.length; i += 2) {
@@ -173,7 +173,7 @@ export function moveDraft(draft: Draft, dx: number, dy: number, limits: Limits):
       s.p[i + 1]! += my;
     }
   }
-  return true;
+  return { x: mx, y: my };
 }
 
 export function liveStrokes(draft: DrawingDraft): DraftStroke[] {
