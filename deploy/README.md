@@ -77,6 +77,23 @@ docker compose --env-file .env --env-file image.env up -d
 
 DB 마이그레이션이 들어간 커밋은 되돌려도 스키마가 남습니다. 12a 스테이징 데이터는 버려도 됩니다.
 
+## 8. ML 서버 가중치 (07b)
+`ml` 컨테이너는 `/opt/graffiti/models`의 파일만 읽고 내려받지 않습니다(SEC-17). 파일이 없거나 `ml/models.lock`의 sha256과 다르면 `/health`가 503이고, 앱은 그림마다 `ml_prediction`에 `ERROR`를 남길 뿐 게시는 그대로 됩니다(INV-13).
+
+1. Mac에서 `ml/models.lock`의 `[image]`와 `[ocr]`에 적힌 파일을 준비합니다(`ml/README.md`). 이름은 lock의 `file` 그대로입니다
+2. 서버에 복사합니다
+   ```bash
+   ssh <배포 사용자>@<도메인> 'mkdir -p /opt/graffiti/models'
+   scp open_clip_model.safetensors craft_mlt_25k.pth korean_g2.pth <배포 사용자>@<도메인>:/opt/graffiti/models/
+   ```
+3. `docker compose --env-file .env --env-file image.env restart ml` 후, 서버 안에서 확인합니다
+   ```bash
+   docker compose --env-file .env --env-file image.env exec app curl -fsS http://ml:8000/health
+   ```
+   `"status":"UP"`과 lock의 버전이 나오면 됩니다. `ml`은 포트를 열지 않으므로 바깥에서는 보이지 않습니다
+
+S3 버킷이 정해지면 이 복사 단계를 스크립트로 바꿉니다.
+
 ## 로컬에서 같은 구성 확인하기
 ```bash
 (cd backend && ./gradlew bootJar) && (cd frontend && npm ci && npm run build)
