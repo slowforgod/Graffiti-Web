@@ -19,7 +19,8 @@ public final class DoodleValidator {
     private static final int LINE_HEIGHT_TENTHS = 14;
 
     /** The page's sizes and the doodle limits from configuration. */
-    public record Limits(CellGeometry geometry, int chunkSize, int paletteSize, List<Integer> strokeWidths,
+    public record Limits(CellGeometry geometry, int chunkSize, int paletteSize, int minStrokeWidth,
+            int maxStrokeWidth,
             List<Integer> fontSizes, int maxBbox, int textMaxLength) {
     }
 
@@ -90,7 +91,7 @@ public final class DoodleValidator {
                 throw invalid("strokes", "required");
             }
             color(s.c(), limits);
-            if (s.w() == null || !limits.strokeWidths().contains(s.w())) {
+            if (s.w() == null || s.w() < limits.minStrokeWidth() || s.w() > limits.maxStrokeWidth()) {
                 throw invalid("w", "not_allowed");
             }
             int[] p = s.p();

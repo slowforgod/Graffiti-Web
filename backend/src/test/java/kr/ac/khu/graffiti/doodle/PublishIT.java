@@ -361,7 +361,7 @@ class PublishIT extends WebIntegrationTest {
                 bad("{\"kind\": \"DRAWING\", \"payload\": {\"v\": 1, \"strokes\": [{\"c\": 0, \"w\": 2, \"p\": [1, 2, 3]}]}}", "p"),
                 bad("{\"kind\": \"DRAWING\", \"payload\": {\"v\": 1, \"strokes\": [{\"c\": 0, \"w\": 2, \"p\": [7680, 2]}]}}", "p"),
                 bad("{\"kind\": \"DRAWING\", \"payload\": {\"v\": 1, \"strokes\": [{\"c\": 12, \"w\": 2, \"p\": [1, 2]}]}}", "c"),
-                bad("{\"kind\": \"DRAWING\", \"payload\": {\"v\": 1, \"strokes\": [{\"c\": 0, \"w\": 3, \"p\": [1, 2]}]}}", "w"),
+                bad("{\"kind\": \"DRAWING\", \"payload\": {\"v\": 1, \"strokes\": [{\"c\": 0, \"w\": 17, \"p\": [1, 2]}]}}", "w"),
                 bad("{\"kind\": \"DRAWING\", \"payload\": {\"v\": 1, \"strokes\": [{\"c\": 0, \"w\": 2, \"p\": [0, 0, 1100, 0]}]}}", "strokes"),
                 bad("{\"kind\": \"DRAWING\", \"payload\": {\"v\": 1, \"strokes\": [{\"c\": 0, \"w\": 2, \"p\": [1.5, 2]}]}}", "body"),
                 bad("{\"kind\": \"DRAWING\", \"payload\": {\"v\": 1, \"strokes\": [{\"c\": \"0\", \"w\": 2, \"p\": [1, 2]}]}}", "body"),

@@ -46,7 +46,8 @@ class GraffitiPropertiesTest {
             assertThat(p.doodle().maxBbox()).isEqualTo(1024);
             assertThat(p.doodle().maxPayloadBytes()).isEqualTo(2_097_152);
             assertThat(p.doodle().palette()).hasSize(12);
-            assertThat(p.doodle().strokeWidths()).containsExactly(2, 4, 8, 16);
+            assertThat(p.doodle().strokeWidth())
+                    .isEqualTo(new GraffitiProperties.StrokeWidth(2, 16, 4));
             assertThat(p.doodle().fontSizes())
                     .containsExactly(10, 11, 12, 13, 14, 15, 16, 20, 24, 32, 36, 40, 48, 64, 96);
             assertThat(p.doodle().defaultFontSize()).isEqualTo(24);

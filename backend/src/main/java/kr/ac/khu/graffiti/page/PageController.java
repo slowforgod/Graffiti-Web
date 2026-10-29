@@ -43,7 +43,8 @@ class PageController {
         GraffitiProperties.Doodle doodle = props.doodle();
         return new ClientConfig(page.geometry().width(), page.geometry().height(), page.chunkSize(),
                 page.geometry().cellSize(), props.canvas().zoomMin(), props.canvas().zoomMax(),
-                doodle.palette(), doodle.strokeWidths(), doodle.fontSizes(), doodle.defaultFontSize(),
+                doodle.palette(), doodle.strokeWidth().min(), doodle.strokeWidth().max(),
+                doodle.strokeWidth().defaultWidth(), doodle.fontSizes(), doodle.defaultFontSize(),
                 doodle.textMaxLength(), doodle.maxBbox(), props.query().maxChunks(),
                 props.postCooldown().toSeconds(), props.page().countdownWarning().toSeconds(),
                 doodle.draftIdleTimeout().toSeconds(), props.realtime().cursorInterval().toMillis(),
@@ -57,7 +58,8 @@ class PageController {
     }
 
     record ClientConfig(int width, int height, int chunkSize, int cellSize, double zoomMin, double zoomMax,
-            List<String> palette, List<Integer> strokeWidths, List<Integer> fontSizes, int defaultFontSize,
+            List<String> palette, int strokeWidthMin, int strokeWidthMax, int defaultStrokeWidth,
+            List<Integer> fontSizes, int defaultFontSize,
             int textMaxLength, int maxBbox, int maxChunks, long postCooldownSec, long countdownWarningSec,
             long draftIdleTimeoutSec, long cursorIntervalMs, long draftIntervalMs, long heartbeatMs,
             int countdownThresholdPermille, long countdownDurationSec) {

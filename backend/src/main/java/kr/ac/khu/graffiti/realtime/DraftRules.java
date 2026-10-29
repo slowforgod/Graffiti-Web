@@ -17,8 +17,8 @@ public final class DraftRules {
     public enum Kind { DRAWING, TEXT }
 
     /** Sizes of the current page and the doodle limits from configuration. */
-    public record Limits(int width, int height, int chunkSize, int paletteSize, List<Integer> strokeWidths,
-            int maxBbox) {
+    public record Limits(int width, int height, int chunkSize, int paletteSize, int minStrokeWidth,
+            int maxStrokeWidth, int maxBbox) {
     }
 
     /** A rectangle {@code [x, x + w) x [y, y + h)} in world pixels. */
@@ -97,7 +97,7 @@ public final class DraftRules {
         if (m.c() < 0 || m.c() >= limits.paletteSize()) {
             throw new IllegalArgumentException("c");
         }
-        if (!limits.strokeWidths().contains(m.w())) {
+        if (m.w() == null || m.w() < limits.minStrokeWidth() || m.w() > limits.maxStrokeWidth()) {
             throw new IllegalArgumentException("w");
         }
         int[] p = m.points();

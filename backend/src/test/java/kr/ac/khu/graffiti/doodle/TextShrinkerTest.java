@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 
 class TextShrinkerTest {
 
-    private static final Limits LIMITS = new Limits(new CellGeometry(4096, 4096, 16), 512, 12, List.of(2, 4, 8, 16),
+    private static final Limits LIMITS = new Limits(new CellGeometry(4096, 4096, 16), 512, 12, 2, 16,
             List.of(10, 12, 24, 96), 1024, 50);
 
     @Test

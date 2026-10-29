@@ -88,7 +88,7 @@ public record GraffitiProperties(
             @Positive int maxBbox,
             @Positive int maxPayloadBytes,
             @NotEmpty List<@NotNull @Pattern(regexp = "#[0-9A-Fa-f]{6}") String> palette,
-            @NotEmpty List<@NotNull @Positive Integer> strokeWidths,
+            @NotNull @Valid StrokeWidth strokeWidth,
             @NotEmpty List<@NotNull @Positive Integer> fontSizes,
             @Positive int defaultFontSize,
             @Positive int textMaxLength,
@@ -102,6 +102,15 @@ public record GraffitiProperties(
         @AssertTrue(message = "draft-idle-timeout must be positive")
         public boolean isDraftIdleTimeoutPositive() {
             return isPositive(draftIdleTimeout);
+        }
+    }
+
+    /** Any whole pixel width from {@code min} to {@code max} is allowed (D-07). */
+    public record StrokeWidth(@Positive int min, @Positive int max, @Positive int defaultWidth) {
+
+        @AssertTrue(message = "stroke-width must have min <= default-width <= max")
+        public boolean isOrdered() {
+            return min <= defaultWidth && defaultWidth <= max;
         }
     }
 

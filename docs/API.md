@@ -82,7 +82,7 @@
   "config": {
     "width": 7680, "height": 4320, "chunkSize": 480, "cellSize": 48,
     "zoomMin": 0.5, "zoomMax": 4.0,
-    "palette": ["#000000", "#FFFFFF", "..."], "strokeWidths": [2,4,8,16],
+    "palette": ["#000000", "#FFFFFF", "..."], "strokeWidthMin": 2, "strokeWidthMax": 16, "defaultStrokeWidth": 4,
     "fontSizes": [10,11,12,13,14,15,16,20,24,32,36,40,48,64,96], "defaultFontSize": 24,
     "textMaxLength": 50, "maxBbox": 1024, "maxChunks": 60,
     "postCooldownSec": 1800, "countdownWarningSec": 300, "draftIdleTimeoutSec": 600,
@@ -145,7 +145,7 @@
 - "내 낙서 PNG로 저장"은 서버 API 없이 브라우저에서 만듭니다(D-13)
 
 검증 규칙(`DoodleValidator`, SEC-02)
-- `v`는 1. 그림: 획 1개 이상, 각 획 점 1개 이상(짝수 개 정수), 좌표는 캔버스 범위 안, `c`는 팔레트 인덱스, `w`는 허용 굵기, 서버가 계산한 bbox(점 최소·최대를 굵기 절반만큼 넓혀 `floor`/`ceil`) ≤ 1024². 그림에 `bbox`를 보내면 거절
+- `v`는 1. 그림: 획 1개 이상, 각 획 점 1개 이상(짝수 개 정수), 좌표는 캔버스 범위 안, `c`는 팔레트 인덱스, `w`는 `strokeWidthMin`~`strokeWidthMax` 사이 정수, 서버가 계산한 bbox(점 최소·최대를 굵기 절반만큼 넓혀 `floor`/`ceil`) ≤ 1024². 그림에 `bbox`를 보내면 거절
 - 텍스트: 1~50자(줄바꿈 제외, 코드 포인트 기준), 공백만은 거절, 줄바꿈 외 제어 문자 금지, `size`는 허용 목록 값, `(x, y)`와 상자 전체가 캔버스 안, bbox 상한(D-31: 너비 ≤ `size` × 가장 긴 줄 글자 수, 높이 ≤ `size` × 1.4 × 줄 수, 각각 1~1024) + `size` × 줄 수 ≤ 1024
 - 요청 본문 2MB 이하(넘으면 읽기를 멈추고 413), 알 수 없는 필드·중복 키·문자열 숫자·소수 좌표는 거절
 - 실패하면 `details.field`(`strokes`, `p`, `c`, `w`, `text`, `size`, `x`, `bbox`, `kind`, `v`, 알 수 없는 필드 이름, 형식 오류는 `body`)와 `details.reason`
@@ -227,7 +227,7 @@
 ```
 - `draftId`는 UUID입니다. 따로 시작 메시지는 없고, 연결에서 처음 보는 `draftId`의 메시지가 초안을 시작합니다(`points`/`erase`는 그림, `text`는 텍스트). 연결당 초안은 하나이며, 다른 `draftId`가 오면 이전 초안을 `draft:cancel`합니다.
 - 클라이언트는 `config.draftIntervalMs`(기본 100ms)마다 최대 1번 보냅니다. 같은 획의 다음 묶음은 앞 묶음의 마지막 점으로 시작합니다. 그리는 동안 `/app/cursor`는 보내지 않습니다(초당 20회 한도).
-- 서버 검증(SEC-02): op마다 정해진 필드만(그 밖의 필드는 `VALIDATION_FAILED`), 좌표는 캔버스 안, `c`는 팔레트 인덱스, `w`는 허용 굵기, 한 묶음의 bbox(굵기의 절반만큼 확장)는 `maxBbox` 이하, `text`의 bbox는 캔버스 안이고 `maxBbox` 이하. 한 초안의 누적 본문이 2MB(`max-payload-bytes`)를 넘으면 `PAYLOAD_TOO_LARGE`. 거절은 모두 `/user/queue/errors`로 가고 연결은 유지됩니다.
+- 서버 검증(SEC-02): op마다 정해진 필드만(그 밖의 필드는 `VALIDATION_FAILED`), 좌표는 캔버스 안, `c`는 팔레트 인덱스, `w`는 `strokeWidthMin`~`strokeWidthMax` 사이 정수, 한 묶음의 bbox(굵기의 절반만큼 확장)는 `maxBbox` 이하, `text`의 bbox는 캔버스 안이고 `maxBbox` 이하. 한 초안의 누적 본문이 2MB(`max-payload-bytes`)를 넘으면 `PAYLOAD_TOO_LARGE`. 거절은 모두 `/user/queue/errors`로 가고 연결은 유지됩니다.
 - 텍스트 초안의 글자는 **서버로도 보내지 않습니다**. 다른 사용자에게는 "작성 중" 상자만 보입니다(D-33).
 - 서버는 초안 내용을 보관하지 않습니다. 연결 상태에 초안 id, 종류, 닿은 청크, 누적 바이트만 둡니다(INV-06). 연결이 끊기면 닿았던 청크에 `draft:cancel`을 보냅니다.
 
