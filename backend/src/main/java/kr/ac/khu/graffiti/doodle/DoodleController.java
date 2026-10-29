@@ -146,8 +146,8 @@ class DoodleController {
 
     private DoodleValidator.Limits limits(PageSnapshot page) {
         GraffitiProperties.Doodle d = props.doodle();
-        return new DoodleValidator.Limits(page.geometry(), page.chunkSize(), d.palette().size(), d.strokeWidths(),
-                d.fontSizes(), d.maxBbox(), d.textMaxLength(), d.fonts(), d.textWidthPercent());
+        return new DoodleValidator.Limits(page.geometry(), page.chunkSize(), d.palette().size(), d.strokeWidth().min(),
+                d.strokeWidth().max(), d.fontSizes(), d.maxBbox(), d.textMaxLength(), d.fonts(), d.textWidthPercent());
     }
 
     private static ApiException invalid(String field, String reason) {

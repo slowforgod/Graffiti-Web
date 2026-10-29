@@ -104,5 +104,5 @@ def test_stroke_widths_match_the_app():
     from pathlib import Path
 
     config = Path(__file__).resolve().parents[3] / "backend" / "src" / "main" / "resources" / "application.yml"
-    widths = re.search(r"stroke-widths: \[([^\]]*)\]", config.read_text(encoding="utf-8")).group(1)
-    assert STROKE_WIDTHS == tuple(int(w) for w in widths.split(","))
+    found = re.search(r"stroke-width:\s*\n\s*min: (\d+)\s*\n\s*max: (\d+)", config.read_text(encoding="utf-8"))
+    assert STROKE_WIDTHS == (int(found.group(1)), int(found.group(2)))

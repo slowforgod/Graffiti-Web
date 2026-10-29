@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 class DoodleValidatorTest {
 
     private static final CellGeometry GEOMETRY = new CellGeometry(7680, 4320, 48);
-    private static final Limits LIMITS = new Limits(GEOMETRY, 480, 12, List.of(2, 4, 8, 16),
+    private static final Limits LIMITS = new Limits(GEOMETRY, 480, 12, 2, 16,
             List.of(10, 12, 24, 96), 1024, 50, List.of("pretendard", "jalnan"), 125);
 
     @Test
@@ -57,6 +57,13 @@ class DoodleValidatorTest {
     }
 
     @Test
+    void anyWholeWidthFromTheMinimumToTheMaximumIsAllowed() {
+        for (int w : new int[] {2, 3, 7, 13, 16}) {
+            assertThat(((DrawingPayload) drawing(stroke(0, w, 100, 100)).payload()).strokes().get(0).w()).isEqualTo(w);
+        }
+    }
+
+    @Test
     void drawingsAreRefusedField() {
         assertRefused(() -> DoodleValidator.drawing(new DrawingPayload(1, List.of()), null, LIMITS), "strokes",
                 "required");
@@ -66,7 +73,8 @@ class DoodleValidatorTest {
                 "v", "unsupported");
         assertRefused(() -> drawing(stroke(12, 2, 1, 1)), "c", "not_in_palette");
         assertRefused(() -> drawing(stroke(-1, 2, 1, 1)), "c", "not_in_palette");
-        assertRefused(() -> drawing(stroke(0, 3, 1, 1)), "w", "not_allowed");
+        assertRefused(() -> drawing(stroke(0, 1, 1, 1)), "w", "not_allowed");
+        assertRefused(() -> drawing(stroke(0, 17, 1, 1)), "w", "not_allowed");
         assertRefused(() -> drawing(new StrokeInput(0, 2, new int[] {1, 2, 3})), "p", "pairs");
         assertRefused(() -> drawing(new StrokeInput(0, 2, new int[0])), "p", "pairs");
         assertRefused(() -> drawing(stroke(0, 2, 7680, 1)), "p", "out_of_canvas");

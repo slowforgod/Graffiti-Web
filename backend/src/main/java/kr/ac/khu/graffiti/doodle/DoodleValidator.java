@@ -23,8 +23,9 @@ public final class DoodleValidator {
      * The page's sizes and the doodle limits from configuration. {@code textWidthPercent}: how wide a letter
      * may be, in percent of the font size (D-31, 13).
      */
-    public record Limits(CellGeometry geometry, int chunkSize, int paletteSize, List<Integer> strokeWidths,
-            List<Integer> fontSizes, int maxBbox, int textMaxLength, List<String> fonts, int textWidthPercent) {
+    public record Limits(CellGeometry geometry, int chunkSize, int paletteSize, int minStrokeWidth,
+            int maxStrokeWidth, List<Integer> fontSizes, int maxBbox, int textMaxLength, List<String> fonts,
+            int textWidthPercent) {
     }
 
     /** {@code payload} of a drawing (DB.md §3). */
@@ -98,7 +99,7 @@ public final class DoodleValidator {
                 throw invalid("strokes", "required");
             }
             color(s.c(), limits);
-            if (s.w() == null || !limits.strokeWidths().contains(s.w())) {
+            if (s.w() == null || s.w() < limits.minStrokeWidth() || s.w() > limits.maxStrokeWidth()) {
                 throw invalid("w", "not_allowed");
             }
             int[] p = s.p();

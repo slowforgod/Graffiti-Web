@@ -47,7 +47,8 @@ class DraftController {
         long pageId = CursorController.parsePageId(message.pageId());
         PageSnapshot page = livePage.ifCurrent(pageId).orElseThrow(() -> new ApiException(ErrorCode.PAGE_ENDED));
         DraftRules.Limits limits = new DraftRules.Limits(page.geometry().width(), page.geometry().height(),
-                page.chunkSize(), doodle.palette().size(), doodle.strokeWidths(), doodle.maxBbox());
+                page.chunkSize(), doodle.palette().size(), doodle.strokeWidth().min(),
+                doodle.strokeWidth().max(), doodle.maxBbox());
         DraftRules.Op op;
         try {
             op = DraftRules.check(message, limits);

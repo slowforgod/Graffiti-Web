@@ -89,7 +89,11 @@ graffiti:
       - "#EC407A"
       - "#795548"
       - "#9E9E9E"
-    stroke-widths: [2, 4, 8, 16]
+    # D-07: any whole width in this range, picked with a slider.
+    stroke-width:
+      min: 2
+      max: 16
+      default-width: 4
     font-sizes: [10, 11, 12, 13, 14, 15, 16, 20, 24, 32, 36, 40, 48, 64, 96]
     default-font-size: 24
     text-max-length: 50

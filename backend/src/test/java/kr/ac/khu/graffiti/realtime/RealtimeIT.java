@@ -314,7 +314,7 @@ class RealtimeIT extends WebIntegrationTest {
         BlockingQueue<JsonNode> chunk0 = watcher.subscribe(chunk(0)).events;
         BlockingQueue<JsonNode> chunk1 = watcher.subscribe(chunk(1)).events;
         DoodleValidator.Limits limits = new DoodleValidator.Limits(page.geometry(), page.chunkSize(), 12,
-                List.of(2, 4, 8, 16), List.of(24), 1024, 50, List.of("pretendard"), 125);
+                2, 16, List.of(24), 1024, 50, List.of("pretendard"), 125);
         DoodleValidator.Validated doodle = DoodleValidator.drawing(new DoodleValidator.DrawingPayload(1,
                 List.of(new DoodleValidator.StrokeInput(3, 8, new int[] {470, 10, 490, 12}))), null, limits);
 
@@ -418,7 +418,7 @@ class RealtimeIT extends WebIntegrationTest {
         endedPage.put("pageId", "999999");
         author.send("/app/draft", endedPage);
         assertThat(next(errors).get("code").asText()).isEqualTo("PAGE_ENDED");
-        for (Map<String, Object> bad : List.<Map<String, Object>>of(points(id, 0, 12, 2, 10, 10), points(id, 0, 0, 3, 10, 10),
+        for (Map<String, Object> bad : List.<Map<String, Object>>of(points(id, 0, 12, 2, 10, 10), points(id, 0, 0, 17, 10, 10),
                 points(id, 0, 0, 2, 7680, 10), points(id, 0, 0, 2, 10, 10, 11), points(id, 0, 0, 2, 10, 10, 1100, 10),
                 points("draft-1", 0, 0, 2, 10, 10), Map.of("pageId", pageId(), "draftId", id, "op", "start"),
                 Map.of("pageId", pageId(), "draftId", id, "op", "cancel", "userId", "1"))) {
