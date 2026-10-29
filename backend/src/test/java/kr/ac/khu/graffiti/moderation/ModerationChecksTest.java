@@ -36,6 +36,7 @@ class ModerationChecksTest {
         GraffitiProperties props = Mockito.mock(GraffitiProperties.class);
         Mockito.when(props.moderation()).thenReturn(new GraffitiProperties.Moderation(Duration.ofSeconds(5),
                 GraffitiProperties.UncheckedPolicy.HOLD, text, drawing, 10,
+                new GraffitiProperties.Api("http://chatkhu", "m", Duration.ofSeconds(3), ""),
                 new GraffitiProperties.Ml(GraffitiProperties.MlMode.SHADOW, "http://ml:8000", Duration.ofSeconds(3),
                         4, 1024)));
         return props;
