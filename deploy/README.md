@@ -22,7 +22,7 @@ main에 머지되고 CI가 통과하면 `.github/workflows/deploy.yml`이 이미
 스테이징 도메인(예: `staging.<도메인>`)의 A 레코드를 Elastic IP로 지정합니다.
 
 ## 3. 서버의 `.env`
-`/opt/graffiti/.env`를 만들고 권한은 `chmod 600`으로 둡니다. 키 목록은 저장소의 `.env.example`과 같습니다. 스테이징에 필요한 값은 아래와 같습니다.
+`/opt/graffiti/.env`를 만들고 권한은 `chmod 600`으로 둡니다. 전체 키 목록은 저장소 `README.md`의 `.env` 표에 있습니다. 스테이징에 필요한 값은 아래와 같습니다.
 
 | 키 | 값 |
 |---|---|
