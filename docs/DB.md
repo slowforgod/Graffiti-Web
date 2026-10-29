@@ -200,7 +200,7 @@ CREATE TABLE ml_prediction (                                -- V6, 07b. 그림 d
   "checks": [                                   // 설정 순서대로, 거부하는 BLOCK에서 멈춤(욕설 BLOCK은 계속, D-43)
     { "check": "personal-info", "outcome": "PASS" },  // BLOCK이면 category PERSONAL_INFO, note PHONE·EMAIL·STUDENT_ID·RRN
     { "check": "word-filter", "outcome": "BLOCK", "category": "PROFANITY" },
-    { "check": "chatkhu", "outcome": "ERROR", "note": "TIMEOUT" },     // note: TIMEOUT, EXCEPTION, BAD_RESULT
+    { "check": "chatkhu", "outcome": "ERROR", "note": "TIMEOUT" },     // note: TIMEOUT, EXCEPTION, BAD_RESULT, HTTP_<코드>, BAD_RESPONSE, IO, RENDER
     { "check": "openai-text", "outcome": "SKIPPED" }                  // SKIPPED = 아직 구현 안 된 검사(스텁)
   ],
   "ml": { "check": "ml", "outcome": "BLOCK", "category": "SEXUAL", "mode": "ENFORCE" },  // ENFORCE의 그림만. SHADOW 결과는 ml_prediction에만
