@@ -153,6 +153,27 @@ class ModerationServiceTest {
     }
 
     @Test
+    void inEnforceHandwrittenProfanityRejectsTheDrawing() throws Exception {
+        Mockito.when(provider.moderate(Mockito.any(), Mockito.any())).thenReturn(new MlAnswer(MlAnswer.Outcome.OK,
+                "clip-zs-1", MlAnswer.Label.SAFE, Map.of("SEXUAL", 0.1, "HATE", 0.1), "읽은 글자", 0.8, 100));
+        List<ModerationCheck> drawing = List.of(check("openai-image", CheckResult::pass));
+        MlAnalysis ml = new MlAnalysis(MlMode.ENFORCE, new DoodleRenderer(List.of("#000000"), 1024), provider,
+                List.of(check("word-filter", n -> CheckResult.block(n, "PROFANITY"))), runner,
+                Mockito.mock(MlPredictionRecorder.class), 4);
+        service = new ModerationService(new ModerationChecks(List.of(), drawing), runner, ml, json,
+                UncheckedPolicy.HOLD);
+
+        ModerationService.Verdict v = service.moderate("DRAWING", DRAWING);
+
+        assertThat(v.state()).isEqualTo(ModerationState.REJECTED);
+        assertThat(v.category()).isEqualTo("PROFANITY");
+        assertThat(v.shrink()).isFalse();
+        JsonNode recorded = json.readTree(v.detail()).get("ml");
+        assertThat(recorded.get("outcome").asText()).isEqualTo("BLOCK");
+        assertThat(recorded.get("category").asText()).isEqualTo("PROFANITY");
+    }
+
+    @Test
     void inEnforceAnMlFailureNeverHolds() throws Exception {
         Mockito.when(provider.moderate(Mockito.any(), Mockito.any()))
                 .thenReturn(MlAnswer.failed(MlAnswer.Outcome.TIMEOUT));

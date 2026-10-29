@@ -76,6 +76,7 @@ cd Graffiti-Web
 | `ADMIN_EMAILS` | 관리자 이메일, 쉼표로 구분 (D-23). 여기 적은 이메일은 학교 계정이 아니어도 로그인됨 (D-23a) |
 | `POST_COOLDOWN` | 게시 후 다음 게시까지 기다리는 시간. 기본 `0s`(바로 다시 게시), 사용자가 늘면 `30m` (D-12) |
 | `OPENAI_API_KEY`, `CHATKHU_API_KEY` | 모더레이션 제공자 키 (07) |
+| `ML_MODE` | 그림의 ML 검사(손글씨 OCR 포함) 모드. 기본 `ENFORCE`, 오탐이 많으면 `SHADOW`(기록만) 또는 `OFF` (D-46) |
 | `MODERATION_UNCHECKED` | `PUBLISH`로 두면 검사하지 않은 낙서도 게시됨. 로컬 그리기 테스트에만, 공개 서버에는 절대 쓰지 않음 |
 | `IMAGE_PREFIX`, `DOMAIN`, `LETSENCRYPT_EMAIL` | 스테이징·운영 서버 전용 (`deploy/README.md` §3) |
 

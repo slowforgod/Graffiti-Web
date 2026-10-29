@@ -138,7 +138,7 @@ graffiti:
       timeout: 3s
       api-key: ${OPENAI_API_KEY:}   # blank: openai-text and openai-image stay stubs
     ml:
-      mode: SHADOW
+      mode: ${ML_MODE:ENFORCE}   # D-46. OFF, SHADOW or ENFORCE; a failure on the ML path never holds a doodle (INV-13)
       base-url: http://ml:8000
       timeout: 3s
       # SHADOW analyses running at once; more are skipped, not queued (07b decision 6)

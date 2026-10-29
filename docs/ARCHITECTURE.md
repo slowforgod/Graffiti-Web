@@ -162,7 +162,7 @@ Client                         REST(Controller)          PageCommandProcessor(�
 - ③ 예약(06): `ReservePost`가 DB에서 차단·역할·`last_posted_at`을 읽고, 쿨다운이 지났으면 `UPDATE users SET last_posted_at = now WHERE id = ? AND banned_at IS NULL AND last_posted_at <=> 읽은 값`. 관리자는 아무것도 쓰지 않음. 예약 시각 = `submitted_at`
 - 되돌림(D-28): ④에서 예외가 나거나 ⑤가 `PAGE_ENDED`·DB 오류로 실패하면 `ReleasePost`가 `last_posted_at`을 예약 전 값으로(그사이 바뀌지 않았을 때만). AI 거부(07)는 되돌리지 않음
 - ⑤ 게시(06): doodle과 `doodle_chunk`(bbox가 걸치는 청크) INSERT와 카운트다운 UPDATE가 한 트랜잭션. 커밋 뒤 `DoodlePublished` → 청크마다 `doodle:published`, 이어서 `minimap:diff`, `page:status`
-- ④ 검사(`specs/07-moderation.md` §5.3): `ModerationService`가 설정한 검사기(`graffiti.moderation.text-checks`, `drawing-checks`)를 순서대로 부르고(각각 타임아웃, 거부하는 BLOCK이면 멈춤, 욕설 BLOCK은 계속) `VerdictCombiner`가 합칩니다. 카테고리 2~4의 BLOCK → `REJECTED`, REVIEW·ERROR → `UNCHECKED`로 게시(관리자 사후 확인, D-42), 욕설만 → 텍스트는 `PASSED`로 축소 게시(`TextShrinker`, `shrink-font-size`, D-43)·그림은 `UNCHECKED` 게시, 모두 PASS → `PASSED`, 스텁(키가 없는 검사기)이 끼어 있으면 `UNCHECKED`이고 `graffiti.moderation.unchecked`(기본 `HOLD`)가 보류할지 게시할지 정합니다. 그림의 ML 분석은 `ml.mode`대로 돌고 SHADOW면 저장 뒤 백그라운드에서 기록만(INV-13, §4.7)
+- ④ 검사(`specs/07-moderation.md` §5.3): `ModerationService`가 설정한 검사기(`graffiti.moderation.text-checks`, `drawing-checks`)를 순서대로 부르고(각각 타임아웃, 거부하는 BLOCK이면 멈춤, 욕설 BLOCK은 계속) `VerdictCombiner`가 합칩니다. 카테고리 2~4의 BLOCK → `REJECTED`, REVIEW·ERROR → `UNCHECKED`로 게시(관리자 사후 확인, D-42), 욕설만 → 텍스트는 `PASSED`로 축소 게시(`TextShrinker`, `shrink-font-size`, D-43)·그림은 `REJECTED`(D-46), 모두 PASS → `PASSED`, 스텁(키가 없는 검사기)이 끼어 있으면 `UNCHECKED`이고 `graffiti.moderation.unchecked`(기본 `HOLD`)가 보류할지 게시할지 정합니다. 그림의 ML 분석은 `ml.mode`대로 돌고 ENFORCE(기본, D-46)면 판정 전에, SHADOW면 저장 뒤 백그라운드에서 기록만(INV-13, §4.7)
 - **실제 검사기는 개인정보 형식(`personal-info`)과 금칙어(`word-filter`)뿐입니다**(ChatKHU·OpenAI는 스텁. ML 경로는 연결됐고 SHADOW라 판정에 들어가지 않음). 기본 설정이면 모든 낙서가 보류되므로, `unchecked: PUBLISH`로 바꿔 공개 배포하면 06과 같은 미검사 상태가 됩니다(PIPELINE)
 - 거부·보류되면 `WithholdDoodle`이 `status=REJECTED|HELD`로 저장하고(`doodle_chunk` 포함, 점유율·브로드캐스트 없음) `moderation_action(AI, REJECT|HOLD)`를 같은 트랜잭션에서 기록합니다. 쿨다운은 그대로 소모됩니다(D-12). 그사이 페이지가 넘어갔으면 `PAGE_ENDED` + 되돌림
 - 관리자가 보류·거부를 게시하면(`PublishWithheld`, 현재 페이지만) ⑤와 같이 점유율·`doodle:published`가 나가고 `moderation_action(ADMIN, APPROVE|RESTORE)`가 남습니다
@@ -292,7 +292,7 @@ ENFORCE에서 ML 결과를 하나의 검사(ml)로 합성 (07b 결정)
   ML 서버·렌더링·OCR 글자 검사 장애        → 판정에서 빠짐 (HELD 아님, INV-13)
 ```
 
-- 모드는 설정값 `graffiti.moderation.ml.mode`(`OFF` / `SHADOW` / `ENFORCE`)로 바꿉니다. `ENFORCE` 전환은 D-39 기준을 넘고 팀이 승인한 뒤에만 합니다.
+- 모드는 설정값 `graffiti.moderation.ml.mode`(`OFF` / `SHADOW` / `ENFORCE`)로 바꿉니다. `ENFORCE` 전환은 D-39 기준을 넘고 팀이 승인한 뒤에만 하기로 했으나, 손글씨 욕설을 막기 위해 기본값을 `ENFORCE`로 앞당겼습니다(D-46, 환경변수 `ML_MODE`).
 - `ml_prediction`은 평가용 기록이라 게시 트랜잭션과 분리합니다. 기록이 실패해도 게시 결과는 바뀌지 않습니다.
 - **학습 데이터 추출**: 관리자 판정이 있는 doodle의 payload를 다시 렌더링해서 이미지와 라벨만 내보냅니다. `author_id`, 닉네임, 이메일은 포함하지 않습니다(D-38, SEC-17).
 
@@ -355,7 +355,7 @@ ENFORCE에서 ML 결과를 하나의 검사(ml)로 합성 (07b 결정)
 | `graffiti.moderation.chatkhu.{base-url, model, timeout, api-key}` | https://factchat-cloud.mindlogic.ai/v1/gateway, gpt-5.6-luna, 3s, `${CHATKHU_API_KEY:}`. 키가 비면 `chatkhu`는 스텁 | 07 §5.4 |
 | `graffiti.moderation.openai.{base-url, model, timeout, api-key}` | https://api.openai.com/v1, omni-moderation-latest, 3s, `${OPENAI_API_KEY:}`. 키가 비면 `openai-text`, `openai-image`는 스텁. 그림은 `ml.render-max-side`로 렌더링한 PNG | 07 §5.5 |
 | `graffiti.moderation.drawing-checks` | [openai-image] | D-19 |
-| `graffiti.moderation.ml.mode` | SHADOW | D-34, D-39 |
+| `graffiti.moderation.ml.mode` | ENFORCE (`ML_MODE`) | D-34, D-39, D-46 |
 | `graffiti.moderation.ml.base-url` | http://ml:8000 (내부망) | D-36 |
 | `graffiti.moderation.ml.timeout` | 3s | D-36 |
 | `graffiti.moderation.ml.max-in-flight` | 4 (SHADOW 백그라운드 분석 동시 상한, 넘치면 건너뜀) | 07b 결정 6 |

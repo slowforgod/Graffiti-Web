@@ -39,6 +39,7 @@ services:
       # Blank leaves the checks stubs (specs/07-moderation.md §5.4-5.5)
       CHATKHU_API_KEY: ${CHATKHU_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ML_MODE: ${ML_MODE:-ENFORCE}   # D-46; SHADOW only records
     mem_limit: 1g
     depends_on:
       mysql:
