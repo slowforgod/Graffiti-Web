@@ -117,6 +117,11 @@ graffiti:
     drawing-checks: [openai-image]
     # A text with profanity only is published at this size, its bbox shrunk alike (D-43). One of font-sizes.
     shrink-font-size: 10
+    chatkhu:
+      base-url: https://factchat-cloud.mindlogic.ai/v1/gateway
+      model: gpt-5.6-luna
+      timeout: 3s   # shorter than moderation.timeout, so the check answers ERROR itself
+      api-key: ${CHATKHU_API_KEY:}   # blank: chatkhu stays a stub
     ml:
       mode: SHADOW
       base-url: http://ml:8000

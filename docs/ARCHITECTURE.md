@@ -349,6 +349,7 @@ ENFORCE에서 ML 결과를 하나의 검사(ml)로 합성 (07b 결정)
 | `graffiti.moderation.unchecked` | 환경변수 `MODERATION_UNCHECKED`, 기본 `HOLD`. 실제 검사 없이 스텁만 지난 낙서를 보류(`HOLD`)할지 미검사로 게시(`PUBLISH`, 로컬 전용)할지 | 07 틀, D-42 |
 | `graffiti.moderation.text-checks` | [personal-info, word-filter, chatkhu, openai-text] (순서대로, 없는 구현은 스텁) | D-19, 07 |
 | `graffiti.moderation.shrink-font-size` | 10. 욕설만 걸린 텍스트를 이 크기로 줄이고 bbox도 비례 축소해 게시. `doodle.font-sizes` 안의 값 | D-43 |
+| `graffiti.moderation.chatkhu.{base-url, model, timeout, api-key}` | https://factchat-cloud.mindlogic.ai/v1/gateway, gpt-5.6-luna, 3s, `${CHATKHU_API_KEY:}`. 키가 비면 `chatkhu`는 스텁 | 07 §5.4 |
 | `graffiti.moderation.drawing-checks` | [openai-image] | D-19 |
 | `graffiti.moderation.ml.mode` | SHADOW | D-34, D-39 |
 | `graffiti.moderation.ml.base-url` | http://ml:8000 (내부망) | D-36 |
