@@ -1,7 +1,7 @@
 # 07-moderation: 실제 텍스트·그림 검사 (개인정보, 욕설 축소, ChatKHU, OpenAI)
 
-- **상태**: DRAFT
-- **승인자**: (G1에서 팀원이 기입) / 승인일:
+- **상태**: APPROVED
+- **승인자**: 현 (slowforgod) / 승인일: 2026-10-29 (스레드 요청 "작업해", §11은 추천안대로. 1번은 D-42 수정 반영)
 - **브랜치**: 구현은 PR 3개로 나눈다. `feat/07-personal-info-shrink`, `feat/07-chatkhu`, `feat/07-openai`
 - **선행 명세**: 07-moderation-frame(MERGED, PR #40), 07b-ml-moderation(PR #61 머지)
 - **공개 전 필요**: 관리자가 게시된 낙서를 지우는 기능(10 나머지, D-23 ①). 애매·실패를 일단 게시하므로(D-42) 이게 없으면 사후 삭제를 할 수 없다
