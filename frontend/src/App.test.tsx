@@ -36,7 +36,7 @@ describe('App', () => {
   it('renders the Korean service title', async () => {
     fetchMock.mockResolvedValue(reply({ authenticated: false }));
     render(<App />);
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('경희 낙서장');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('경희대 사랑의 낙서장');
     await screen.findByRole('link', { name: '경희대 계정으로 로그인' });
   });
 
