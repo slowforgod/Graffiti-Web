@@ -21,7 +21,7 @@ const admin = {
   cooldownEndsAt: null,
 } as Me;
 
-function item(id: string, status: string, pageEnded = false) {
+function item(id: string, status: string, pageEnded = false, moderationState = status) {
   return {
     id,
     pageId: '3',
@@ -30,7 +30,7 @@ function item(id: string, status: string, pageEnded = false) {
     bbox: { x: 0, y: 0, w: 10, h: 10 },
     payload: { v: 1, strokes: [] },
     status,
-    moderationState: status,
+    moderationState,
     moderationDetail: { checks: [{ check: 'word-filter', outcome: 'SKIPPED' }], heldAsUnchecked: true },
     submittedAt: '2026-10-21T00:00:00Z',
     author: { id: '9', nickname: '익명의 고양이 #2', email: 'cat@khu.ac.kr' },
@@ -130,6 +130,35 @@ describe('AdminScreen', () => {
 
     expect(await screen.findByRole('button', { name: '복구해서 게시' })).toBeEnabled();
     expect(screen.getByRole('button', { name: '거부', pressed: true })).toBeInTheDocument();
+  });
+
+  it('lists passed doodles and takes one off the canvas as rejected', async () => {
+    route({
+      '/api/admin/doodles?moderation=HELD': () => reply({ items: [], page: 0, size: 20, total: 0 }),
+      '/api/admin/doodles?moderation=PASSED': () =>
+        reply({ items: [item('7', 'PUBLISHED', false, 'PASSED')], page: 0, size: 20, total: 1 }),
+      '/api/admin/doodles?moderation=REJECTED': () =>
+        reply({ items: [item('7', 'REJECTED', false, 'PASSED')], page: 0, size: 20, total: 1 }),
+      '/api/pages/current': () => reply({ config: TEST_CONFIG }),
+      '/api/admin/doodles/7/reject': () => reply({ id: '7', status: 'REJECTED' }),
+    });
+    await act(async () => {
+      render(<AdminScreen me={admin} />);
+    });
+
+    await act(async () => screen.getByRole('button', { name: '통과 게시' }).click());
+    const list = await screen.findByRole('list', { name: '낙서 목록' });
+    await waitFor(() => expect(within(list).getAllByRole('listitem')).toHaveLength(1));
+    expect(within(list).queryByRole('button', { name: '게시' })).not.toBeInTheDocument();
+
+    await act(async () => within(list).getByRole('button', { name: '거부하고 내리기' }).click());
+
+    expect(within(list).queryAllByRole('listitem')).toHaveLength(0);
+    const posts = fetchMock.mock.calls.filter((c) => c[1]?.method === 'POST').map((c) => String(c[0]));
+    expect(posts).toEqual(['/api/admin/doodles/7/reject']);
+
+    await act(async () => screen.getByRole('button', { name: '거부' }).click());
+    expect(await screen.findByText('게시된 뒤 관리자가 내림')).toBeInTheDocument();
   });
 });
 

@@ -3,7 +3,7 @@ import { ApiError } from '../api/client';
 import type { Me } from '../auth/me';
 import { fetchCurrentPage } from '../shared/pageConfig';
 import type { AdminAction, ReviewDoodle, ReviewFilter } from './adminApi';
-import { describeChecks, fetchActions, fetchReview, rejectDoodle, restoreDoodle } from './adminApi';
+import { describeChecks, fetchActions, fetchReview, rejectDoodle, restoreDoodle, takenDown } from './adminApi';
 import DoodlePreview from './DoodlePreview';
 
 interface Props {
@@ -17,6 +17,7 @@ type View = ReviewFilter | 'ACTIONS';
 const TABS: { filter: View; label: string }[] = [
   { filter: 'HELD', label: '보류' },
   { filter: 'REJECTED', label: '거부' },
+  { filter: 'PASSED', label: '통과 게시' },
   { filter: 'UNCHECKED', label: '미검사 게시' },
   { filter: 'ACTIONS', label: '조치 기록' },
 ];
@@ -36,8 +37,8 @@ function message(e: unknown): string {
   return '처리하지 못했어요.';
 }
 
-// The admin tools: the review queue of D-23 (held, rejected, published unchecked doodles) and the action
-// log. Opened from the settings button on the canvas, or at /admin.
+// The admin tools: the review queue of D-23 (held, rejected, published passed or unchecked doodles) and the
+// action log. Opened from the settings button on the canvas, or at /admin.
 export default function AdminScreen({ me, onClose }: Props) {
   const [filter, setFilter] = useState<View>('HELD');
   const [items, setItems] = useState<ReviewDoodle[]>([]);
@@ -164,6 +165,7 @@ export default function AdminScreen({ me, onClose }: Props) {
               {a.targetDoodleId && ` · 낙서 ${a.targetDoodleId}`}
               {a.targetUserId && ` · 사용자 ${a.targetUserId}`}
               {a.reason && ` · ${a.reason}`}
+              {a.detail?.from === 'PUBLISHED' && ' · 게시 중 내림'}
             </li>
           ))}
         </ul>
@@ -186,6 +188,12 @@ export default function AdminScreen({ me, onClose }: Props) {
               </dd>
               <dt>검사</dt>
               <dd>{describeChecks(item.moderationDetail)}</dd>
+              {takenDown(item) && (
+                <>
+                  <dt>조치</dt>
+                  <dd>게시된 뒤 관리자가 내림</dd>
+                </>
+              )}
             </dl>
             <div className="admin-actions">
               {(item.status === 'HELD' || item.status === 'REJECTED') && (
@@ -200,6 +208,11 @@ export default function AdminScreen({ me, onClose }: Props) {
               {item.status === 'HELD' && (
                 <button type="button" disabled={busy !== null} onClick={() => void act(item, 'reject')}>
                   거부
+                </button>
+              )}
+              {item.status === 'PUBLISHED' && (
+                <button type="button" disabled={busy !== null} onClick={() => void act(item, 'reject')}>
+                  거부하고 내리기
                 </button>
               )}
             </div>
