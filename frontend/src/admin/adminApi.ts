@@ -5,7 +5,7 @@ import type { Doodle } from '../canvas/doodles';
 export const ADMIN_PATH = '/admin';
 
 // API.md §4, review part. Admins see the author (D-22); the detail lists check names and outcomes only.
-export type ReviewFilter = 'HELD' | 'REJECTED' | 'UNCHECKED';
+export type ReviewFilter = 'HELD' | 'REJECTED' | 'PASSED' | 'UNCHECKED';
 
 export interface CheckEntry {
   check: string;
@@ -45,6 +45,12 @@ export function restoreDoodle(id: string): Promise<{ doodle: Doodle }> {
   return apiFetch(`/api/admin/doodles/${encodeURIComponent(id)}/restore`, { method: 'POST' });
 }
 
+// A REJECTED doodle whose AI verdict let it onto the canvas: an admin took it down after it was published.
+export function takenDown(d: Pick<ReviewDoodle, 'status' | 'moderationState'>): boolean {
+  return d.status === 'REJECTED' && (d.moderationState === 'PASSED' || d.moderationState === 'UNCHECKED');
+}
+
+// HELD → REJECTED, or PUBLISHED → REJECTED (off the canvas, the row stays).
 export function rejectDoodle(id: string): Promise<{ id: string; status: string }> {
   return apiFetch(`/api/admin/doodles/${encodeURIComponent(id)}/reject`, { method: 'POST' });
 }
@@ -58,6 +64,8 @@ export interface AdminAction {
   targetDoodleId: string | null;
   targetUserId: string | null;
   reason: string | null;
+  // { from: 'PUBLISHED' } when an admin REJECT took a published doodle off the canvas.
+  detail: { from?: string } | null;
   createdAt: string;
 }
 
