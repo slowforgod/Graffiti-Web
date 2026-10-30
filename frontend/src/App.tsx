@@ -75,7 +75,7 @@ export default function App() {
     <main>
       <CanvasScreen me={me} />
       <header className="app-header">
-        <h1>경희 낙서장</h1>
+        <h1>경희대 사랑의 낙서장</h1>
         <AuthBar me={me} onLogout={() => void signOut()} />
         <AdminMenu me={me} />
       </header>
