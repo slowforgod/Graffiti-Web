@@ -298,6 +298,12 @@
 - **이유**: 잘난체(W 1.05em), 카페24 써라운드(% 1.08em)처럼 1em보다 넓은 글자가 있는 글꼴이 있다. 올림은 D-43 축소 후에도 상한을 넘지 않게 하려는 것
 - **명세**: `specs/13-text-fonts.md`
 
+### D-47 게시된 낙서도 관리자가 거부할 수 있고, 행은 거부로 남긴다 — ACCEPTED (현, 2026-10-30)
+- **결정**: 필터가 놓쳐 게시된 낙서(`PASSED`·`UNCHECKED`)를 관리자가 `reject`하면 낙서장에서 내리고(칸 제거, `doodle:removed`) `status=REJECTED`로 바꾼다. 삭제(`DELETED`)가 아니다. `moderation_state`는 AI 판정 그대로 두고, `removed_at`/`removed_by`와 `moderation_action(ADMIN, REJECT, detail={"from":"PUBLISHED"})`를 남긴다. 관리자 화면에 통과 낙서 전체 목록(`moderation=PASSED`)을 둔다
+- **이유**: 관리자가 거부한 낙서(보류 거부 + 게시 후 거부)를 모아 부적절 데이터셋으로 쓴다. 보류 거부와 같은 부류로 두되, `moderation_state`가 남아 "AI가 놓친 것"을 따로 골라낼 수 있다
+- **영향**: 데이터셋 = `moderation_action`에 `ADMIN REJECT`가 있고 지금 `status=REJECTED`인 행(DB.md §4). 추출본에 작성자 정보 금지(SEC-17). 잘못 내렸으면 기존 복구로 되돌린다
+- **명세**: `specs/10a-admin-takedown.md`
+
 ### D-46 그림의 욕설은 거부하고 ML 경로를 ENFORCE로 — ACCEPTED (현, 2026-10-30, D-43의 그림 부분과 D-39의 전환 절차를 바꿈)
 - **결정**: 그림 doodle에서 욕설(`PROFANITY`)이 나오면, 손글씨 OCR 글자에서 나온 것이든 다른 그림 검사에서 나온 것이든 `REJECTED`로 거부한다. 다른 거부 카테고리(2~4)가 함께 나오면 그 카테고리가 우선한다. 손글씨를 실제로 판정하도록 `graffiti.moderation.ml.mode` 기본값을 `ENFORCE`로 바꾼다(환경변수 `ML_MODE`로 덮어씀)
 - **이유**: 손글씨 욕설 그림이 `openai-image`만 지나 `PASSED`로 게시됐다. OpenAI 이미지 모더레이션은 성적·폭력·자해만 보고 그림 속 글자를 읽지 않는다. 그림은 텍스트처럼 줄일 수 없어서 게시해 두면 관리자가 지울 때까지 누구나 본다

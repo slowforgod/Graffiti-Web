@@ -37,11 +37,15 @@ class JdbcPostStore implements PostStore {
                     :x, :y, :w, :h, :payload, :payloadBytes, :submittedAt, :publishedAt)""";
 
     private static final String PUBLISH_WITHHELD = """
-            UPDATE doodle SET status = 'PUBLISHED', published_at = :at
+            UPDATE doodle SET status = 'PUBLISHED', published_at = :at, removed_at = NULL, removed_by = NULL
             WHERE id = :id AND page_id = :pageId AND status = :from""";
 
     private static final String REJECT_HELD = """
             UPDATE doodle SET status = 'REJECTED' WHERE id = :id AND status = 'HELD'""";
+
+    private static final String REJECT_PUBLISHED = """
+            UPDATE doodle SET status = 'REJECTED', removed_at = :at, removed_by = :adminId
+            WHERE id = :id AND page_id = :pageId AND status = 'PUBLISHED'""";
 
     private static final String DELETE_OWN = """
             UPDATE doodle SET status = 'DELETED', removed_at = :at, removed_by = :authorId
@@ -105,6 +109,14 @@ class JdbcPostStore implements PostStore {
     @Override
     public boolean rejectHeld(long doodleId) {
         return jdbc.update(REJECT_HELD, Map.of("id", doodleId)) == 1;
+    }
+
+    @Override
+    public boolean rejectPublished(long doodleId, long pageId, long adminId, Instant at) {
+        return jdbc.update(REJECT_PUBLISHED, new MapSqlParameterSource("id", doodleId)
+                .addValue("pageId", pageId)
+                .addValue("adminId", adminId)
+                .addValue("at", utc(at))) == 1;
     }
 
     @Override

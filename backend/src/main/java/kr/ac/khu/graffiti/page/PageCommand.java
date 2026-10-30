@@ -80,6 +80,25 @@ public sealed interface PageCommand<R> {
     }
 
     /**
+     * An admin takes a PUBLISHED doodle off the canvas as REJECTED (the filter let it through), on any page;
+     * {@code moderation_action(ADMIN, REJECT)} with {@code detail.from = PUBLISHED}. The row and its
+     * {@code moderation_state} stay, so it joins the admin-rejected doodles. On the current page its cells are
+     * removed and viewers get {@code doodle:removed}; {@code footprint} is null when the service saw an ended page.
+     */
+    record RejectPublished(long doodleId, long pageId, long authorId, Footprint footprint, List<Integer> chunks,
+            long adminId) implements PageCommand<Boolean> {
+
+        public RejectPublished {
+            chunks = List.copyOf(chunks);
+        }
+
+        @Override
+        public Boolean executeOn(PageCommandHandler handler) {
+            return handler.rejectPublished(this);
+        }
+    }
+
+    /**
      * The author deletes their own published doodles of the current page (D-13), all or none: each row must still
      * be PUBLISHED and theirs, else {@code STATE_CONFLICT}. Removes their cells; the post is not given back (INV-08).
      */

@@ -26,6 +26,7 @@ import kr.ac.khu.graffiti.page.PageCommand;
 import kr.ac.khu.graffiti.page.PageCommandProcessor;
 import kr.ac.khu.graffiti.page.PageSnapshot;
 import kr.ac.khu.graffiti.page.event.DoodlePublished;
+import kr.ac.khu.graffiti.page.event.DoodleRemoved;
 import kr.ac.khu.graffiti.support.MutableClock;
 import kr.ac.khu.graffiti.support.WebIntegrationTest;
 import kr.ac.khu.graffiti.user.User;
@@ -46,8 +47,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
-/** The review part of {@code /api/admin/**} against MySQL: listing, publishing and rejecting withheld doodles. */
-@Import(AdminReviewIT.Published.class)
+/** The review part of {@code /api/admin/**} against MySQL: listing, publishing and rejecting doodles. */
+@Import({AdminReviewIT.Published.class, AdminReviewIT.Removed.class})
 class AdminReviewIT extends WebIntegrationTest {
 
     private static final String CSRF_TOKEN = "test-csrf-token";
@@ -81,6 +82,9 @@ class AdminReviewIT extends WebIntegrationTest {
     @Autowired
     private Published published;
 
+    @Autowired
+    private Removed removed;
+
     @MockitoSpyBean
     private ModerationService moderation;
 
@@ -95,13 +99,14 @@ class AdminReviewIT extends WebIntegrationTest {
         admin = newUser();
         jdbc.update("UPDATE users SET role = 'ADMIN' WHERE id = ?", admin.getId());
         published.received.clear();
+        removed.received.clear();
     }
 
     @Test
     void heldDoodlesAreListedOldestFirstWithTheirAuthor() throws Exception {
-        long first = withheld(ModerationState.HELD);
+        long first = posted(ModerationState.HELD);
         clock.advance(props.postCooldown());
-        long second = withheld(ModerationState.HELD);
+        long second = posted(ModerationState.HELD);
 
         JsonNode body = read(mvc.perform(get("/api/admin/doodles").param("moderation", "HELD").param("size", "100")
                 .with(authentication(session(admin)))).andExpect(status().isOk()));
@@ -120,7 +125,7 @@ class AdminReviewIT extends WebIntegrationTest {
 
     @Test
     void onlyAdminsMayReview() throws Exception {
-        long id = withheld(ModerationState.HELD);
+        long id = posted(ModerationState.HELD);
 
         mvc.perform(get("/api/admin/doodles")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/admin/doodles").with(authentication(session(author))))
@@ -138,7 +143,7 @@ class AdminReviewIT extends WebIntegrationTest {
 
     @Test
     void publishingAHeldDoodlePutsItOnTheCanvasAndRecordsTheAdmin() throws Exception {
-        long id = withheld(ModerationState.HELD);
+        long id = posted(ModerationState.HELD);
 
         JsonNode body = read(mvc.perform(withCsrf(post("/api/admin/doodles/{id}/restore", id))
                 .with(authentication(session(admin)))).andExpect(status().isOk()));
@@ -162,7 +167,7 @@ class AdminReviewIT extends WebIntegrationTest {
 
     @Test
     void aRejectedDoodleCanBeRestored() throws Exception {
-        long id = withheld(ModerationState.REJECTED);
+        long id = posted(ModerationState.REJECTED);
 
         mvc.perform(withCsrf(post("/api/admin/doodles/{id}/restore", id)).with(authentication(session(admin))))
                 .andExpect(status().isOk());
@@ -173,7 +178,7 @@ class AdminReviewIT extends WebIntegrationTest {
 
     @Test
     void aDoodleOfAnEndedPageStaysHeld() throws Exception {
-        long id = withheld(ModerationState.HELD);
+        long id = posted(ModerationState.HELD);
         page = FreshPage.start(context, clock);
 
         mvc.perform(withCsrf(post("/api/admin/doodles/{id}/restore", id)).with(authentication(session(admin))))
@@ -188,7 +193,7 @@ class AdminReviewIT extends WebIntegrationTest {
 
     @Test
     void rejectingAHeldDoodleKeepsItOffTheCanvas() throws Exception {
-        long id = withheld(ModerationState.HELD);
+        long id = posted(ModerationState.HELD);
 
         mvc.perform(withCsrf(post("/api/admin/doodles/{id}/reject", id)).with(authentication(session(admin))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REJECTED"));
@@ -200,8 +205,94 @@ class AdminReviewIT extends WebIntegrationTest {
     }
 
     @Test
+    void passedDoodlesAreListedNewestFirst() throws Exception {
+        long first = posted(ModerationState.PASSED);
+        clock.advance(props.postCooldown());
+        long second = posted(ModerationState.PASSED);
+        clock.advance(props.postCooldown());
+        long unchecked = posted(ModerationState.UNCHECKED);
+
+        JsonNode body = read(mvc.perform(get("/api/admin/doodles").param("moderation", "PASSED")
+                .param("size", "100").with(authentication(session(admin)))).andExpect(status().isOk()));
+
+        List<String> ids = body.get("items").findValuesAsText("id");
+        assertThat(ids.indexOf(Long.toString(second))).isLessThan(ids.indexOf(Long.toString(first)));
+        assertThat(ids).doesNotContain(Long.toString(unchecked));
+        JsonNode item = itemWithId(body, first);
+        assertThat(item.get("status").asText()).isEqualTo("PUBLISHED");
+        assertThat(item.get("moderationState").asText()).isEqualTo("PASSED");
+        assertThat(item.at("/author/email").asText()).isEqualTo(author.getEmail());
+    }
+
+    @Test
+    void rejectingAPublishedDoodleTakesItOffTheCanvasAndKeepsTheRow() throws Exception {
+        long id = posted(ModerationState.PASSED);
+        String payload = jdbc.queryForObject("SELECT payload FROM doodle WHERE id = ?", String.class, id);
+
+        mvc.perform(withCsrf(post("/api/admin/doodles/{id}/reject", id)).with(authentication(session(admin))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REJECTED"));
+
+        Map<String, Object> row = jdbc.queryForMap("SELECT status, moderation_state, payload, removed_by, "
+                + "removed_at IS NOT NULL AS removed FROM doodle WHERE id = ?", id);
+        assertThat(row).containsEntry("status", "REJECTED").containsEntry("moderation_state", "PASSED")
+                .containsEntry("removed_by", admin.getId());
+        assertThat(json.readTree((String) row.get("payload"))).isEqualTo(json.readTree(payload));
+        assertThat(((Number) row.get("removed")).intValue()).isEqualTo(1);
+        assertThat(lastAction(id)).containsEntry("actor_type", "ADMIN").containsEntry("action", "REJECT")
+                .containsEntry("actor_id", admin.getId());
+        assertThat(json.readTree((String) lastAction(id).get("detail")).get("from").asText()).isEqualTo("PUBLISHED");
+        assertThat(removed.received).singleElement().satisfies(e -> {
+            assertThat(e.doodleId()).isEqualTo(id);
+            assertThat(e.chunks()).containsExactly(0, 1);
+        });
+        byte[] cells = processor.submit(new PageCommand.GetMinimap(page.id())).join().bitmap();
+        assertThat(cells).as("occupied cells").isEqualTo(new byte[cells.length]);
+        mvc.perform(get("/api/pages/{p}/doodles", page.id()).param("chunks", "0"))
+                .andExpect(jsonPath("$.doodles").isEmpty());
+        JsonNode rejected = read(mvc.perform(get("/api/admin/doodles").param("moderation", "REJECTED")
+                .param("size", "100").with(authentication(session(admin)))));
+        assertThat(itemWithId(rejected, id).get("moderationState").asText()).isEqualTo("PASSED");
+        JsonNode passed = read(mvc.perform(get("/api/admin/doodles").param("moderation", "PASSED")
+                .param("size", "100").with(authentication(session(admin)))));
+        assertThat(passed.get("items").findValuesAsText("id")).doesNotContain(Long.toString(id));
+        mvc.perform(withCsrf(post("/api/admin/doodles/{id}/reject", id)).with(authentication(session(admin))))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.error.code").value("STATE_CONFLICT"));
+    }
+
+    @Test
+    void aPublishedDoodleRejectedByMistakeCanBeRestored() throws Exception {
+        long id = posted(ModerationState.UNCHECKED);
+        mvc.perform(withCsrf(post("/api/admin/doodles/{id}/reject", id)).with(authentication(session(admin))))
+                .andExpect(status().isOk());
+
+        mvc.perform(withCsrf(post("/api/admin/doodles/{id}/restore", id)).with(authentication(session(admin))))
+                .andExpect(status().isOk());
+
+        assertThat(jdbc.queryForMap("SELECT status, removed_at, removed_by FROM doodle WHERE id = ?", id))
+                .containsEntry("status", "PUBLISHED").containsEntry("removed_at", null)
+                .containsEntry("removed_by", null);
+        assertThat(lastAction(id)).containsEntry("action", "RESTORE");
+        mvc.perform(get("/api/pages/{p}/doodles", page.id()).param("chunks", "0"))
+                .andExpect(jsonPath("$.doodles[0].id").value(Long.toString(id)));
+    }
+
+    @Test
+    void aPublishedDoodleOfAnEndedPageCanBeRejected() throws Exception {
+        long id = posted(ModerationState.PASSED);
+        page = FreshPage.start(context, clock);
+        removed.received.clear();
+
+        mvc.perform(withCsrf(post("/api/admin/doodles/{id}/reject", id)).with(authentication(session(admin))))
+                .andExpect(status().isOk());
+
+        assertThat(statusOf(id)).isEqualTo("REJECTED");
+        assertThat(lastAction(id)).containsEntry("action", "REJECT");
+        assertThat(removed.received).isEmpty();
+    }
+
+    @Test
     void aPublishedDoodleCannotBePublishedAgain() throws Exception {
-        long id = withheld(ModerationState.HELD);
+        long id = posted(ModerationState.HELD);
         mvc.perform(withCsrf(post("/api/admin/doodles/{id}/restore", id)).with(authentication(session(admin))))
                 .andExpect(status().isOk());
 
@@ -214,7 +305,7 @@ class AdminReviewIT extends WebIntegrationTest {
 
     @Test
     void theActionLogListsTheNewestFirst() throws Exception {
-        long id = withheld(ModerationState.HELD);
+        long id = posted(ModerationState.HELD);
         mvc.perform(withCsrf(post("/api/admin/doodles/{id}/reject", id)).with(authentication(session(admin))))
                 .andExpect(status().isOk());
 
@@ -229,7 +320,7 @@ class AdminReviewIT extends WebIntegrationTest {
 
     @Test
     void listParametersAreChecked() throws Exception {
-        for (Map.Entry<String, String> bad : List.of(Map.entry("moderation", "PUBLISHED"), Map.entry("size", "0"),
+        for (Map.Entry<String, String> bad : List.of(Map.entry("moderation", "DELETED"), Map.entry("size", "0"),
                 Map.entry("size", "101"), Map.entry("page", "-1"))) {
             mvc.perform(get("/api/admin/doodles").param(bad.getKey(), bad.getValue())
                     .with(authentication(session(admin)))).andExpect(status().isBadRequest())
@@ -238,7 +329,7 @@ class AdminReviewIT extends WebIntegrationTest {
     }
 
     // Publishes as the author with moderation answering {@code state}; returns the stored doodle's id.
-    private long withheld(ModerationState state) throws Exception {
+    private long posted(ModerationState state) throws Exception {
         doReturn(new ModerationService.Verdict(state, "{\"checks\": []}", state == ModerationState.REJECTED
                 ? "PROFANITY" : null)).when(moderation).moderate(anyString(), any());
         jdbc.update("UPDATE users SET last_posted_at = NULL WHERE id = ?", author.getId());
@@ -252,7 +343,7 @@ class AdminReviewIT extends WebIntegrationTest {
     }
 
     private Map<String, Object> lastAction(long doodleId) {
-        return jdbc.queryForMap("SELECT actor_type, actor_id, action FROM moderation_action "
+        return jdbc.queryForMap("SELECT actor_type, actor_id, action, detail FROM moderation_action "
                 + "WHERE target_doodle_id = ? ORDER BY id DESC LIMIT 1", doodleId);
     }
 
@@ -291,6 +382,17 @@ class AdminReviewIT extends WebIntegrationTest {
 
         @EventListener
         void on(DoodlePublished event) {
+            received.add(event);
+        }
+    }
+
+    @TestComponent
+    static class Removed {
+
+        final List<DoodleRemoved> received = new CopyOnWriteArrayList<>();
+
+        @EventListener
+        void on(DoodleRemoved event) {
             received.add(event);
         }
     }

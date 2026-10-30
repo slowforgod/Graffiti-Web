@@ -14,11 +14,12 @@ import org.springframework.stereotype.Repository;
 @Repository
 class AdminDoodleQuery {
 
-    /** Which doodles a review list shows: HELD and REJECTED by status, UNCHECKED among the published ones. */
+    /** Which doodles a review list shows: HELD and REJECTED by status, PASSED and UNCHECKED among the published. */
     enum Filter {
         HELD("d.status = 'HELD'", "ASC"),
         REJECTED("d.status = 'REJECTED'", "DESC"),
-        UNCHECKED("d.status = 'PUBLISHED' AND d.moderation_state = 'UNCHECKED'", "DESC");
+        UNCHECKED("d.status = 'PUBLISHED' AND d.moderation_state = 'UNCHECKED'", "DESC"),
+        PASSED("d.status = 'PUBLISHED' AND d.moderation_state = 'PASSED'", "DESC");
 
         // Fixed SQL fragments chosen by the enum, never from the request (SEC-01).
         private final String where;
