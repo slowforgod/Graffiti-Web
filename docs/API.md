@@ -159,10 +159,10 @@
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| GET | `/api/admin/doodles?moderation=HELD\|REJECTED\|UNCHECKED&page=0&size=20` | 보류·거부·미검사 게시 내역 (작성자 이메일, 닉네임, 렌더링용 payload 포함). **07 틀에서 구현** |
+| GET | `/api/admin/doodles?moderation=HELD\|REJECTED\|PASSED\|UNCHECKED&page=0&size=20` | 보류·거부·통과 게시·미검사 게시 내역 (작성자 이메일, 닉네임, 렌더링용 payload 포함). **07 틀, 10a에서 구현** |
 | GET | `/api/admin/doodles/{id}` | doodle 상세 (작성자 이메일 포함) |
 | POST | `/api/admin/doodles/{id}/restore` | HELD 또는 REJECTED → PUBLISHED (현재 페이지만). **07 틀에서 구현**. UNCHECKED 표시 해제는 아직 없음 |
-| POST | `/api/admin/doodles/{id}/reject` | HELD → REJECTED (끝난 페이지도 가능). **07 틀에서 구현** |
+| POST | `/api/admin/doodles/{id}/reject` | HELD 또는 PUBLISHED → REJECTED (끝난 페이지도 가능, 행은 남음). **07 틀, 10a에서 구현** |
 | DELETE | `/api/admin/doodles/{id}` | 아무 doodle 삭제 (종료된 페이지 포함) |
 | POST | `/api/admin/doodles/delete` | 일괄 삭제 `{ "ids": [...] }` |
 | GET | `/api/admin/users?sort=rejects&page=0&size=20` | AI 적발 횟수 순 사용자 |
@@ -171,10 +171,10 @@
 | GET | `/api/admin/actions?page=0&size=50` | 조치 기록, 최신순 (SEC-14). **07 틀에서 구현** |
 
 07 틀에서 구현한 관리자 API (나머지는 10에서)
-- 목록: `moderation` 기본 `HELD`. HELD는 오래된 순(검토 대기열), REJECTED·UNCHECKED는 최신순. `size`는 1~`graffiti.query.admin-page-size-max`(100), `page` ≥ 0, 아니면 400 `VALIDATION_FAILED`
+- 목록: `moderation` 기본 `HELD`. HELD는 오래된 순(검토 대기열), REJECTED·PASSED·UNCHECKED는 최신순. PASSED·UNCHECKED는 게시 중인 것만(`status=PUBLISHED`). `size`는 1~`graffiti.query.admin-page-size-max`(100), `page` ≥ 0, 아니면 400 `VALIDATION_FAILED`
   - 응답 `{ "items": [{ "id", "pageId", "pageEnded", "kind", "bbox", "payload", "status", "moderationState", "moderationDetail", "submittedAt", "author": { "id", "nickname", "email" } }], "page", "size", "total" }`. `moderationDetail` 형식은 DB.md §3
 - `restore`: `200 { "doodle": { "id", "kind", "bbox", "payload" } }`. 게시와 같이 큐 안에서 점유율 반영, 청크마다 `doodle:published`, `moderation_action(ADMIN, APPROVE|RESTORE)`. 끝난 페이지면 `409 PAGE_ENDED`(보류 그대로), 이미 처리됐으면 `409 STATE_CONFLICT`, 없으면 `404`
-- `reject`: `200 { "id", "status": "REJECTED" }`, `moderation_action(ADMIN, REJECT)`. HELD가 아니면 `409 STATE_CONFLICT`
+- `reject`: `200 { "id", "status": "REJECTED" }`, `moderation_action(ADMIN, REJECT)`. PUBLISHED였으면(필터가 놓친 낙서, D-47) 큐 안에서 칸을 빼고 청크마다 `doodle:removed`(현재 페이지일 때만), `removed_at`/`removed_by` 기록, `detail = {"from": "PUBLISHED"}`. `moderation_state`와 payload는 그대로. HELD·PUBLISHED가 아니면 `409 STATE_CONFLICT`
 - `actions`: `{ "items": [{ "id", "actorType", "actorId", "action", "targetDoodleId", "targetUserId", "reason", "detail", "createdAt" }], "page", "size", "total" }`
 - 관리자 화면은 `/admin`(nginx가 `index.html`로 응답). 미리보기는 캔버스(Konva)로만 그림(SEC-12)
 

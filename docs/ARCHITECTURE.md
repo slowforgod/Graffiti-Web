@@ -77,7 +77,7 @@ backend/src/main/java/kr/ac/khu/graffiti/
 │                  SubscribeReceipts(구독 등록 후 RECEIPT, INV-09), StompErrorHandler(ERROR 프레임 = 에러 코드),
 │                  Broadcaster + PageEventRelay(page/event → 메타 토픽, DoodlePublished → 청크 토픽), CursorController(/app/cursor 중계),
 │                  DraftController + DraftRules(/app/draft 검증·중계, 연결 종료 시 취소), RealtimeErrorAdvice
-├── admin/         관리자 API: 검토 목록(AdminDoodleQuery), 보류·거부 게시와 거부(AdminReviewService → 큐), 조치 기록 조회
+├── admin/         관리자 API: 검토 목록(AdminDoodleQuery, 보류·거부·통과·미검사), 보류·거부 게시와 보류·게시 낙서 거부(AdminReviewService → 큐), 조치 기록 조회
 └── common/        에러 응답 형식(ApiError), 예외 → 에러 코드 매핑, 시계(Clock) 주입
 ```
 
@@ -255,10 +255,13 @@ PageBootstrap (SmartLifecycle, 웹 서버보다 앞 단계)
 |---|---|---|---|---|
 | 내 doodle 삭제 | 작성자 | PUBLISHED → DELETED | −칸 | doodle:removed |
 | 관리자 삭제 | 관리자 | PUBLISHED → DELETED | −칸 (현재 페이지일 때만) | doodle:removed |
+| 게시된 낙서 거부 (D-47) | 관리자 | PUBLISHED → REJECTED (행 유지, 데이터셋용) | −칸 (현재 페이지일 때만) | doodle:removed |
 | 차단과 함께 일괄 숨김 | 관리자 | PUBLISHED → HIDDEN | −칸 | doodle:removed |
 | 거부/미검사 복구 | 관리자 | REJECTED → PUBLISHED (UNCHECKED는 이미 PUBLISHED, 표시만 해제) | +칸 (현재 페이지일 때만) | doodle:published |
 
 모두 큐를 거치고(INV-01), 행은 지우지 않습니다(INV-07).
+
+- 게시된 낙서 거부(10a, `RejectPublished`): 행 읽기와 칸 계산은 큐 밖, 큐 안에서 한 트랜잭션으로 `UPDATE ... WHERE status = 'PUBLISHED'` + `moderation_action(ADMIN, REJECT, from=PUBLISHED)`. 그사이 페이지가 끝났으면 행만 바꾸고 칸·브로드캐스트는 없습니다(끝난 페이지의 칸 기록은 그대로)
 
 - 내 doodle 삭제(08, `RemoveDoodles`): 행 읽기, 작성자·페이지·상태 확인, 칸 계산(`StoredFootprint`)은 큐 밖에서 하고, 큐 안에서는 한 트랜잭션으로 doodle마다 `UPDATE ... WHERE author_id = 나 AND status = 'PUBLISHED'`를 실행합니다. 하나라도 0행이면 `STATE_CONFLICT`로 전부 롤백하고 메모리도 그대로 둡니다. 커밋 뒤 메모리 칸을 바꾸고 doodle마다 `DoodleRemoved`(→ 저장된 `doodle_chunk`마다 `doodle:removed`), 비워진 칸이 있으면 `OccupancyChanged`(→ `minimap:diff`). 점유율이 내려가도 카운트다운은 멈추지 않습니다(INV-03). 끝난 페이지의 doodle은 지울 수 없습니다(`PAGE_ENDED`).
 

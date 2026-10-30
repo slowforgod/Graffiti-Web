@@ -50,11 +50,20 @@ public interface PostStore {
      */
     long insertWithheld(NewDoodle doodle, String status);
 
-    /** REJECTED or HELD ({@code from}) to PUBLISHED on {@code pageId}; false when the row is not in that state. */
+    /**
+     * REJECTED or HELD ({@code from}) to PUBLISHED on {@code pageId}, clearing {@code removed_at}/{@code removed_by}
+     * of an earlier admin rejection; false when the row is not in that state.
+     */
     boolean publishWithheld(long doodleId, long pageId, String from, Instant publishedAt);
 
     /** HELD to REJECTED; false when the row is not HELD any more. */
     boolean rejectHeld(long doodleId);
+
+    /**
+     * PUBLISHED to REJECTED on {@code pageId} by an admin, with {@code removed_at} and {@code removed_by} (the row,
+     * its payload and {@code moderation_state} stay); false when the row is not PUBLISHED any more.
+     */
+    boolean rejectPublished(long doodleId, long pageId, long adminId, Instant at);
 
     /**
      * PUBLISHED to DELETED for the author's own doodle on {@code pageId} (D-13, INV-07: the row stays), with

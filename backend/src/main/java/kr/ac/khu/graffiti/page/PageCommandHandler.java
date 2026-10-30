@@ -39,6 +39,9 @@ class PageCommandHandler {
     private final GraffitiProperties props;
     private final Clock clock;
 
+    // moderation_action.detail of an admin REJECT that took a published doodle off the canvas.
+    private static final String REJECTED_FROM_PUBLISHED = "{\"from\": \"PUBLISHED\"}";
+
     private PageState current;
 
     PageCommandHandler(PageRepository pages, PostStore posts, TransactionTemplate tx, ApplicationEventPublisher events,
@@ -138,6 +141,42 @@ class PageCommandHandler {
                     null, null), now);
             return true;
         }));
+    }
+
+    boolean rejectPublished(PageCommand.RejectPublished c) {
+        PageState state = current;
+        Instant now = now();
+        PostStore.Action action = new PostStore.Action("ADMIN", c.adminId(), "REJECT", c.doodleId(), c.authorId(),
+                null, REJECTED_FROM_PUBLISHED);
+        if (state == null || state.id() != c.pageId() || c.footprint() == null) {
+            // An ended page's cells are its final record (07 draft, 결정 4), and nobody views it (D-17).
+            return Boolean.TRUE.equals(tx.execute(s -> {
+                if (!posts.rejectPublished(c.doodleId(), c.pageId(), c.adminId(), now)) {
+                    return false;
+                }
+                posts.recordAction(action, now);
+                return true;
+            }));
+        }
+        OccupancyGrid grid = state.grid().copy();
+        List<Integer> clear = tx.execute(s -> {
+            if (!posts.rejectPublished(c.doodleId(), c.pageId(), c.adminId(), now)) {
+                return null;
+            }
+            posts.recordAction(action, now);
+            // The row was still PUBLISHED on this page, so its cells are in the grid.
+            return grid.apply(c.footprint(), -1).clear();
+        });
+        if (clear == null) {
+            return false;
+        }
+        current = state.withGrid(grid);
+        events.publishEvent(new DoodleRemoved(c.pageId(), c.doodleId(), c.chunks()));
+        if (!clear.isEmpty()) {
+            events.publishEvent(new OccupancyChanged(c.pageId(), List.of(), List.copyOf(clear),
+                    grid.occupancyPermille()));
+        }
+        return true;
     }
 
     List<Long> removeDoodles(PageCommand.RemoveDoodles c) {

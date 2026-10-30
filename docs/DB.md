@@ -98,8 +98,8 @@ CREATE TABLE doodle (
   payload_bytes     INT         NOT NULL,                    -- ≤ 2MB (D-11)
   submitted_at      DATETIME(3) NOT NULL,                    -- ✓ 누른 시각
   published_at      DATETIME(3) NULL,
-  removed_at        DATETIME(3) NULL,                        -- HIDDEN/DELETED 된 시각
-  removed_by        BIGINT      NULL,                        -- 작성자 본인 또는 관리자
+  removed_at        DATETIME(3) NULL,                        -- HIDDEN/DELETED 또는 게시 후 관리자 거부(D-47)된 시각
+  removed_by        BIGINT      NULL,                        -- 작성자 본인 또는 관리자. 복구하면 둘 다 NULL
   PRIMARY KEY (id),
   KEY idx_doodle_page_status (page_id, status),
   KEY idx_doodle_author (author_id, submitted_at),
@@ -230,11 +230,23 @@ WHERE id = :id AND banned_at IS NULL AND last_posted_at <=> :readValue;
 UPDATE users SET last_posted_at = :previous WHERE id = :id AND last_posted_at = :reservedAt;
 
 -- 관리자가 보류·거부를 게시 (07 틀, 큐 안): 그 상태 그대로이고 현재 페이지일 때만. 0행이면 STATE_CONFLICT
-UPDATE doodle SET status = 'PUBLISHED', published_at = :now
+UPDATE doodle SET status = 'PUBLISHED', published_at = :now, removed_at = NULL, removed_by = NULL
 WHERE id = :id AND page_id = :currentPage AND status = :from;   -- :from = 'HELD' 또는 'REJECTED'
 
 -- 관리자가 보류를 거부
 UPDATE doodle SET status = 'REJECTED' WHERE id = :id AND status = 'HELD';
+
+-- 관리자가 게시된 낙서를 거부 (D-47, 큐 안): 행·payload·moderation_state는 그대로. 0행이면 STATE_CONFLICT
+UPDATE doodle SET status = 'REJECTED', removed_at = :now, removed_by = :admin
+WHERE id = :id AND page_id = :pageId AND status = 'PUBLISHED';
+
+-- 부적절 데이터셋 (D-47): 관리자가 거부해서 지금 REJECTED인 낙서. moderation_state = HELD면 보류 거부,
+-- PASSED·UNCHECKED면 필터가 놓쳐 게시됐다가 내린 것. 추출본에 작성자 정보 금지 (SEC-17)
+SELECT d.id, d.kind, d.payload, d.moderation_state, d.moderation_detail, d.submitted_at
+FROM doodle d
+WHERE d.status = 'REJECTED' AND EXISTS (
+  SELECT 1 FROM moderation_action ma
+  WHERE ma.target_doodle_id = d.id AND ma.actor_type = 'ADMIN' AND ma.action = 'REJECT');
 
 -- 내 doodle 목록 (08): 게시된 것만
 SELECT id, bbox_x, bbox_y, bbox_w, bbox_h FROM doodle

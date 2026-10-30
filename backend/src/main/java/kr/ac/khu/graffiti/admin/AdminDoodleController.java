@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** The review part of {@code /api/admin/**} (API.md §4): held, rejected and unchecked doodles, the action log. */
+/** The review part of {@code /api/admin/**} (API.md §4): held, rejected, passed and unchecked doodles, the action log. */
 @RestController
 class AdminDoodleController {
 
