@@ -65,5 +65,16 @@
 - **What**: 손글씨 한국어 욕설 대응 (범용 비전 LLM 등)
 - **Context**: `ModerationProvider` 인터페이스로 교체 가능 (D-19)
 
+### GitHub Actions 배포 경로 (SSH 22 제한과 충돌)
+- **What**: `deploy.yml`의 SSH 배포 단계가 서버에 닿는 방법을 정한다. 후보는 수동 배포, SSM 배포, 자체 호스팅 러너
+- **Why**: SEC-10은 22를 팀원 IP로만 열도록 한다. Actions의 IP는 고정이 아니라 `STAGING_HOST`를 넣으면 배포 단계가 SSH 연결 실패로 끝난다
+- **Context**: `deploy/README.md` §1.2와 §4가 "처음에는 22를 열고 12b에서 좁힙니다"를 전제로 쓰여 있어 고쳐야 한다. 12c-aws-infra는 SEC-10을 따른다. 임시 추천은 12b 전까지 수동 배포이고 `STAGING_HOST`는 넣지 않는다
+- **Depends on**: 12c-aws-infra, 팀 결정(12a 결정 변경이 필요할 수 있음)
+
+### 서버 인스턴스 프로파일, SSM 접속, 백업 권한
+- **What**: EC2에 IAM 역할을 붙여 S3 백업(SEC-11)과 SSM Session Manager 접속을 가능하게 한다
+- **Why**: 12c는 서버가 AWS API를 부르지 않는다고 보고 역할 없이 만든다. 백업이 생기면 최소 권한 역할이 필요하다
+- **Depends on**: 12b, 12c-aws-infra
+
 ### 수익 구조
 - 설계 범위 밖 (D-04)
